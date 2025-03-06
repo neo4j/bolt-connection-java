@@ -1,6 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -12,22 +11,16 @@
     <artifactId>neo4j-bolt-connection-netty</artifactId>
 
     <packaging>jar</packaging>
-    <name>Neo4j Bolt Connection Netty</name>
-    <url>https://github.com/neo4j/bolt-connection-java</url>
+    <name>Neo4j Bolt Connection (Netty reference impl)</name>
 
     <properties>
-        <rootDir>${project.basedir}/..</rootDir>
         <maven.compiler.xlint.extras>,-try</maven.compiler.xlint.extras>
-        <surefire.jpms.args>--add-opens org.neo4j.bolt.netty/org.neo4j.driver.internal.bolt.basicimpl.impl.util.messaging=ALL-UNNAMED</surefire.jpms.args>
         <maven.deploy.skip>false</maven.deploy.skip>
+        <rootDir>${project.basedir}/..</rootDir>
+        <surefire.jpms.args>--add-opens org.neo4j.bolt.netty/org.neo4j.driver.internal.bolt.basicimpl.impl.util.messaging=ALL-UNNAMED</surefire.jpms.args>
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>org.neo4j.bolt</groupId>
-            <artifactId>neo4j-bolt-connection</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-handler</artifactId>
@@ -36,20 +29,27 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-classes</artifactId>
         </dependency>
-        <!-- Test dependencies -->
         <dependency>
             <groupId>org.neo4j.bolt</groupId>
-            <artifactId>neo4j-bolt-connection-test-values</artifactId>
+            <artifactId>neo4j-bolt-connection</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
         </dependency>
+
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>org.neo4j.bolt</groupId>
+            <artifactId>neo4j-bolt-connection-test-values</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -76,11 +76,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <scm>
-        <connection>scm:git:git://github.com/neo4j/bolt-connection-java.git</connection>
-        <developerConnection>scm:git:git@github.com:neo4j/bolt-connection-java.git</developerConnection>
-        <url>https://github.com/neo4j/bolt-connection-java</url>
-    </scm>
 
 </project>

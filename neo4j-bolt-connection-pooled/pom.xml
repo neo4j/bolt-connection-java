@@ -1,6 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                      http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -12,13 +11,12 @@
     <artifactId>neo4j-bolt-connection-pooled</artifactId>
 
     <packaging>jar</packaging>
-    <name>Neo4j Bolt Connection Pooled</name>
-    <url>https://github.com/neo4j/bolt-connection-java</url>
+    <name>Neo4j Bolt Connection (Pooled provider impl)</name>
 
     <properties>
-        <rootDir>${project.basedir}/..</rootDir>
         <maven.compiler.xlint.extras>,-try</maven.compiler.xlint.extras>
         <maven.deploy.skip>false</maven.deploy.skip>
+        <rootDir>${project.basedir}/..</rootDir>
     </properties>
 
     <dependencies>
@@ -27,14 +25,16 @@
             <artifactId>neo4j-bolt-connection</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Test dependencies -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -61,11 +61,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <scm>
-        <connection>scm:git:git://github.com/neo4j/bolt-connection-java.git</connection>
-        <developerConnection>scm:git:git@github.com:neo4j/bolt-connection-java.git</developerConnection>
-        <url>https://github.com/neo4j/bolt-connection-java</url>
-    </scm>
 
 </project>
