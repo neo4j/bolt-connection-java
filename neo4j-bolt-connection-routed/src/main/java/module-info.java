@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 /**
- * The Neo4j Bolt API routed implementation module.
+ * The Neo4j Bolt Connection routed implementation module.
  */
-module org.neo4j.bolt.routed {
-    exports org.neo4j.driver.internal.bolt.routedimpl;
+module org.neo4j.bolt.connection.routed {
+    exports org.neo4j.bolt.connection.routed;
 
-    requires transitive org.neo4j.bolt.api;
+    requires transitive org.neo4j.bolt.connection;
 }

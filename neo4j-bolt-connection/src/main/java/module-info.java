@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 /**
- * The Neo4j Bolt API module.
+ * The Neo4j Bolt Connection module.
  */
-module org.neo4j.bolt.api {
-    exports org.neo4j.driver.internal.bolt.api;
-    exports org.neo4j.driver.internal.bolt.api.exception;
-    exports org.neo4j.driver.internal.bolt.api.summary;
-    exports org.neo4j.driver.internal.bolt.api.values;
-    exports org.neo4j.driver.internal.bolt.api.ssl;
+module org.neo4j.bolt.connection {
+    exports org.neo4j.bolt.connection;
+    exports org.neo4j.bolt.connection.exception;
+    exports org.neo4j.bolt.connection.summary;
+    exports org.neo4j.bolt.connection.values;
+    exports org.neo4j.bolt.connection.ssl;
 }

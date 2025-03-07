@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 /**
- * The Neo4j Bolt API pooled implementation module.
+ * The Neo4j Bolt Connection pooled implementation module.
  */
-module org.neo4j.bolt.pooled {
-    exports org.neo4j.driver.internal.bolt.pooledimpl;
+module org.neo4j.bolt.connection.pooled {
+    exports org.neo4j.bolt.connection.pooled;
 
-    requires transitive org.neo4j.bolt.api;
+    requires transitive org.neo4j.bolt.connection;
 }

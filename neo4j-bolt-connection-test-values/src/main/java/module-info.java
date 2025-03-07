@@ -14,6 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-module org.neo4j.bolt.netty.test.values {
-    requires transitive org.neo4j.bolt.api;
+module org.neo4j.bolt.connection.test.values {
+    requires transitive org.neo4j.bolt.connection;
 }
