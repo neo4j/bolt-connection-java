@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 /**
- * The Neo4j Bolt API Netty implementation module.
+ * The Neo4j Bolt Connection Netty implementation module.
  */
 @SuppressWarnings({"requires-automatic", "requires-transitive-automatic"})
-module org.neo4j.bolt.netty {
-    exports org.neo4j.driver.internal.bolt.basicimpl;
+module org.neo4j.bolt.connection.netty {
+    exports org.neo4j.bolt.connection.netty;
 
-    requires transitive org.neo4j.bolt.api;
+    requires transitive org.neo4j.bolt.connection;
     requires io.netty.common;
     requires io.netty.handler;
     requires transitive io.netty.transport;
