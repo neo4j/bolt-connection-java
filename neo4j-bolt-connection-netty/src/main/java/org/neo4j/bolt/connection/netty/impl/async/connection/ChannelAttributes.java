@@ -16,8 +16,6 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async.connection;
 
-import static io.netty.util.AttributeKey.newInstance;
-
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 import java.util.Collections;
@@ -30,23 +28,24 @@ import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatch
 import org.neo4j.bolt.connection.netty.impl.messaging.BoltPatchesListener;
 
 public final class ChannelAttributes {
-    private static final AttributeKey<String> CONNECTION_ID = newInstance("connectionId");
-    private static final AttributeKey<BoltProtocolVersion> PROTOCOL_VERSION = newInstance("protocolVersion");
-    private static final AttributeKey<String> SERVER_AGENT = newInstance("serverAgent");
-    private static final AttributeKey<BoltServerAddress> ADDRESS = newInstance("serverAddress");
-    private static final AttributeKey<Long> CREATION_TIMESTAMP = newInstance("creationTimestamp");
-    private static final AttributeKey<Long> LAST_USED_TIMESTAMP = newInstance("lastUsedTimestamp");
-    private static final AttributeKey<InboundMessageDispatcher> MESSAGE_DISPATCHER = newInstance("messageDispatcher");
-    private static final AttributeKey<String> TERMINATION_REASON = newInstance("terminationReason");
+    private static final AttributeKey<String> CONNECTION_ID = AttributeKey.valueOf("connectionId");
+    private static final AttributeKey<BoltProtocolVersion> PROTOCOL_VERSION = AttributeKey.valueOf("protocolVersion");
+    private static final AttributeKey<String> SERVER_AGENT = AttributeKey.valueOf("serverAgent");
+    private static final AttributeKey<BoltServerAddress> ADDRESS = AttributeKey.valueOf("serverAddress");
+    private static final AttributeKey<Long> CREATION_TIMESTAMP = AttributeKey.valueOf("creationTimestamp");
+    private static final AttributeKey<Long> LAST_USED_TIMESTAMP = AttributeKey.valueOf("lastUsedTimestamp");
+    private static final AttributeKey<InboundMessageDispatcher> MESSAGE_DISPATCHER =
+            AttributeKey.valueOf("messageDispatcher");
+    private static final AttributeKey<String> TERMINATION_REASON = AttributeKey.valueOf("terminationReason");
     private static final AttributeKey<AuthorizationStateListener> AUTHORIZATION_STATE_LISTENER =
-            newInstance("authorizationStateListener");
+            AttributeKey.valueOf("authorizationStateListener");
     private static final AttributeKey<Set<BoltPatchesListener>> BOLT_PATCHES_LISTENERS =
-            newInstance("boltPatchesListeners");
+            AttributeKey.valueOf("boltPatchesListeners");
 
     // configuration hints provided by the server
-    private static final AttributeKey<Long> CONNECTION_READ_TIMEOUT = newInstance("connectionReadTimeout");
-    private static final AttributeKey<Boolean> TELEMETRY_ENABLED = newInstance("telemetryEnabled");
-    private static final AttributeKey<Boolean> SSR_ENABLED = newInstance("ssr.enabled");
+    private static final AttributeKey<Long> CONNECTION_READ_TIMEOUT = AttributeKey.valueOf("connectionReadTimeout");
+    private static final AttributeKey<Boolean> TELEMETRY_ENABLED = AttributeKey.valueOf("telemetryEnabled");
+    private static final AttributeKey<Boolean> SSR_ENABLED = AttributeKey.valueOf("ssr.enabled");
 
     private ChannelAttributes() {}
 
