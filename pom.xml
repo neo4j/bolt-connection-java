@@ -29,6 +29,7 @@
     </developers>
 
     <modules>
+        <module>neo4j-bolt-connection-bom</module>
         <module>neo4j-bolt-connection</module>
         <module>neo4j-bolt-connection-test-values</module>
         <module>neo4j-bolt-connection-netty</module>
@@ -106,6 +107,11 @@
         <pluginManagement>
             <plugins>
                 <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>flatten-maven-plugin</artifactId>
+                    <version>1.7.0</version>
+                </plugin>
+                <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.10.1</version>
@@ -139,12 +145,12 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-source-plugin</artifactId>
-                    <version>3.0.1</version>
+                    <version>3.3.1</version>
                     <executions>
                         <execution>
                             <id>attach-sources</id>
                             <goals>
-                                <goal>jar</goal>
+                                <goal>jar-no-fork</goal>
                             </goals>
                             <configuration>
                                 <archive>
@@ -184,7 +190,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.5.0</version>
                     <configuration>
                         <rules>
                             <RestrictImports>
@@ -368,15 +374,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <!-- Explicit deployment override for this artifact only. -->
             <plugin>

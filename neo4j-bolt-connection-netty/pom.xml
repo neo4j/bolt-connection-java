@@ -20,6 +20,18 @@
         <surefire.jpms.args>--add-opens org.neo4j.bolt.connection.netty/org.neo4j.bolt.connection.netty.impl.util.messaging=ALL-UNNAMED</surefire.jpms.args>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.neo4j.bolt</groupId>
+                <artifactId>neo4j-bolt-connection-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>io.netty</groupId>
@@ -32,7 +44,6 @@
         <dependency>
             <groupId>org.neo4j.bolt</groupId>
             <artifactId>neo4j-bolt-connection</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
