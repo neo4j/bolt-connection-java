@@ -17,7 +17,7 @@
         <maven.compiler.xlint.extras>,-try</maven.compiler.xlint.extras>
         <maven.deploy.skip>false</maven.deploy.skip>
         <rootDir>${project.basedir}/..</rootDir>
-        <surefire.jpms.args>--add-opens org.neo4j.bolt.netty/org.neo4j.driver.internal.bolt.basicimpl.impl.util.messaging=ALL-UNNAMED</surefire.jpms.args>
+        <surefire.jpms.args>--add-opens org.neo4j.bolt.connection.netty/org.neo4j.bolt.connection.netty.impl.util.messaging=ALL-UNNAMED</surefire.jpms.args>
     </properties>
 
     <dependencies>
