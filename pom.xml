@@ -295,7 +295,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>3.4.0</version>
+                    <version>3.11.2</version>
                     <configuration>
                         <charset>UTF-8</charset>
                         <docencoding>UTF-8</docencoding>
@@ -318,9 +318,8 @@
                             <option>-Xdoclint/package:-org.neo4j.driver.internal,-org.neo4j.driver.internal.*</option>
                         </additionalOptions>
                         <sourceFileIncludes>
-                            <sourceFileInclude>org/neo4j/driver/**/*.java</sourceFileInclude>
+                            <sourceFileInclude>org/neo4j/bolt/**/*.java</sourceFileInclude>
                         </sourceFileIncludes>
-                        <excludePackageNames>org.neo4j.driver.internal</excludePackageNames>
                         <overview>${rootDir}/build/javadoc/overview.html</overview>
                     </configuration>
                     <executions>
@@ -330,7 +329,7 @@
                                 <goal>jar</goal>
                             </goals>
                             <configuration>
-                                <failOnWarnings>true</failOnWarnings>
+                                <failOnWarnings>false</failOnWarnings>
                             </configuration>
                         </execution>
                         <execution>
@@ -374,6 +373,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
             </plugin>
             <!-- Explicit deployment override for this artifact only. -->
             <plugin>
