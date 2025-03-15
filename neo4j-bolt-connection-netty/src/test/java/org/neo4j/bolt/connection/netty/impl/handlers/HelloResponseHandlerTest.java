@@ -99,7 +99,7 @@ class HelloResponseHandlerTest {
         var latestAuth = new CompletableFuture<Long>();
         var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
 
-        var metadata = metadata(valueFactory.value(null), "bolt-x");
+        var metadata = metadata(valueFactory.value((Object) null), "bolt-x");
         assertThrows(BoltUntrustedServerException.class, () -> handler.onSuccess(metadata));
 
         assertTrue(agentFuture.isCompletedExceptionally()); // initialization failed
@@ -151,7 +151,7 @@ class HelloResponseHandlerTest {
         var latestAuth = new CompletableFuture<Long>();
         var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
 
-        var metadata = metadata(SERVER_AGENT, valueFactory.value(null));
+        var metadata = metadata(SERVER_AGENT, valueFactory.value((Object) null));
         assertThrows(IllegalStateException.class, () -> handler.onSuccess(metadata));
 
         assertTrue(agentFuture.isCompletedExceptionally()); // initialization failed
@@ -209,7 +209,7 @@ class HelloResponseHandlerTest {
         var latestAuth = new CompletableFuture<Long>();
         var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
 
-        var metadata = metadata(SERVER_AGENT, "bolt-x", valueFactory.value(null));
+        var metadata = metadata(SERVER_AGENT, "bolt-x", valueFactory.value((Object) null));
         handler.onSuccess(metadata);
 
         assertTrue(agentFuture.isDone() && !agentFuture.isCompletedExceptionally() && !agentFuture.isCancelled());
@@ -243,7 +243,7 @@ class HelloResponseHandlerTest {
         if (version == null) {
             result.put("server", null);
         } else if (version instanceof Value && ((Value) version).isNull()) {
-            result.put("server", valueFactory.value(null));
+            result.put("server", valueFactory.value((Object) null));
         } else {
             result.put("server", valueFactory.value(version.toString()));
         }

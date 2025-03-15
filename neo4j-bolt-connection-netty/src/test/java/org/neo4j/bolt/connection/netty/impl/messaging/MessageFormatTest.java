@@ -64,8 +64,8 @@ class MessageFormatTest {
 
     @Test
     void shouldPackUnpackValidValues() {
-        assertSerializesValue(
-                valueFactory.value(Map.of("cat", valueFactory.value(null), "dog", valueFactory.value(null))));
+        assertSerializesValue(valueFactory.value(
+                Map.of("cat", valueFactory.value((Object) null), "dog", valueFactory.value((Object) null))));
         assertSerializesValue(
                 valueFactory.value(Map.of("k", valueFactory.value(12), "a", valueFactory.value("banana"))));
         assertSerializesValue(valueFactory.value(asList("k", 12, "a", "banana")));
