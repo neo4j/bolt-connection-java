@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.neo4j.bolt</groupId>
         <artifactId>neo4j-bolt-connection-parent</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>neo4j-bolt-connection-bom</artifactId>
