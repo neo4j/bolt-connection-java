@@ -72,7 +72,8 @@ public class MessageReaderV43Test extends AbstractMessageReaderTestBase {
                 IgnoredMessage.IGNORED,
                 new SuccessMessage(new HashMap<>()),
                 record(valueFactory.value(1337L)),
-                record(valueFactory.value(List.of("cat", valueFactory.value(null), "dog", valueFactory.value(null)))),
+                record(valueFactory.value(
+                        List.of("cat", valueFactory.value((Object) null), "dog", valueFactory.value((Object) null)))),
                 record(valueFactory.value(List.of("k", valueFactory.value(12), "a", valueFactory.value("banana")))),
                 record(valueFactory.value(asList(
                         valueFactory.value("k"),

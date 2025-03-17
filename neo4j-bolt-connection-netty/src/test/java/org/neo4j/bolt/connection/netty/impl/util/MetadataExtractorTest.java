@@ -76,7 +76,7 @@ class MetadataExtractorTest {
     void shouldFailToExtractServerVersionWhenMetadataDoesNotContainIt() {
         assertThrows(
                 BoltUntrustedServerException.class,
-                () -> extractServer(singletonMap("server", valueFactory.value(null))));
+                () -> extractServer(singletonMap("server", valueFactory.value((Object) null))));
         assertThrows(BoltUntrustedServerException.class, () -> extractServer(singletonMap("server", null)));
     }
 

@@ -17,12 +17,92 @@
 package org.neo4j.bolt.connection.values;
 
 import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 public interface ValueFactory {
     Value value(Object value);
+
+    default Value value(boolean value) {
+        return value((Object) value);
+    }
+
+    default Value value(long value) {
+        return value((Object) value);
+    }
+
+    default Value value(double value) {
+        return value((Object) value);
+    }
+
+    default Value value(byte[] values) {
+        return value((Object) values);
+    }
+
+    default Value value(String value) {
+        return value((Object) value);
+    }
+
+    default Value value(Map<String, Value> stringToValue) {
+        return value((Object) stringToValue);
+    }
+
+    default Value value(Value[] values) {
+        return value((Object) values);
+    }
+
+    default Value value(Node node) {
+        return value((Object) node);
+    }
+
+    default Value value(Relationship relationship) {
+        return value((Object) relationship);
+    }
+
+    default Value value(Path path) {
+        return value((Object) path);
+    }
+
+    default Value value(LocalDate localDate) {
+        return value((Object) localDate);
+    }
+
+    default Value value(OffsetTime offsetTime) {
+        return value((Object) offsetTime);
+    }
+
+    default Value value(LocalTime localTime) {
+        return value((Object) localTime);
+    }
+
+    default Value value(LocalDateTime localDateTime) {
+        return value((Object) localDateTime);
+    }
+
+    default Value value(OffsetDateTime offsetDateTime) {
+        return value((Object) offsetDateTime);
+    }
+
+    default Value value(ZonedDateTime zonedDateTime) {
+        return value((Object) zonedDateTime);
+    }
+
+    default Value value(Period period) {
+        return value((Object) period);
+    }
+
+    default Value value(Duration duration) {
+        return value((Object) duration);
+    }
 
     Node node(long id, String elementId, Collection<String> labels, Map<String, Value> properties);
 
