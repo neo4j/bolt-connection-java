@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.netty.impl.handlers;
 
 import static java.util.Objects.requireNonNull;
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setClosing;
 
 import io.netty.channel.Channel;
 import java.time.Clock;
@@ -49,6 +50,7 @@ public class LogonResponseHandler implements ResponseHandler {
     @Override
     public void onFailure(Throwable error) {
         if (channel != null) {
+            setClosing(channel);
             channel.close().addListener(future -> this.future.completeExceptionally(error));
         } else {
             future.completeExceptionally(error);

@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.netty.impl.handlers;
 import static java.util.Objects.requireNonNull;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.boltPatchesListeners;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.protocolVersion;
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setClosing;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setConnectionId;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setConnectionReadTimeout;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setServerAgent;
@@ -88,6 +89,7 @@ public class HelloResponseHandler implements ResponseHandler {
 
     @Override
     public void onFailure(Throwable error) {
+        setClosing(channel);
         channel.close().addListener(future -> this.future.completeExceptionally(error));
     }
 

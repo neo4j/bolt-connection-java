@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.handlers;
 
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setClosing;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setConnectionId;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setConnectionReadTimeout;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setServerAgent;
@@ -66,6 +67,7 @@ public class HelloV51ResponseHandler implements ResponseHandler {
 
     @Override
     public void onFailure(Throwable error) {
+        setClosing(channel);
         channel.close().addListener(future -> helloFuture.completeExceptionally(error));
     }
 
