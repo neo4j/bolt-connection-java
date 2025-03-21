@@ -162,7 +162,7 @@ public final class ChannelAttributes {
     }
 
     public static void setClosing(Channel channel) {
-        setOnce(channel, CLOSING, true);
+        set(channel, CLOSING, true);
     }
 
     public static boolean isClosing(Channel channel) {
