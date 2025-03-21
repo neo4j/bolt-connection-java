@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async;
 
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setClosing;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setTerminationReason;
 import static org.neo4j.bolt.connection.netty.impl.util.LockUtil.executeWithLock;
 
@@ -143,6 +144,7 @@ public class NetworkConnection implements Connection {
         var fut = new CompletableFuture<Void>();
         eventLoop().execute(() -> {
             setTerminationReason(channel, reason);
+            setClosing(channel);
             channel.close().addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     fut.complete(null);
@@ -165,6 +167,7 @@ public class NetworkConnection implements Connection {
                 .thenCompose(ignored -> flush())
                 .whenComplete((ignored, throwable) -> {
                     if (throwable == null) {
+                        setClosing(channel);
                         this.channel.close().addListener((ChannelFutureListener) future -> {
                             if (future.isSuccess()) {
                                 closeFuture.complete(null);
@@ -209,6 +212,7 @@ public class NetworkConnection implements Connection {
             if (messageDispatcher.fatalErrorOccurred() && GoodbyeMessage.GOODBYE.equals(message)) {
                 future.complete(null);
                 handler.onSuccess(Collections.emptyMap());
+                setClosing(channel);
                 channel.close();
                 return;
             }

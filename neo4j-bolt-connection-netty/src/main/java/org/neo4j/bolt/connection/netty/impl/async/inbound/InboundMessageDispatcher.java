@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.netty.impl.async.inbound;
 
 import static java.util.Objects.requireNonNull;
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.isClosing;
 
 import io.netty.channel.Channel;
 import java.util.Arrays;
@@ -174,7 +175,9 @@ public class InboundMessageDispatcher implements ResponseMessageHandler {
             handler.onFailure(error);
         }
 
-        errorLog.traceOrDebug("Closing channel because of a failure", error);
+        if (!isClosing(channel)) {
+            errorLog.traceOrDebug("Closing channel because of a failure", error);
+        }
         this.channel.close();
     }
 
