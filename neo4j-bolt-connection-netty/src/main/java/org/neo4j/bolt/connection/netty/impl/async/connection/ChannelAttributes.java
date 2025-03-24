@@ -41,6 +41,7 @@ public final class ChannelAttributes {
             AttributeKey.valueOf("authorizationStateListener");
     private static final AttributeKey<Set<BoltPatchesListener>> BOLT_PATCHES_LISTENERS =
             AttributeKey.valueOf("boltPatchesListeners");
+    private static final AttributeKey<Boolean> CLOSING = AttributeKey.valueOf("closing");
 
     // configuration hints provided by the server
     private static final AttributeKey<Long> CONNECTION_READ_TIMEOUT = AttributeKey.valueOf("connectionReadTimeout");
@@ -158,6 +159,14 @@ public final class ChannelAttributes {
 
     public static boolean ssrEnabled(Channel channel) {
         return Optional.ofNullable(get(channel, SSR_ENABLED)).orElse(false);
+    }
+
+    public static void setClosing(Channel channel) {
+        set(channel, CLOSING, true);
+    }
+
+    public static boolean isClosing(Channel channel) {
+        return Optional.ofNullable(get(channel, CLOSING)).orElse(false);
     }
 
     private static <T> T get(Channel channel, AttributeKey<T> key) {
