@@ -37,6 +37,11 @@
             </dependency>
             <dependency>
                 <groupId>org.neo4j.bolt</groupId>
+                <artifactId>neo4j-bolt-connection-query-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.neo4j.bolt</groupId>
                 <artifactId>neo4j-bolt-connection-routed</artifactId>
                 <version>${project.version}</version>
             </dependency>
