@@ -20,39 +20,20 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.OffsetTime;
-import java.time.Period;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.neo4j.bolt.connection.exception.BoltProtocolException;
-import org.neo4j.bolt.connection.values.Node;
-import org.neo4j.bolt.connection.values.Relationship;
-import org.neo4j.bolt.connection.values.Segment;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class ValueUtil {
-    private static final Pattern POINT_PATTERN = Pattern.compile("^SRID=(\\d+);POINT Z?\\s?\\(([-\\d.\\s]+)\\)$");
-
     static JsonObject asJsonObject(Value value) {
         return switch (value.type()) {
             case ANY -> throw new IllegalArgumentException("Any value type is not supported");
             case BOOLEAN -> {
                 var jsonObject = new JsonObject();
-                jsonObject.addProperty("$type", "Boolean");
+                jsonObject.addProperty("$type", "boolean");
                 jsonObject.addProperty("_value", value.asBoolean());
                 yield jsonObject;
             }
@@ -111,9 +92,8 @@ final class ValueUtil {
                 jsonObject.addProperty("$type", "Point");
                 var point = value.asPoint();
                 var pointAsString = Double.isNaN(point.z())
-                        ? String.format(Locale.US, "SRID=%d;POINT (%f %f)", point.srid(), point.x(), point.y())
-                        : String.format(
-                                Locale.US, "SRID=%d;POINT (%f %f %f)", point.srid(), point.x(), point.y(), point.z());
+                        ? "SRID=%d;POINT (%f %f)".formatted(point.srid(), point.x(), point.y())
+                        : "SRID=%d;POINT (%f %f %f)".formatted(point.srid(), point.x(), point.y(), point.z());
                 jsonObject.addProperty("_value", pointAsString);
                 yield jsonObject;
             }
@@ -143,7 +123,7 @@ final class ValueUtil {
             }
             case DATE_TIME -> {
                 var jsonObject = new JsonObject();
-                jsonObject.addProperty("$type", "ZonedDateTime");
+                jsonObject.addProperty("$type", "OffsetDateTime");
                 jsonObject.addProperty("_value", value.asZonedDateTime().toString());
                 yield jsonObject;
             }
@@ -166,7 +146,7 @@ final class ValueUtil {
         var type = jsonObject.get("$type").getAsString();
         var valueElem = jsonObject.get("_value");
         return switch (type) {
-            case "Boolean" -> valueFactory.value(valueElem.getAsBoolean());
+            case "boolean" -> valueFactory.value(valueElem.getAsBoolean());
             case "Base64" -> valueFactory.value(Base64.getDecoder().decode(valueElem.getAsString()));
             case "String" -> valueFactory.value(valueElem.getAsString());
             case "Integer" -> valueFactory.value(valueElem.getAsLong());
@@ -186,155 +166,73 @@ final class ValueUtil {
                 yield valueFactory.value(values);
             }
             case "Point" -> {
-                var stringValue = valueElem.getAsString();
-                var matcher = POINT_PATTERN.matcher(stringValue);
-                if (matcher.matches()) {
-                    var srid = Integer.parseInt(matcher.group(1));
-                    var coordinates = matcher.group(2).split(" ");
-                    if (coordinates.length == 2) {
-                        yield valueFactory.point(
-                                srid, Double.parseDouble(coordinates[0]), Double.parseDouble(coordinates[1]));
-                    } else if (coordinates.length == 3) {
-                        yield valueFactory.point(
-                                srid,
-                                Double.parseDouble(coordinates[0]),
-                                Double.parseDouble(coordinates[1]),
-                                Double.parseDouble(coordinates[2]));
-                    }
-                }
-                throw new BoltProtocolException("Invalid point value: " + stringValue);
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "Date" -> {
-                var stringValue = valueElem.getAsString();
-                yield valueFactory.value(LocalDate.parse(stringValue));
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "Time" -> {
-                var stringValue = valueElem.getAsString();
-                yield valueFactory.value(OffsetTime.parse(stringValue));
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "LocalTime" -> {
-                var stringValue = valueElem.getAsString();
-                yield valueFactory.value(LocalTime.parse(stringValue));
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "LocalDateTime" -> {
-                var stringValue = valueElem.getAsString();
-                yield valueFactory.value(LocalDateTime.parse(stringValue));
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "OffsetDateTime" -> {
-                var stringValue = valueElem.getAsString();
-                yield valueFactory.value(OffsetDateTime.parse(stringValue));
-            }
-            case "ZonedDateTime" -> {
-                var stringValue = valueElem.getAsString();
-                yield valueFactory.value(ZonedDateTime.parse(stringValue));
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "Duration" -> {
-                var stringValue = valueElem.getAsString();
-                var parts = stringValue.split("T", 2);
-
-                var months = 0L;
-                var days = 0L;
-                var seconds = 0L;
-                var nanos = 0;
-
-                if (parts.length == 2) {
-                    try {
-                        var period = Period.parse(parts[0]);
-                        months = period.getMonths();
-                        days = period.getDays();
-                    } catch (DateTimeParseException ignored) {
-                    }
-
-                    try {
-                        var duration = Duration.parse("PT" + parts[1]);
-                        seconds = duration.getSeconds();
-                        nanos = duration.getNano();
-                    } catch (DateTimeParseException ignored) {
-                    }
-
-                } else if (parts.length == 1) {
-                    if (stringValue.startsWith("P") && !stringValue.contains("T")) {
-                        try {
-                            var period = Period.parse(parts[0]);
-                            months = period.getMonths();
-                            days = period.getDays();
-                        } catch (DateTimeParseException e) {
-                            var duration = Duration.parse(parts[0]);
-                            seconds = duration.getSeconds();
-                            nanos = duration.getNano();
-                        }
-                    }
-                }
-                yield valueFactory.isoDuration(months, days, seconds, nanos);
+                // todo
+                yield valueFactory.value((Object) null);
             }
             case "Null" -> valueFactory.value((Object) null);
-            case "Node" -> valueFactory.value(asNode(valueElem.getAsJsonObject(), valueFactory));
-            case "Relationship" -> valueFactory.value(asRelationship(valueElem.getAsJsonObject(), valueFactory));
+            case "Node" -> {
+                var obj = valueElem.getAsJsonObject();
+                var elementId = obj.get("_element_id").getAsString();
+                var labels = obj.get("_labels").getAsJsonArray().asList().stream()
+                        .map(JsonElement::getAsString)
+                        .toList();
+                var properties = obj.get("_properties").getAsJsonObject().entrySet().stream()
+                        .map(entry -> {
+                            var key = entry.getKey();
+                            var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
+                            return Map.entry(key, value);
+                        })
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                var node = valueFactory.node(0, elementId, labels, properties);
+                yield valueFactory.value(node);
+            }
+            case "Relationship" -> {
+                var obj = valueElem.getAsJsonObject();
+                var elementId = obj.get("_element_id").getAsString();
+                var startElementId = obj.get("_start_node_element_id").getAsString();
+                var endElementId = obj.get("_end_node_element_id").getAsString();
+                var relationshipType = obj.get("_type").getAsString();
+                var properties = obj.get("_properties").getAsJsonObject().entrySet().stream()
+                        .map(entry -> {
+                            var key = entry.getKey();
+                            var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
+                            return Map.entry(key, value);
+                        })
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                var relationship = valueFactory.relationship(
+                        0, elementId, 0, startElementId, 0, endElementId, relationshipType, properties);
+                yield valueFactory.value(relationship);
+            }
             case "Path" -> {
-                List<Segment> segments = new ArrayList<>();
-                List<Node> nodes = new ArrayList<>();
-                List<Relationship> relationships = new ArrayList<>();
-
-                Node start = null;
-                Relationship relationship = null;
-
-                var list = valueElem.getAsJsonArray().asList();
-                for (var jsonElement : list) {
-                    var elementObject = jsonElement.getAsJsonObject();
-                    var elementType = elementObject.get("$type").getAsString();
-                    var eleventValue = elementObject.get("_value").getAsJsonObject();
-                    switch (elementType) {
-                        case "Node" -> {
-                            var node = asNode(eleventValue, valueFactory);
-
-                            if (start != null) {
-                                segments.add(valueFactory.segment(start, relationship, node));
-                            }
-                            start = node;
-
-                            nodes.add(node);
-                        }
-                        case "Relationship" -> {
-                            relationship = asRelationship(eleventValue, valueFactory);
-                            relationships.add(relationship);
-                        }
-                    }
-                }
-                yield valueFactory.value(valueFactory.path(segments, nodes, relationships));
+                // todo
+                yield valueFactory.value((Object) null);
             }
             default -> throw new IllegalStateException("Unexpected value: " + type);
         };
-    }
-
-    private static Node asNode(JsonObject node, ValueFactory valueFactory) {
-        var elementId = node.get("_element_id").getAsString();
-        var labels = node.get("_labels").getAsJsonArray().asList().stream()
-                .map(JsonElement::getAsString)
-                .toList();
-        var properties = node.get("_properties").getAsJsonObject().entrySet().stream()
-                .map(entry -> {
-                    var key = entry.getKey();
-                    var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
-                    return Map.entry(key, value);
-                })
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        return valueFactory.node(0, elementId, labels, properties);
-    }
-
-    private static Relationship asRelationship(JsonObject relationship, ValueFactory valueFactory) {
-        var elementId = relationship.get("_element_id").getAsString();
-        var startElementId = relationship.get("_start_node_element_id").getAsString();
-        var endElementId = relationship.get("_end_node_element_id").getAsString();
-        var relationshipType = relationship.get("_type").getAsString();
-        var properties = relationship.get("_properties").getAsJsonObject().entrySet().stream()
-                .map(entry -> {
-                    var key = entry.getKey();
-                    var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
-                    return Map.entry(key, value);
-                })
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        return valueFactory.relationship(
-                0, elementId, 0, startElementId, 0, endElementId, relationshipType, properties);
     }
 
     private ValueUtil() {}
