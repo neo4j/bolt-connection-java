@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.AuthInfo;
@@ -120,8 +121,8 @@ public final class BoltConnectionImpl implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> onLoop() {
-        return executeInEventLoop(() -> {}).thenApply(ignored -> this);
+    public <T> CompletionStage<T> onLoop(Supplier<T> supplier) {
+        return executeInEventLoop(supplier);
     }
 
     @Override
@@ -538,15 +539,21 @@ public final class BoltConnectionImpl implements BoltConnection {
         return connection.defaultReadTimeoutMillis();
     }
 
-    private CompletionStage<Void> executeInEventLoop(Runnable runnable) {
-        var executeFuture = new CompletableFuture<Void>();
+    private <T> CompletionStage<T> executeInEventLoop(Runnable runnable) {
+        return executeInEventLoop(() -> {
+            runnable.run();
+            return null;
+        });
+    }
+
+    private <T> CompletionStage<T> executeInEventLoop(Supplier<T> supplier) {
+        var executeFuture = new CompletableFuture<T>();
         Runnable stageCompletingRunnable = () -> {
             try {
-                runnable.run();
+                executeFuture.complete(supplier.get());
             } catch (Throwable throwable) {
                 executeFuture.completeExceptionally(throwable);
             }
-            executeFuture.complete(null);
         };
         if (eventLoop.inEventLoop()) {
             stageCompletingRunnable.run();

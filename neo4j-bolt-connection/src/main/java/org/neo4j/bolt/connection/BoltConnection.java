@@ -21,10 +21,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 import org.neo4j.bolt.connection.values.Value;
 
 public interface BoltConnection {
-    CompletionStage<BoltConnection> onLoop();
+    <T> CompletionStage<T> onLoop(Supplier<T> supplier);
 
     CompletionStage<BoltConnection> route(DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks);
 

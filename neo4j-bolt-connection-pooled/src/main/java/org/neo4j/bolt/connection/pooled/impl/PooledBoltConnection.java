@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.AuthInfo;
 import org.neo4j.bolt.connection.AuthToken;
@@ -70,8 +71,8 @@ public class PooledBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<BoltConnection> onLoop() {
-        return delegate.onLoop();
+    public <T> CompletionStage<T> onLoop(Supplier<T> supplier) {
+        return delegate.onLoop(supplier);
     }
 
     @Override
