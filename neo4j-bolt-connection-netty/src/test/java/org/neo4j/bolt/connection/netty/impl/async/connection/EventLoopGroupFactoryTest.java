@@ -44,6 +44,8 @@ class EventLoopGroupFactoryTest {
         assertEquals(NioSocketChannel.class, EventLoopGroupFactory.channelClass());
     }
 
+    // use NioEventLoopGroup for now to be compatible with Netty 4.1
+    @SuppressWarnings("deprecation")
     @Test
     void shouldCreateEventLoopGroupWithSpecifiedThreadCount() {
         var threadCount = 2;
@@ -85,6 +87,8 @@ class EventLoopGroupFactoryTest {
      * Test verifies that our event loop group uses same kind of thread as Netty does by default.
      * It's needed because default Netty setup has good performance.
      */
+    // use NioEventLoopGroup for now to be compatible with Netty 4.1
+    @SuppressWarnings("deprecation")
     @Test
     void shouldUseSameThreadClassAsNioEventLoopGroupDoesByDefault() throws Exception {
         var nioEventLoopGroup = new NioEventLoopGroup(1);
