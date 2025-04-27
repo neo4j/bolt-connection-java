@@ -52,6 +52,7 @@ import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltTransientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
+import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.pooled.impl.PooledBoltConnection;
 import org.neo4j.bolt.connection.pooled.impl.util.FutureUtil;
 
@@ -481,8 +482,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
             stage = connectionEntryWithMetadata
                     .connectionEntry
                     .connection
-                    .logoff()
-                    .thenCompose(conn -> conn.logon(authToken))
+                    .write(List.of(Messages.logoff(), Messages.logon(authToken)))
                     .handle((ignored, throwable) -> {
                         if (throwable != null) {
                             connectionEntryWithMetadata.connectionEntry.connection.close();
@@ -503,8 +503,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
         if (idleBeforeTest >= 0 && entry.lastUsedTimestamp + idleBeforeTest < clock.millis()) {
             var resetHandler = new BasicResponseHandler();
             stage = entry.connection
-                    .reset()
-                    .thenCompose(conn -> conn.flush(resetHandler))
+                    .writeAndFlush(resetHandler, Messages.reset())
                     .thenCompose(ignored -> resetHandler.summaries())
                     .thenApply(ignored -> null);
         } else {

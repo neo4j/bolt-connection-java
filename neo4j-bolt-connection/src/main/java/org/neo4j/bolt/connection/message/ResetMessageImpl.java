@@ -14,14 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * The Neo4j Bolt Connection module.
- */
-module org.neo4j.bolt.connection {
-    exports org.neo4j.bolt.connection;
-    exports org.neo4j.bolt.connection.message;
-    exports org.neo4j.bolt.connection.exception;
-    exports org.neo4j.bolt.connection.summary;
-    exports org.neo4j.bolt.connection.values;
-    exports org.neo4j.bolt.connection.ssl;
-}
+package org.neo4j.bolt.connection.message;
+
+record ResetMessageImpl() implements ResetMessage {}

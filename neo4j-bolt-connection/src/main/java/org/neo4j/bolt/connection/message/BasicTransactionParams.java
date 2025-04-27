@@ -14,14 +14,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * The Neo4j Bolt Connection module.
- */
-module org.neo4j.bolt.connection {
-    exports org.neo4j.bolt.connection;
-    exports org.neo4j.bolt.connection.message;
-    exports org.neo4j.bolt.connection.exception;
-    exports org.neo4j.bolt.connection.summary;
-    exports org.neo4j.bolt.connection.values;
-    exports org.neo4j.bolt.connection.ssl;
+package org.neo4j.bolt.connection.message;
+
+import java.time.Duration;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import org.neo4j.bolt.connection.AccessMode;
+import org.neo4j.bolt.connection.NotificationConfig;
+import org.neo4j.bolt.connection.values.Value;
+
+interface BasicTransactionParams {
+    Optional<String> databaseName();
+
+    AccessMode accessMode();
+
+    Optional<String> impersonatedUser();
+
+    Set<String> bookmarks();
+
+    Optional<Duration> txTimeout();
+
+    Map<String, Value> txMetadata();
+
+    NotificationConfig notificationConfig();
 }
