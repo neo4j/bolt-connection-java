@@ -77,6 +77,7 @@ import org.neo4j.bolt.connection.SecurityPlans;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
+import org.neo4j.bolt.connection.message.RouteMessage;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
 import org.neo4j.bolt.connection.routed.impl.AuthTokenManagerExecutionException;
@@ -771,19 +772,19 @@ class RediscoveryTest {
 
     private BoltConnection setupConnection(Object answer) {
         var boltConnection = mock(BoltConnection.class);
-        given(boltConnection.route(any(), any(), any())).willReturn(CompletableFuture.completedStage(boltConnection));
-        given(boltConnection.flush(any())).willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
-            var handler = (ResponseHandler) invocationOnMock.getArguments()[0];
+        given(boltConnection.writeAndFlush(any(), any(RouteMessage.class)))
+                .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
+                    var handler = (ResponseHandler) invocationOnMock.getArguments()[0];
 
-            if (answer instanceof ClusterComposition composition) {
-                handler.onRouteSummary(() -> composition);
-            } else if (answer instanceof Throwable throwable) {
-                handler.onError(throwable);
-            }
-            handler.onComplete();
+                    if (answer instanceof ClusterComposition composition) {
+                        handler.onRouteSummary(() -> composition);
+                    } else if (answer instanceof Throwable throwable) {
+                        handler.onError(throwable);
+                    }
+                    handler.onComplete();
 
-            return CompletableFuture.completedStage(null);
-        });
+                    return CompletableFuture.completedStage(null);
+                });
         given(boltConnection.close()).willReturn(CompletableFuture.completedStage(null));
         return boltConnection;
     }

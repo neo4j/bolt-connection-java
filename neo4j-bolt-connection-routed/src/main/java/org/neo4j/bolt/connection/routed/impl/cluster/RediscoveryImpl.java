@@ -54,6 +54,7 @@ import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
+import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
@@ -393,30 +394,32 @@ public class RediscoveryImpl implements Rediscovery {
                     connectionRef.set(connection);
                     return connection;
                 })
-                .thenCompose(connection -> connection.route(routingTable.database(), impersonatedUser, bookmarks))
-                .thenCompose(connection -> connection.flush(new ResponseHandler() {
-                    ClusterComposition clusterComposition;
-                    Throwable throwable;
+                .thenCompose(connection -> connection.writeAndFlush(
+                        new ResponseHandler() {
+                            ClusterComposition clusterComposition;
+                            Throwable throwable;
 
-                    @Override
-                    public void onError(Throwable throwable) {
-                        this.throwable = throwable;
-                    }
+                            @Override
+                            public void onError(Throwable throwable) {
+                                this.throwable = throwable;
+                            }
 
-                    @Override
-                    public void onRouteSummary(RouteSummary summary) {
-                        clusterComposition = summary.clusterComposition();
-                    }
+                            @Override
+                            public void onRouteSummary(RouteSummary summary) {
+                                clusterComposition = summary.clusterComposition();
+                            }
 
-                    @Override
-                    public void onComplete() {
-                        if (throwable != null) {
-                            compositionFuture.completeExceptionally(throwable);
-                        } else {
-                            compositionFuture.complete(clusterComposition);
-                        }
-                    }
-                }))
+                            @Override
+                            public void onComplete() {
+                                if (throwable != null) {
+                                    compositionFuture.completeExceptionally(throwable);
+                                } else {
+                                    compositionFuture.complete(clusterComposition);
+                                }
+                            }
+                        },
+                        Messages.route(
+                                routingTable.database().databaseName().orElse(null), impersonatedUser, bookmarks)))
                 .thenCompose(ignored -> compositionFuture)
                 .thenApply(clusterComposition -> {
                     if (clusterComposition.routers().isEmpty()

@@ -17,61 +17,23 @@
 package org.neo4j.bolt.connection;
 
 import java.time.Duration;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Supplier;
-import org.neo4j.bolt.connection.values.Value;
+import org.neo4j.bolt.connection.message.Message;
 
 public interface BoltConnection {
-    <T> CompletionStage<T> onLoop(Supplier<T> supplier);
+    default CompletionStage<Void> writeAndFlush(ResponseHandler handler, Message messages) {
+        return writeAndFlush(handler, List.of(messages));
+    }
 
-    CompletionStage<BoltConnection> route(DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks);
+    CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages);
 
-    CompletionStage<BoltConnection> beginTransaction(
-            DatabaseName databaseName,
-            AccessMode accessMode,
-            String impersonatedUser,
-            Set<String> bookmarks,
-            TransactionType transactionType,
-            Duration txTimeout,
-            Map<String, Value> txMetadata,
-            String txType,
-            NotificationConfig notificationConfig);
+    default CompletionStage<Void> write(Message messages) {
+        return write(List.of(messages));
+    }
 
-    CompletionStage<BoltConnection> runInAutoCommitTransaction(
-            DatabaseName databaseName,
-            AccessMode accessMode,
-            String impersonatedUser,
-            Set<String> bookmarks,
-            String query,
-            Map<String, Value> parameters,
-            Duration txTimeout,
-            Map<String, Value> txMetadata,
-            NotificationConfig notificationConfig);
-
-    CompletionStage<BoltConnection> run(String query, Map<String, Value> parameters);
-
-    CompletionStage<BoltConnection> pull(long qid, long request);
-
-    CompletionStage<BoltConnection> discard(long qid, long number);
-
-    CompletionStage<BoltConnection> commit();
-
-    CompletionStage<BoltConnection> rollback();
-
-    CompletionStage<BoltConnection> reset();
-
-    CompletionStage<BoltConnection> logoff();
-
-    CompletionStage<BoltConnection> logon(AuthToken authToken);
-
-    CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi);
-
-    CompletionStage<BoltConnection> clear();
-
-    CompletionStage<Void> flush(ResponseHandler handler);
+    CompletionStage<Void> write(List<Message> messages);
 
     CompletionStage<Void> forceClose(String reason);
 

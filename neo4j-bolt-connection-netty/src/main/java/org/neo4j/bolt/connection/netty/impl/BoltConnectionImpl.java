@@ -22,37 +22,44 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.AuthInfo;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.DatabaseName;
+import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.RoutingContext;
-import org.neo4j.bolt.connection.TelemetryApi;
-import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
+import org.neo4j.bolt.connection.message.BeginMessage;
+import org.neo4j.bolt.connection.message.CommitMessage;
+import org.neo4j.bolt.connection.message.DiscardMessage;
+import org.neo4j.bolt.connection.message.LogoffMessage;
+import org.neo4j.bolt.connection.message.LogonMessage;
+import org.neo4j.bolt.connection.message.Message;
+import org.neo4j.bolt.connection.message.PullMessage;
+import org.neo4j.bolt.connection.message.ResetMessage;
+import org.neo4j.bolt.connection.message.RollbackMessage;
+import org.neo4j.bolt.connection.message.RouteMessage;
+import org.neo4j.bolt.connection.message.RunMessage;
+import org.neo4j.bolt.connection.message.TelemetryMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.BoltProtocol;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.PullMessageHandler;
@@ -86,7 +93,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     private final AtomicReference<BoltConnectionState> stateRef = new AtomicReference<>(BoltConnectionState.OPEN);
     private final AtomicReference<CompletableFuture<AuthInfo>> authDataRef;
     private final Map<String, Value> routingContext;
-    private final Queue<Function<ResponseHandler, CompletionStage<Void>>> messageWriters;
+    private final Queue<Message> messages;
     private final Clock clock;
     private final ValueFactory valueFactory;
 
@@ -114,350 +121,331 @@ public final class BoltConnectionImpl implements BoltConnection {
         this.routingContext = routingContext.toMap().entrySet().stream()
                 .collect(Collectors.toUnmodifiableMap(
                         Map.Entry::getKey, entry -> valueFactory.value(entry.getValue()), (a, b) -> b));
-        this.messageWriters = new ArrayDeque<>();
+        this.messages = new ArrayDeque<>();
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
         this.log = this.logging.getLog(getClass());
     }
 
     @Override
-    public <T> CompletionStage<T> onLoop(Supplier<T> supplier) {
-        return executeInEventLoop(supplier);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> route(
-            DatabaseName databaseName, String impersonatedUser, Set<String> bookmarks) {
-        return executeInEventLoop(() -> messageWriters.add(handler -> protocol.route(
-                        this.connection,
-                        this.routingContext,
-                        bookmarks,
-                        databaseName.databaseName().orElse(null),
-                        impersonatedUser,
-                        new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(RouteSummary summary) {
-                                handler.onRouteSummary(summary);
-                            }
-                        },
-                        clock,
-                        logging,
-                        valueFactory)))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> beginTransaction(
-            DatabaseName databaseName,
-            AccessMode accessMode,
-            String impersonatedUser,
-            Set<String> bookmarks,
-            TransactionType transactionType,
-            Duration txTimeout,
-            Map<String, Value> txMetadata,
-            String txType,
-            NotificationConfig notificationConfig) {
-        return executeInEventLoop(() -> messageWriters.add(handler -> protocol.beginTransaction(
-                        this.connection,
-                        databaseName,
-                        accessMode,
-                        impersonatedUser,
-                        bookmarks,
-                        txTimeout,
-                        txMetadata,
-                        txType,
-                        notificationConfig,
-                        new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(BeginSummary summary) {
-                                handler.onBeginSummary(summary);
-                            }
-                        },
-                        logging,
-                        valueFactory)))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> runInAutoCommitTransaction(
-            DatabaseName databaseName,
-            AccessMode accessMode,
-            String impersonatedUser,
-            Set<String> bookmarks,
-            String query,
-            Map<String, Value> parameters,
-            Duration txTimeout,
-            Map<String, Value> txMetadata,
-            NotificationConfig notificationConfig) {
-        return executeInEventLoop(() -> messageWriters.add(handler -> protocol.runAuto(
-                        connection,
-                        databaseName,
-                        accessMode,
-                        impersonatedUser,
-                        query,
-                        parameters,
-                        bookmarks,
-                        txTimeout,
-                        txMetadata,
-                        notificationConfig,
-                        new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(RunSummary summary) {
-                                handler.onRunSummary(summary);
-                            }
-                        },
-                        logging,
-                        valueFactory)))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> run(String query, Map<String, Value> parameters) {
-        return executeInEventLoop(() -> messageWriters.add(
-                        handler -> protocol.run(connection, query, parameters, new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(RunSummary summary) {
-                                handler.onRunSummary(summary);
-                            }
-                        })))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> pull(long qid, long request) {
-        return executeInEventLoop(() -> messageWriters.add(handler -> protocol.pull(
-                        connection,
-                        qid,
-                        request,
-                        new PullMessageHandler() {
-                            @Override
-                            public void onRecord(Value[] fields) {
-                                handler.onRecord(fields);
-                            }
-
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(PullSummary success) {
-                                handler.onPullSummary(success);
-                            }
-                        },
-                        valueFactory)))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> discard(long qid, long number) {
-        return executeInEventLoop(() -> messageWriters.add(handler -> protocol.discard(
-                        this.connection,
-                        qid,
-                        number,
-                        new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(DiscardSummary summary) {
-                                handler.onDiscardSummary(summary);
-                            }
-                        },
-                        valueFactory)))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> commit() {
-        return executeInEventLoop(() ->
-                        messageWriters.add(handler -> protocol.commitTransaction(connection, new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(String bookmark) {
-                                handler.onCommitSummary(() -> Optional.ofNullable(bookmark));
-                            }
-                        })))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> rollback() {
-        return executeInEventLoop(() ->
-                        messageWriters.add(handler -> protocol.rollbackTransaction(connection, new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(Void summary) {
-                                handler.onRollbackSummary(RollbackSummaryImpl.INSTANCE);
-                            }
-                        })))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> reset() {
-        return executeInEventLoop(
-                        () -> messageWriters.add(handler -> protocol.reset(connection, new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(Void summary) {
-                                stateRef.set(BoltConnectionState.OPEN);
-                                handler.onResetSummary(null);
-                            }
-                        })))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> logoff() {
-        return executeInEventLoop(
-                        () -> messageWriters.add(handler -> protocol.logoff(connection, new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(Void summary) {
-                                authDataRef.set(new CompletableFuture<>());
-                                handler.onLogoffSummary(null);
-                            }
-                        })))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> logon(AuthToken authToken) {
-        return executeInEventLoop(() -> messageWriters.add(handler -> protocol.logon(
-                        connection,
-                        authToken.asMap(),
-                        clock,
-                        new MessageHandler<>() {
-                            @Override
-                            public void onError(Throwable throwable) {
-                                updateState(throwable);
-                                handler.onError(throwable);
-                            }
-
-                            @Override
-                            public void onSummary(Void summary) {
-                                authDataRef.get().complete(new AuthInfoImpl(authToken, clock.millis()));
-                                handler.onLogonSummary(null);
-                            }
-                        },
-                        valueFactory)))
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> telemetry(TelemetryApi telemetryApi) {
-        return executeInEventLoop(() -> {
-                    if (!telemetrySupported()) {
-                        throw new BoltUnsupportedFeatureException("telemetry not supported");
-                    } else {
-                        messageWriters.add(handler ->
-                                protocol.telemetry(connection, telemetryApi.getValue(), new MessageHandler<>() {
-                                    @Override
-                                    public void onError(Throwable throwable) {
-                                        updateState(throwable);
-                                        handler.onError(throwable);
-                                    }
-
-                                    @Override
-                                    public void onSummary(Void summary) {
-                                        handler.onTelemetrySummary(TelemetrySummaryImpl.INSTANCE);
-                                    }
-                                }));
-                    }
-                })
-                .thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<BoltConnection> clear() {
-        return executeInEventLoop(messageWriters::clear).thenApply(ignored -> this);
-    }
-
-    @Override
-    public CompletionStage<Void> flush(ResponseHandler handler) {
+    public CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages) {
         var flushFuture = new CompletableFuture<Void>();
         return executeInEventLoop(() -> {
-                    if (connection.isOpen()) {
-                        var flushStage = CompletableFuture.<Void>completedStage(null);
-                        var responseHandler = new ResponseHandleImpl(handler, messageWriters.size());
-                        var messageWriterIterator = messageWriters.iterator();
-                        while (messageWriterIterator.hasNext()) {
-                            var messageWriter = messageWriterIterator.next();
-                            messageWriterIterator.remove();
-                            flushStage = flushStage.thenCompose(ignored -> messageWriter.apply(responseHandler));
-                        }
-                        flushStage.thenCompose(ignored -> connection.flush()).whenComplete((ignored, throwable) -> {
-                            if (throwable != null) {
-                                throwable = FutureUtil.completionExceptionCause(throwable);
-                                if (throwable instanceof CodecException
-                                        && throwable.getCause() instanceof IOException) {
-                                    var serviceError = new BoltServiceUnavailableException(
-                                            "Connection to the database failed", throwable.getCause());
-                                    forceClose("Connection has been closed due to encoding error")
-                                            .whenComplete((ignored1, ignored2) ->
-                                                    flushFuture.completeExceptionally(serviceError));
-                                } else {
-                                    flushFuture.completeExceptionally(throwable);
-                                }
-                            } else {
-                                flushFuture.complete(null);
-                                log.log(System.Logger.Level.DEBUG, "flushed");
-                            }
-                        });
-                    } else {
-                        throw new BoltServiceUnavailableException("Connection is closed");
-                    }
+                    this.messages.addAll(messages);
+                    flush(handler, flushFuture);
                 })
                 .thenCompose(ignored -> flushFuture);
+    }
+
+    @Override
+    public CompletionStage<Void> write(List<Message> messages) {
+        return executeInEventLoop(() -> this.messages.addAll(messages)).thenApply(ignored -> null);
+    }
+
+    private void flush(ResponseHandler handler, CompletableFuture<Void> flushFuture) {
+        if (connection.isOpen()) {
+            var flushStage = CompletableFuture.<Void>completedStage(null);
+            var responseHandler = new ResponseHandleImpl(handler, messages.size());
+
+            for (var message : messages) {
+                flushStage = flushStage.thenCompose(ignored -> writeMessage(responseHandler, message));
+            }
+            messages.clear();
+
+            flushStage.thenCompose(ignored -> connection.flush()).whenComplete((ignored, throwable) -> {
+                if (throwable != null) {
+                    throwable = FutureUtil.completionExceptionCause(throwable);
+                    if (throwable instanceof CodecException && throwable.getCause() instanceof IOException) {
+                        var serviceError = new BoltServiceUnavailableException(
+                                "Connection to the database failed", throwable.getCause());
+                        forceClose("Connection has been closed due to encoding error")
+                                .whenComplete((ignored1, ignored2) -> flushFuture.completeExceptionally(serviceError));
+                    } else {
+                        flushFuture.completeExceptionally(throwable);
+                    }
+                } else {
+                    flushFuture.complete(null);
+                    log.log(System.Logger.Level.DEBUG, "flushed");
+                }
+            });
+        } else {
+            throw new BoltServiceUnavailableException("Connection is closed");
+        }
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, Message message) {
+        CompletionStage<Void> result;
+        if (message instanceof RouteMessage routeMessage) {
+            result = writeMessage(handler, routeMessage);
+        } else if (message instanceof BeginMessage beginMessage) {
+            result = writeMessage(handler, beginMessage);
+        } else if (message instanceof RunMessage runMessage) {
+            result = writeMessage(handler, runMessage);
+        } else if (message instanceof PullMessage pullMessage) {
+            result = writeMessage(handler, pullMessage);
+        } else if (message instanceof DiscardMessage discardMessage) {
+            result = writeMessage(handler, discardMessage);
+        } else if (message instanceof CommitMessage commitMessage) {
+            result = writeMessage(handler, commitMessage);
+        } else if (message instanceof RollbackMessage rollbackMessage) {
+            result = writeMessage(handler, rollbackMessage);
+        } else if (message instanceof ResetMessage resetMessage) {
+            result = writeMessage(handler, resetMessage);
+        } else if (message instanceof LogoffMessage logoffMessage) {
+            result = writeMessage(handler, logoffMessage);
+        } else if (message instanceof LogonMessage logonMessage) {
+            result = writeMessage(handler, logonMessage);
+        } else if (message instanceof TelemetryMessage telemetryMessage) {
+            result = writeMessage(handler, telemetryMessage);
+        } else {
+            result = CompletableFuture.failedStage(new BoltException("Unknown message type: " + message.getClass()));
+        }
+        return result;
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, RouteMessage routeMessage) {
+        return protocol.route(
+                this.connection,
+                this.routingContext,
+                routeMessage.bookmarks(),
+                routeMessage.databaseName().orElse(null),
+                routeMessage.impersonatedUser().orElse(null),
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(RouteSummary summary) {
+                        handler.onRouteSummary(summary);
+                    }
+                },
+                clock,
+                logging,
+                valueFactory);
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, BeginMessage beginMessage) {
+        return protocol.beginTransaction(
+                this.connection,
+                DatabaseNameUtil.database(beginMessage.databaseName().orElse(null)),
+                beginMessage.accessMode(),
+                beginMessage.impersonatedUser().orElse(null),
+                beginMessage.bookmarks(),
+                beginMessage.txTimeout().orElse(null),
+                beginMessage.txMetadata(),
+                switch (beginMessage.transactionType()) {
+                    case DEFAULT -> null;
+                    case UNCONSTRAINED -> "IMPLICIT";
+                },
+                beginMessage.notificationConfig(),
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(BeginSummary summary) {
+                        handler.onBeginSummary(summary);
+                    }
+                },
+                logging,
+                valueFactory);
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, RunMessage runMessage) {
+        if (runMessage.extra().isEmpty()) {
+            return protocol.run(connection, runMessage.query(), runMessage.parameters(), new MessageHandler<>() {
+                @Override
+                public void onError(Throwable throwable) {
+                    updateState(throwable);
+                    handler.onError(throwable);
+                }
+
+                @Override
+                public void onSummary(RunSummary summary) {
+                    handler.onRunSummary(summary);
+                }
+            });
+        } else {
+            var extra = runMessage.extra().get();
+            return protocol.runAuto(
+                    connection,
+                    DatabaseNameUtil.database(extra.databaseName().orElse(null)),
+                    extra.accessMode(),
+                    extra.impersonatedUser().orElse(null),
+                    runMessage.query(),
+                    runMessage.parameters(),
+                    extra.bookmarks(),
+                    extra.txTimeout().orElse(null),
+                    extra.txMetadata(),
+                    extra.notificationConfig(),
+                    new MessageHandler<>() {
+                        @Override
+                        public void onError(Throwable throwable) {
+                            updateState(throwable);
+                            handler.onError(throwable);
+                        }
+
+                        @Override
+                        public void onSummary(RunSummary summary) {
+                            handler.onRunSummary(summary);
+                        }
+                    },
+                    logging,
+                    valueFactory);
+        }
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, PullMessage pullMessage) {
+        return protocol.pull(
+                connection,
+                pullMessage.qid(),
+                pullMessage.request(),
+                new PullMessageHandler() {
+                    @Override
+                    public void onRecord(Value[] fields) {
+                        handler.onRecord(fields);
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(PullSummary success) {
+                        handler.onPullSummary(success);
+                    }
+                },
+                valueFactory);
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, DiscardMessage discardMessage) {
+        return protocol.discard(
+                this.connection,
+                discardMessage.qid(),
+                discardMessage.number(),
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(DiscardSummary summary) {
+                        handler.onDiscardSummary(summary);
+                    }
+                },
+                valueFactory);
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, CommitMessage commitMessage) {
+        return protocol.commitTransaction(connection, new MessageHandler<>() {
+            @Override
+            public void onError(Throwable throwable) {
+                updateState(throwable);
+                handler.onError(throwable);
+            }
+
+            @Override
+            public void onSummary(String bookmark) {
+                handler.onCommitSummary(() -> Optional.ofNullable(bookmark));
+            }
+        });
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, RollbackMessage rollbackMessage) {
+        return protocol.rollbackTransaction(connection, new MessageHandler<>() {
+            @Override
+            public void onError(Throwable throwable) {
+                updateState(throwable);
+                handler.onError(throwable);
+            }
+
+            @Override
+            public void onSummary(Void summary) {
+                handler.onRollbackSummary(RollbackSummaryImpl.INSTANCE);
+            }
+        });
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, ResetMessage resetMessage) {
+        return protocol.reset(connection, new MessageHandler<>() {
+            @Override
+            public void onError(Throwable throwable) {
+                updateState(throwable);
+                handler.onError(throwable);
+            }
+
+            @Override
+            public void onSummary(Void summary) {
+                stateRef.set(BoltConnectionState.OPEN);
+                handler.onResetSummary(null);
+            }
+        });
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, LogoffMessage logoffMessage) {
+        return protocol.logoff(connection, new MessageHandler<>() {
+            @Override
+            public void onError(Throwable throwable) {
+                updateState(throwable);
+                handler.onError(throwable);
+            }
+
+            @Override
+            public void onSummary(Void summary) {
+                authDataRef.set(new CompletableFuture<>());
+                handler.onLogoffSummary(null);
+            }
+        });
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, LogonMessage logonMessage) {
+        return protocol.logon(
+                connection,
+                logonMessage.authToken().asMap(),
+                clock,
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(Void summary) {
+                        authDataRef.get().complete(new AuthInfoImpl(logonMessage.authToken(), clock.millis()));
+                        handler.onLogonSummary(null);
+                    }
+                },
+                valueFactory);
+    }
+
+    private CompletionStage<Void> writeMessage(ResponseHandler handler, TelemetryMessage telemetryMessage) {
+        if (!telemetrySupported()) {
+            return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("telemetry not supported"));
+        } else {
+            return protocol.telemetry(connection, telemetryMessage.api().getValue(), new MessageHandler<>() {
+                @Override
+                public void onError(Throwable throwable) {
+                    updateState(throwable);
+                    handler.onError(throwable);
+                }
+
+                @Override
+                public void onSummary(Void summary) {
+                    handler.onTelemetrySummary(TelemetrySummaryImpl.INSTANCE);
+                }
+            });
+        }
     }
 
     @Override

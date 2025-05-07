@@ -14,14 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * The Neo4j Bolt Connection module.
- */
-module org.neo4j.bolt.connection {
-    exports org.neo4j.bolt.connection;
-    exports org.neo4j.bolt.connection.message;
-    exports org.neo4j.bolt.connection.exception;
-    exports org.neo4j.bolt.connection.summary;
-    exports org.neo4j.bolt.connection.values;
-    exports org.neo4j.bolt.connection.ssl;
+package org.neo4j.bolt.connection.message;
+
+import java.util.Optional;
+import java.util.Set;
+
+record RouteMessageImpl(String rawDatabaseName, String rawImpersonatedUser, Set<String> bookmarks)
+        implements RouteMessage {
+    @Override
+    public Optional<String> databaseName() {
+        return Optional.ofNullable(rawDatabaseName);
+    }
+
+    @Override
+    public Optional<String> impersonatedUser() {
+        return Optional.ofNullable(rawImpersonatedUser);
+    }
 }
