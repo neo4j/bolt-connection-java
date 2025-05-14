@@ -14,19 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.v5;
+package org.neo4j.bolt.connection.netty.impl.messaging.v6;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonMessageReader;
+import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-public class MessageReaderV5 extends CommonMessageReader {
-    public MessageReaderV5(PackInput input, ValueFactory valueFactory) {
-        super(new ValueUnpackerV5(input, valueFactory), valueFactory);
+final class MessageFormatV6 implements MessageFormat {
+    @Override
+    public Writer newWriter(PackOutput output, ValueFactory valueFactory) {
+        return new MessageWriterV6(output, valueFactory);
     }
 
-    protected MessageReaderV5(ValueUnpacker unpacker, ValueFactory valueFactory) {
-        super(unpacker, valueFactory);
+    @Override
+    public Reader newReader(PackInput input, ValueFactory valueFactory) {
+        return new MessageReaderV6(input, valueFactory);
     }
 }

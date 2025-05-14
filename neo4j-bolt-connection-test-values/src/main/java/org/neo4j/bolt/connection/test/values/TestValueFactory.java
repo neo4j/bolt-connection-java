@@ -95,6 +95,11 @@ public class TestValueFactory implements ValueFactory {
     }
 
     @Override
+    public Value vector(Class<?> elementType, Object elements) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Value unsupportedDateTimeValue(DateTimeException e) {
         return new UnsupportedDateTimeValue(e);
     }

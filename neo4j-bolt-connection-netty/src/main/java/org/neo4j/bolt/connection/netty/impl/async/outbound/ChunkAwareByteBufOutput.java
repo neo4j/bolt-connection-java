@@ -108,6 +108,14 @@ public class ChunkAwareByteBufOutput implements PackOutput {
         return this;
     }
 
+    @Override
+    public PackOutput writeFloat(float value) {
+        ensureCanFitInCurrentChunk(4);
+        buf.writeFloat(value);
+        currentChunkSize += 4;
+        return this;
+    }
+
     private void ensureCanFitInCurrentChunk(int numberOfBytes) {
         var targetChunkSize = currentChunkSize + numberOfBytes;
         if (targetChunkSize > maxChunkSize) {

@@ -59,6 +59,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             Clock clock,
             DomainNameResolver domainNameResolver,
             LocalAddress localAddress,
+            BoltProtocolVersion maxVersion,
             LoggingProvider logging,
             ValueFactory valueFactory,
             MetricsListener metricsListener,
@@ -69,7 +70,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.log = logging.getLog(getClass());
         this.eventLoopGroup = Objects.requireNonNull(eventLoopGroup);
         this.connectionProvider = ConnectionProviders.netty(
-                eventLoopGroup, clock, domainNameResolver, localAddress, logging, valueFactory);
+                eventLoopGroup, clock, domainNameResolver, localAddress, maxVersion, logging, valueFactory);
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.metricsListener = NoopMetricsListener.getInstance();
         InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));

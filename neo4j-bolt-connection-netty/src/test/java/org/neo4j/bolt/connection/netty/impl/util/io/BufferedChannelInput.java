@@ -72,6 +72,12 @@ public class BufferedChannelInput implements PackInput {
     }
 
     @Override
+    public float readFloat() throws IOException {
+        ensure(4);
+        return buffer.getFloat();
+    }
+
+    @Override
     public void readBytes(byte[] into, int index, int toRead) throws IOException {
         var endIndex = index + toRead;
         while (index < endIndex) {

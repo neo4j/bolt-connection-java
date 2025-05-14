@@ -85,6 +85,9 @@ public class CommonValueUnpacker implements ValueUnpacker {
     private static final int NODE_FIELDS = 3;
     private static final int RELATIONSHIP_FIELDS = 5;
 
+    public static final byte VECTOR = 'V';
+    public static final int VECTOR_STRUCT_SIZE = 2;
+
     private final boolean dateTimeUtcEnabled;
     protected final PackStream.Unpacker unpacker;
     protected final ValueFactory valueFactory;
@@ -238,6 +241,13 @@ public class CommonValueUnpacker implements ValueUnpacker {
             case PATH -> {
                 ensureCorrectStructSize(Type.PATH, 3, size);
                 return valueFactory.value(unpackPath());
+            }
+            case VECTOR -> {
+                try {
+                    return unpackVector(size);
+                } catch (UnsupportedOperationException e) {
+                    throw instantiateExceptionForUnknownType(type);
+                }
             }
             default -> throw instantiateExceptionForUnknownType(type);
         }
@@ -423,6 +433,10 @@ public class CommonValueUnpacker implements ValueUnpacker {
         var y = unpacker.unpackDouble();
         var z = unpacker.unpackDouble();
         return valueFactory.point(srid, x, y, z);
+    }
+
+    protected Value unpackVector(long size) throws IOException {
+        throw new UnsupportedOperationException();
     }
 
     private static ZonedDateTime newZonedDateTime(long epochSecondLocal, long nano, ZoneId zoneId) {

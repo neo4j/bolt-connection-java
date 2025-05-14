@@ -61,4 +61,10 @@ public class ByteBufOutput implements PackOutput {
         buf.writeDouble(value);
         return this;
     }
+
+    @Override
+    public PackOutput writeFloat(float value) {
+        buf.writeFloat(value);
+        return this;
+    }
 }

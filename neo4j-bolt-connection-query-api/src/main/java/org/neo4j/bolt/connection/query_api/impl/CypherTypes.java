@@ -26,6 +26,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -148,7 +149,12 @@ enum CypherTypes {
     Path(
         Type.PATH,
         null, // handled in DriverValueProvider
-        CypherTypes::unsupported);
+        CypherTypes::unsupported),
+
+    Vector(
+            Type.VECTOR,
+            null, // handled in DriverValueProvider
+            CypherTypes::unsupportedVector);
 
     // spotless:on
     private final BiFunction<ValueFactory, String, Value> reader;
@@ -226,6 +232,10 @@ enum CypherTypes {
 
     private static Object unsupported(Value value) {
         throw new IllegalArgumentException("Node value type is not supported");
+    }
+
+    private static Object unsupportedVector(Value value) {
+        throw new BoltUnsupportedFeatureException("Vector type is not supported");
     }
 
     private static Value parseDuration(ValueFactory valueFactory, String input) {

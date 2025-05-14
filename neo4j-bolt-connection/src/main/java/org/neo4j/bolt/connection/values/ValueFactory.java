@@ -104,6 +104,10 @@ public interface ValueFactory {
         return value((Object) duration);
     }
 
+    default Value value(Vector vector) {
+        return value((Object) vector);
+    }
+
     Node node(long id, String elementId, Collection<String> labels, Map<String, Value> properties);
 
     Relationship relationship(
@@ -125,6 +129,8 @@ public interface ValueFactory {
     Value point(int srid, double x, double y);
 
     Value point(int srid, double x, double y, double z);
+
+    Value vector(Class<?> elementType, Object elements);
 
     Value unsupportedDateTimeValue(DateTimeException e);
 }

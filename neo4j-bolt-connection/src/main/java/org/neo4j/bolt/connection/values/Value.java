@@ -52,6 +52,8 @@ public interface Value extends MapAccessor {
 
     Map<String, Value> asBoltMap();
 
+    Vector asBoltVector();
+
     boolean isNull();
 
     boolean isEmpty();

@@ -43,4 +43,8 @@ public interface PackOutput {
     /** Produce an 8-byte IEEE 754 "double format" floating-point number */
     @SuppressWarnings("UnusedReturnValue")
     PackOutput writeDouble(double value) throws IOException;
+
+    /** Produce a 4-byte IEEE 754 "double format" floating-point number */
+    @SuppressWarnings("UnusedReturnValue")
+    PackOutput writeFloat(float value) throws IOException;
 }

@@ -23,6 +23,7 @@ import java.util.Map;
 import org.neo4j.bolt.connection.GqlError;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.netty.impl.messaging.ResponseMessageHandler;
+import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.v5.MessageReaderV5;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.Type;
@@ -32,6 +33,10 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 public class MessageReaderV57 extends MessageReaderV5 {
     public MessageReaderV57(PackInput input, ValueFactory valueFactory) {
         super(input, valueFactory);
+    }
+
+    protected MessageReaderV57(ValueUnpacker unpacker, ValueFactory valueFactory) {
+        super(unpacker, valueFactory);
     }
 
     @Override
