@@ -16,26 +16,8 @@
  */
 package org.neo4j.bolt.connection.values;
 
-public enum Type {
-    ANY,
-    BOOLEAN,
-    BYTES,
-    STRING,
-    NUMBER,
-    INTEGER,
-    FLOAT,
-    LIST,
-    MAP,
-    NODE,
-    RELATIONSHIP,
-    PATH,
-    POINT,
-    DATE,
-    TIME,
-    LOCAL_TIME,
-    LOCAL_DATE_TIME,
-    DATE_TIME,
-    DURATION,
-    VECTOR,
-    NULL
+public interface Vector {
+    Class<?> elementType();
+
+    Object elements();
 }

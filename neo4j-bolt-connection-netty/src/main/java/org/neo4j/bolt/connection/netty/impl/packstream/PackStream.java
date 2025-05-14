@@ -22,10 +22,12 @@ import static java.util.Collections.singletonList;
 
 import java.io.IOException;
 import java.io.Serial;
+import java.lang.reflect.Array;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import org.neo4j.bolt.connection.values.Vector;
 
 /**
  * PackStream is a messaging serialisation format heavily inspired by MessagePack.
@@ -394,6 +396,21 @@ public class PackStream {
                 throw new Overflow("Structures cannot have more than " + (PLUS_2_TO_THE_16 - 1) + " fields");
             }
         }
+
+        public void packVector(Vector vector) throws IOException {
+            var elementType = vector.elementType();
+            var elements = vector.elements();
+            var length = Array.getLength(elements);
+
+            // todo pack as Bolt Vector
+            packListHeader(length);
+            for (var i = 0; i < length; i++) {
+                var element = Array.get(elements, i);
+                pack(element);
+            }
+        }
+
+        public void packVectorElement(Class<?> elementType, Object element) throws IOException {}
     }
 
     public static class Unpacker {

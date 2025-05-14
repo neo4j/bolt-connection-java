@@ -132,6 +132,8 @@ public class CommonValuePacker implements ValuePacker {
                     pack(item);
                 }
             }
+            case VECTOR -> // todo ensure protocol version
+            packer.packVector(value.asVector());
             default -> throw new IOException("Unknown type: " + value.type().name());
         }
     }

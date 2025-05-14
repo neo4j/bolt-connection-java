@@ -49,6 +49,10 @@ public interface Value extends MapAccessor {
 
     Point asPoint();
 
+    default Vector asVector() {
+        throw new UnsupportedOperationException();
+    }
+
     boolean isNull();
 
     boolean isEmpty();

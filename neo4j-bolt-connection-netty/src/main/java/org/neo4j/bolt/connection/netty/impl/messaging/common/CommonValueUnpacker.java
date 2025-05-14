@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +49,7 @@ import org.neo4j.bolt.connection.values.Segment;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
+import org.neo4j.bolt.connection.values.Vector;
 
 public class CommonValueUnpacker implements ValueUnpacker {
     public static final byte DATE = 'D';
@@ -84,6 +86,9 @@ public class CommonValueUnpacker implements ValueUnpacker {
 
     private static final int NODE_FIELDS = 3;
     private static final int RELATIONSHIP_FIELDS = 5;
+
+    public static final byte VECTOR = '8';
+    public static final int VECTOR_STRUCT_SIZE = 2;
 
     private final boolean dateTimeUtcEnabled;
     protected final PackStream.Unpacker unpacker;
@@ -156,9 +161,28 @@ public class CommonValueUnpacker implements ValueUnpacker {
             case LIST -> {
                 var size = (int) unpacker.unpackListHeader();
                 var vals = new Value[size];
+                var types = new HashSet<Type>();
                 for (var j = 0; j < size; j++) {
                     vals[j] = unpack();
+                    types.add(vals[j].type());
                 }
+
+                // todo remove this
+                if (types.size() == 1) {
+                    var singleType = types.iterator().next();
+                    if (singleType == Type.INTEGER) {
+                        var longValues =
+                                Arrays.stream(vals).mapToLong(Value::asLong).toArray();
+                        var vector = valueFactory.vector(long.class, longValues);
+                        return valueFactory.value(vector);
+                    } else if (singleType == Type.FLOAT) {
+                        var doubleValues =
+                                Arrays.stream(vals).mapToDouble(Value::asDouble).toArray();
+                        var vector = valueFactory.vector(double.class, doubleValues);
+                        return valueFactory.value(vector);
+                    }
+                }
+
                 return valueFactory.value(vals);
             }
             case STRUCT -> {
@@ -243,6 +267,10 @@ public class CommonValueUnpacker implements ValueUnpacker {
             case PATH -> {
                 ensureCorrectStructSize(Type.PATH, 3, size);
                 return valueFactory.value(unpackPath());
+            }
+            case VECTOR -> {
+                ensureCorrectStructSize(Type.VECTOR, VECTOR_STRUCT_SIZE, size);
+                return valueFactory.value(unpackVector());
             }
             default -> throw instantiateExceptionForUnknownType(type);
         }
@@ -428,6 +456,14 @@ public class CommonValueUnpacker implements ValueUnpacker {
         var y = unpacker.unpackDouble();
         var z = unpacker.unpackDouble();
         return valueFactory.point(srid, x, y, z);
+    }
+
+    protected Vector unpackVector() throws IOException {
+        // todo implement
+        // todo ensure protocol version
+        var elementType = float.class;
+        var elements = new float[0];
+        return valueFactory.vector(elementType, elements);
     }
 
     private static ZonedDateTime newZonedDateTime(long epochSecondLocal, long nano, ZoneId zoneId) {
