@@ -20,6 +20,7 @@ import static org.neo4j.bolt.connection.query.api.impl.FutureUtil.completionExce
 import static org.neo4j.bolt.connection.query.api.impl.HttpUtil.mapToString;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -79,7 +80,16 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                     } else {
                         log.log(System.Logger.Level.DEBUG, "Received response %s".formatted(mapToString(response)));
                         return switch (response.statusCode()) {
-                            case 200, 202 -> handleResponse(response);
+                            case 200, 202 -> {
+                                // Query API may return an error
+                                if (gson.fromJson(response.body(), JsonObject.class)
+                                                .get("errors")
+                                        != null) {
+                                    yield handleFailureResponse(response);
+                                } else {
+                                    yield handleResponse(response);
+                                }
+                            }
                             case 400, 401, 404, 500 -> handleFailureResponse(response);
                             default -> throw new BoltException(
                                     "An unexpected response code: " + response.statusCode(), null);
