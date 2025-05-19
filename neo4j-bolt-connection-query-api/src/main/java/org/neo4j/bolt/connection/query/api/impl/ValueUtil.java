@@ -20,14 +20,26 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class ValueUtil {
+    private static final Pattern POINT_PATTERN = Pattern.compile("^SRID=(\\d+);POINT Z?\\s?\\(([\\d.\\s]+)\\)$");
+
     static JsonObject asJsonObject(Value value) {
         return switch (value.type()) {
             case ANY -> throw new IllegalArgumentException("Any value type is not supported");
@@ -123,7 +135,7 @@ final class ValueUtil {
             }
             case DATE_TIME -> {
                 var jsonObject = new JsonObject();
-                jsonObject.addProperty("$type", "OffsetDateTime");
+                jsonObject.addProperty("$type", "ZonedDateTime");
                 jsonObject.addProperty("_value", value.asZonedDateTime().toString());
                 yield jsonObject;
             }
@@ -166,32 +178,82 @@ final class ValueUtil {
                 yield valueFactory.value(values);
             }
             case "Point" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                var stringValue = valueElem.getAsString();
+                var matcher = POINT_PATTERN.matcher(stringValue);
+                if (matcher.matches()) {
+                    var srid = Integer.parseInt(matcher.group(1));
+                    var coordinates = matcher.group(2).split(" ");
+                    if (coordinates.length == 2) {
+                        yield valueFactory.point(
+                                srid, Double.parseDouble(coordinates[0]), Double.parseDouble(coordinates[1]));
+                    } else if (coordinates.length == 3) {
+                        yield valueFactory.point(
+                                srid,
+                                Double.parseDouble(coordinates[0]),
+                                Double.parseDouble(coordinates[1]),
+                                Double.parseDouble(coordinates[2]));
+                    }
+                }
+                throw new BoltProtocolException("Invalid point value: " + stringValue);
             }
             case "Date" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                var stringValue = valueElem.getAsString();
+                yield valueFactory.value(LocalDate.parse(stringValue));
             }
             case "Time" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                var stringValue = valueElem.getAsString();
+                yield valueFactory.value(OffsetTime.parse(stringValue));
             }
             case "LocalTime" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                var stringValue = valueElem.getAsString();
+                yield valueFactory.value(LocalTime.parse(stringValue));
             }
             case "LocalDateTime" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                var stringValue = valueElem.getAsString();
+                yield valueFactory.value(LocalDateTime.parse(stringValue));
             }
-            case "OffsetDateTime" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+            case "ZonedDateTime" -> {
+                var stringValue = valueElem.getAsString();
+                yield valueFactory.value(ZonedDateTime.parse(stringValue));
             }
             case "Duration" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                var stringValue = valueElem.getAsString();
+                var parts = stringValue.split("T", 2);
+
+                var months = 0L;
+                var days = 0L;
+                var seconds = 0L;
+                var nanos = 0;
+
+                if (parts.length == 2) {
+                    try {
+                        var period = Period.parse(parts[0]);
+                        months = period.getMonths();
+                        days = period.getDays();
+                    } catch (DateTimeParseException ignored) {
+                    }
+
+                    try {
+                        var duration = Duration.parse("PT" + parts[1]);
+                        seconds = duration.getSeconds();
+                        nanos = duration.getNano();
+                    } catch (DateTimeParseException ignored) {
+                    }
+
+                } else if (parts.length == 1) {
+                    if (stringValue.startsWith("P") && !stringValue.contains("T")) {
+                        try {
+                            var period = Period.parse(parts[0]);
+                            months = period.getMonths();
+                            days = period.getDays();
+                        } catch (DateTimeParseException e) {
+                            var duration = Duration.parse(parts[0]);
+                            seconds = duration.getSeconds();
+                            nanos = duration.getNano();
+                        }
+                    }
+                }
+                yield valueFactory.isoDuration(months, days, seconds, nanos);
             }
             case "Null" -> valueFactory.value((Object) null);
             case "Node" -> {
