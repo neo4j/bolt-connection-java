@@ -82,9 +82,8 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                         return switch (response.statusCode()) {
                             case 200, 202 -> {
                                 // Query API may return an error
-                                if (gson.fromJson(response.body(), JsonObject.class)
-                                                .get("errors")
-                                        != null) {
+                                var jsonObject = gson.fromJson(response.body(), JsonObject.class);
+                                if (jsonObject != null && jsonObject.get("errors") != null) {
                                     yield handleFailureResponse(response);
                                 } else {
                                     yield handleResponse(response);
