@@ -16,6 +16,10 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,11 +35,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.values.Node;
 import org.neo4j.bolt.connection.values.Relationship;
@@ -331,6 +330,5 @@ final class ValueUtil {
                 0, elementId, 0, startElementId, 0, endElementId, relationshipType, properties);
     }
 
-    private ValueUtil() {
-    }
+    private ValueUtil() {}
 }
