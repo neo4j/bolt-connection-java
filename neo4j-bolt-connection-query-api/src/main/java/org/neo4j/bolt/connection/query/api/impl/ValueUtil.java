@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.Period;
 import java.time.ZonedDateTime;
@@ -50,7 +51,7 @@ final class ValueUtil {
             case ANY -> throw new IllegalArgumentException("Any value type is not supported");
             case BOOLEAN -> {
                 var jsonObject = new JsonObject();
-                jsonObject.addProperty("$type", "boolean");
+                jsonObject.addProperty("$type", "Boolean");
                 jsonObject.addProperty("_value", value.asBoolean());
                 yield jsonObject;
             }
@@ -163,7 +164,7 @@ final class ValueUtil {
         var type = jsonObject.get("$type").getAsString();
         var valueElem = jsonObject.get("_value");
         return switch (type) {
-            case "boolean" -> valueFactory.value(valueElem.getAsBoolean());
+            case "Boolean" -> valueFactory.value(valueElem.getAsBoolean());
             case "Base64" -> valueFactory.value(Base64.getDecoder().decode(valueElem.getAsString()));
             case "String" -> valueFactory.value(valueElem.getAsString());
             case "Integer" -> valueFactory.value(valueElem.getAsLong());
@@ -216,6 +217,10 @@ final class ValueUtil {
             case "LocalDateTime" -> {
                 var stringValue = valueElem.getAsString();
                 yield valueFactory.value(LocalDateTime.parse(stringValue));
+            }
+            case "OffsetDateTime" -> {
+                var stringValue = valueElem.getAsString();
+                yield valueFactory.value(OffsetDateTime.parse(stringValue));
             }
             case "ZonedDateTime" -> {
                 var stringValue = valueElem.getAsString();
