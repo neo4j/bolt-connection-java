@@ -80,7 +80,7 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                         log.log(System.Logger.Level.DEBUG, "Received response %s".formatted(mapToString(response)));
                         return switch (response.statusCode()) {
                             case 200, 202 -> handleResponse(response);
-                            case 400, 401, 404 -> handleFailureResponse(response);
+                            case 400, 401, 404, 500 -> handleFailureResponse(response);
                             default -> throw new BoltException(
                                     "An unexpected response code: " + response.statusCode(), null);
                         };

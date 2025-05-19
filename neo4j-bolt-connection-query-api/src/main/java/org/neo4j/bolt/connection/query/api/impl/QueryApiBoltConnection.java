@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.query.api.impl;
 import static org.neo4j.bolt.connection.query.api.impl.FutureUtil.completionExceptionCause;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Clock;
@@ -57,7 +58,8 @@ import org.neo4j.bolt.connection.message.RunMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class QueryApiBoltConnection implements BoltConnection {
-    private static final Gson GSON = new Gson();
+    private static final Gson GSON =
+            new GsonBuilder().disableHtmlEscaping().serializeNulls().create();
     private final LoggingProvider logging;
     private final System.Logger log;
     private final ValueFactory valueFactory;

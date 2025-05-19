@@ -103,7 +103,18 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             int connectTimeoutMillis,
             SecurityPlan securityPlan,
             AuthToken authToken) {
-        return null;
+        var request = HttpRequest.newBuilder(baseUri).build();
+        return httpClient
+                .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() == 200) {
+                        var discoveryResponse = GSON.fromJson(response.body(), DiscoveryResponse.class);
+                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
+                        return null;
+                    } else {
+                        throw new BoltClientException("Unexpected response code: " + response.statusCode());
+                    }
+                });
     }
 
     @Override
