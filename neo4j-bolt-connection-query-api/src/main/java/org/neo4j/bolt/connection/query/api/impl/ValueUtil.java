@@ -16,10 +16,6 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,12 +24,22 @@ import java.time.OffsetTime;
 import java.time.Period;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
+import org.neo4j.bolt.connection.values.Node;
+import org.neo4j.bolt.connection.values.Relationship;
+import org.neo4j.bolt.connection.values.Segment;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -256,46 +262,75 @@ final class ValueUtil {
                 yield valueFactory.isoDuration(months, days, seconds, nanos);
             }
             case "Null" -> valueFactory.value((Object) null);
-            case "Node" -> {
-                var obj = valueElem.getAsJsonObject();
-                var elementId = obj.get("_element_id").getAsString();
-                var labels = obj.get("_labels").getAsJsonArray().asList().stream()
-                        .map(JsonElement::getAsString)
-                        .toList();
-                var properties = obj.get("_properties").getAsJsonObject().entrySet().stream()
-                        .map(entry -> {
-                            var key = entry.getKey();
-                            var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
-                            return Map.entry(key, value);
-                        })
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                var node = valueFactory.node(0, elementId, labels, properties);
-                yield valueFactory.value(node);
-            }
-            case "Relationship" -> {
-                var obj = valueElem.getAsJsonObject();
-                var elementId = obj.get("_element_id").getAsString();
-                var startElementId = obj.get("_start_node_element_id").getAsString();
-                var endElementId = obj.get("_end_node_element_id").getAsString();
-                var relationshipType = obj.get("_type").getAsString();
-                var properties = obj.get("_properties").getAsJsonObject().entrySet().stream()
-                        .map(entry -> {
-                            var key = entry.getKey();
-                            var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
-                            return Map.entry(key, value);
-                        })
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                var relationship = valueFactory.relationship(
-                        0, elementId, 0, startElementId, 0, endElementId, relationshipType, properties);
-                yield valueFactory.value(relationship);
-            }
+            case "Node" -> valueFactory.value(asNode(valueElem.getAsJsonObject(), valueFactory));
+            case "Relationship" -> valueFactory.value(asRelationship(valueElem.getAsJsonObject(), valueFactory));
             case "Path" -> {
-                // todo
-                yield valueFactory.value((Object) null);
+                List<Segment> segments = new ArrayList<>();
+                List<Node> nodes = new ArrayList<>();
+                List<Relationship> relationships = new ArrayList<>();
+
+                Node start = null;
+                Relationship relationship = null;
+
+                var list = valueElem.getAsJsonArray().asList();
+                for (var jsonElement : list) {
+                    var elementObject = jsonElement.getAsJsonObject();
+                    var elementType = elementObject.get("$type").getAsString();
+                    var eleventValue = elementObject.get("_value").getAsJsonObject();
+                    switch (elementType) {
+                        case "Node" -> {
+                            var node = asNode(eleventValue, valueFactory);
+
+                            if (start != null) {
+                                segments.add(valueFactory.segment(start, relationship, node));
+                            }
+                            start = node;
+
+                            nodes.add(node);
+                        }
+                        case "Relationship" -> {
+                            relationship = asRelationship(eleventValue, valueFactory);
+                            relationships.add(relationship);
+                        }
+                    }
+                }
+                yield valueFactory.value(valueFactory.path(segments, nodes, relationships));
             }
             default -> throw new IllegalStateException("Unexpected value: " + type);
         };
     }
 
-    private ValueUtil() {}
+    private static Node asNode(JsonObject node, ValueFactory valueFactory) {
+        var elementId = node.get("_element_id").getAsString();
+        var labels = node.get("_labels").getAsJsonArray().asList().stream()
+                .map(JsonElement::getAsString)
+                .toList();
+        var properties = node.get("_properties").getAsJsonObject().entrySet().stream()
+                .map(entry -> {
+                    var key = entry.getKey();
+                    var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
+                    return Map.entry(key, value);
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return valueFactory.node(0, elementId, labels, properties);
+    }
+
+    private static Relationship asRelationship(JsonObject relationship, ValueFactory valueFactory) {
+        var elementId = relationship.get("_element_id").getAsString();
+        var startElementId = relationship.get("_start_node_element_id").getAsString();
+        var endElementId = relationship.get("_end_node_element_id").getAsString();
+        var relationshipType = relationship.get("_type").getAsString();
+        var properties = relationship.get("_properties").getAsJsonObject().entrySet().stream()
+                .map(entry -> {
+                    var key = entry.getKey();
+                    var value = asValue(entry.getValue().getAsJsonObject(), valueFactory);
+                    return Map.entry(key, value);
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return valueFactory.relationship(
+                0, elementId, 0, startElementId, 0, endElementId, relationshipType, properties);
+    }
+
+    private ValueUtil() {
+    }
 }
