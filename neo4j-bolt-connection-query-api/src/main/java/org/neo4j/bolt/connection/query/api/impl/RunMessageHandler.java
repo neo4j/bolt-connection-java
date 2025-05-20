@@ -151,7 +151,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         return query;
     }
 
-    private static HttpRequest.BodyPublisher newHttpRequestBodyPublisher(Gson gson, RunMessage message) {
+    private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(Gson gson, RunMessage message) {
         var jsonObject = new JsonObject();
 
         jsonObject.addProperty("statement", message.query());
@@ -175,6 +175,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
 
         jsonObject.addProperty("includeCounters", true);
         var jsonBody = gson.toJson(jsonObject);
+        log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
         return HttpRequest.BodyPublishers.ofString(jsonBody);
     }
 
