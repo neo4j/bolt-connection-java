@@ -45,7 +45,7 @@ import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class ValueUtil {
-    private static final Pattern POINT_PATTERN = Pattern.compile("^SRID=(\\d+);POINT Z?\\s?\\(([\\d.\\s]+)\\)$");
+    private static final Pattern POINT_PATTERN = Pattern.compile("^SRID=(\\d+);POINT Z?\\s?\\(([-\\d.\\s]+)\\)$");
 
     static JsonObject asJsonObject(Value value) {
         return switch (value.type()) {
