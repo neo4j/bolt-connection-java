@@ -16,17 +16,19 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import java.io.IOException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.Objects;
+
+import com.fasterxml.jackson.jr.ob.JSON;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.message.BeginMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -57,7 +59,11 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
         if (message.transactionType() != TransactionType.DEFAULT) {
             throw new BoltClientException("Only TransactionType.DEFAULT is supported");
         }
-        this.bodyPublisher = newHttpRequestBodyPublisher(httpContext, message, this.databaseName);
+        try {
+            this.bodyPublisher = newHttpRequestBodyPublisher(httpContext, message, this.databaseName);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -73,33 +79,45 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
     @Override
     protected TransactionInfo handleResponse(HttpResponse<String> response) {
-        var transactionEntry = httpContext.gson().fromJson(response.body(), TransactionEntry.class);
-        var affinity = response.headers().firstValue("neo4j-cluster-affinity").orElse(null);
-        var info = new TransactionInfo(
+        try {
+            var transactionEntry = httpContext.json().beanFrom(TransactionEntry.class, response.body());
+            var affinity = response.headers().firstValue("neo4j-cluster-affinity").orElse(null);
+            var info = new TransactionInfo(
                 databaseName,
                 transactionEntry.transaction().id(),
                 Instant.parse(transactionEntry.transaction().expires()),
                 affinity);
-        handler.onBeginSummary(new BeginSummaryImpl(databaseName));
-        return info;
+            handler.onBeginSummary(new BeginSummaryImpl(databaseName));
+            return info;
+        } catch (IOException e) {
+            throw new BoltException("kaputt");
+        }
     }
 
     private static HttpRequest.BodyPublisher newHttpRequestBodyPublisher(
-            HttpContext httpContext, BeginMessage message, String databaseName) {
-        var jsonObject = new JsonObject();
+            HttpContext httpContext, BeginMessage message, String databaseName) throws IOException {
+        var jsonObject = JSON.std.composeString().startObject();
 
         if (message.accessMode() == AccessMode.READ) {
-            jsonObject.addProperty("accessMode", "Read");
+            jsonObject.put("accessMode", "Read");
         }
         message.impersonatedUser()
-                .ifPresent(impersonatedUser -> jsonObject.addProperty("impersonatedUser", impersonatedUser));
+                .ifPresent(impersonatedUser -> {
+                    try {
+                        jsonObject.put("impersonatedUser", impersonatedUser);
+                    } catch (IOException e) {
+                        throw new BoltException("kaputt");
+                    }
+                });
         if (!message.bookmarks().isEmpty()) {
-            var jsonArray = new JsonArray();
-            message.bookmarks().forEach(jsonArray::add);
-            jsonObject.add("bookmarks", jsonArray);
+            var jsonArray = jsonObject.startArrayField("bookmarks");
+            for (String bookmark : message.bookmarks()) {
+                jsonArray.add(bookmark);
+            }
+            jsonArray.end();
         }
 
-        var jsonBody = httpContext.gson().toJson(jsonObject);
+        var jsonBody = jsonObject.end().finish();
         return HttpRequest.BodyPublishers.ofString(jsonBody);
     }
 
