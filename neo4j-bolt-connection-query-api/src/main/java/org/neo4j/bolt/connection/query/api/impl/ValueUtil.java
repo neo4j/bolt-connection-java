@@ -32,6 +32,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -110,8 +111,9 @@ final class ValueUtil {
                 jsonObject.addProperty("$type", "Point");
                 var point = value.asPoint();
                 var pointAsString = Double.isNaN(point.z())
-                        ? "SRID=%d;POINT (%f %f)".formatted(point.srid(), point.x(), point.y())
-                        : "SRID=%d;POINT (%f %f %f)".formatted(point.srid(), point.x(), point.y(), point.z());
+                        ? String.format(Locale.US, "SRID=%d;POINT (%f %f)", point.srid(), point.x(), point.y())
+                        : String.format(
+                                Locale.US, "SRID=%d;POINT (%f %f %f)", point.srid(), point.x(), point.y(), point.z());
                 jsonObject.addProperty("_value", pointAsString);
                 yield jsonObject;
             }
