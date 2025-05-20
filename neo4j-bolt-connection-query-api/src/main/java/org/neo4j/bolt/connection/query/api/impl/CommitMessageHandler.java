@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -26,6 +27,7 @@ import java.util.function.Supplier;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class CommitMessageHandler extends AbstractMessageHandler<Void> {
@@ -69,21 +71,25 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
 
     @Override
     protected Void handleResponse(HttpResponse<String> response) {
-        var bookmarksWrapper = httpContext.gson().fromJson(response.body(), BookmarksWrapper.class);
-        var bookmarks = bookmarksWrapper.bookmarks();
-        String bookmark = null;
-        if (bookmarks == null) {
-            log.log(System.Logger.Level.INFO, "No bookmarks found");
-        } else if (bookmarks.isEmpty()) {
-            log.log(System.Logger.Level.INFO, "No bookmarks found");
-        } else if (bookmarks.size() > 1) {
-            log.log(System.Logger.Level.INFO, "Multiple bookmarks found");
-            bookmark = bookmarks.get(0);
-        } else {
-            bookmark = bookmarks.get(0);
+        try {
+            var bookmarksWrapper = httpContext.json().beanFrom(BookmarksWrapper.class, response.body());
+            var bookmarks = bookmarksWrapper.bookmarks();
+            String bookmark = null;
+            if (bookmarks == null) {
+                log.log(System.Logger.Level.INFO, "No bookmarks found");
+            } else if (bookmarks.isEmpty()) {
+                log.log(System.Logger.Level.INFO, "No bookmarks found");
+            } else if (bookmarks.size() > 1) {
+                log.log(System.Logger.Level.INFO, "Multiple bookmarks found");
+                bookmark = bookmarks.get(0);
+            } else {
+                bookmark = bookmarks.get(0);
+            }
+            handler.onCommitSummary(new CommitSummaryImpl(bookmark));
+            return null;
+        } catch (IOException e) {
+           throw new BoltException("kaputt");
         }
-        handler.onCommitSummary(new CommitSummaryImpl(bookmark));
-        return null;
     }
 
     record BookmarksWrapper(List<String> bookmarks) {}

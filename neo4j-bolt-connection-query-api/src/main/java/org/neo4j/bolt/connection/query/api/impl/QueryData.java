@@ -16,7 +16,7 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.JsonObject;
 import java.util.List;
+import java.util.Map;
 
-record QueryData(List<String> fields, List<List<JsonObject>> values) {}
+record QueryData(List<String> fields, List<List<Map<String, Object>>> values) {}

@@ -19,9 +19,7 @@ package org.neo4j.bolt.connection.query.api.impl;
 import static org.neo4j.bolt.connection.query.api.impl.ValueUtil.asJsonObject;
 import static org.neo4j.bolt.connection.query.api.impl.ValueUtil.asValue;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -34,10 +32,15 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.jr.ob.JSON;
+import com.fasterxml.jackson.jr.ob.JSONComposer;
+import com.fasterxml.jackson.jr.ob.comp.ObjectComposer;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.message.RunMessage;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -73,7 +76,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
                 throw new BoltClientException("Database name must be specified");
             }
         }
-        this.bodyPublisher = newHttpRequestBodyPublisher(httpContext.gson(), message);
+        this.bodyPublisher = newHttpRequestBodyPublisher(httpContext.json(), message);
     }
 
     @Override
@@ -105,7 +108,12 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
 
     @Override
     protected Query handleResponse(HttpResponse<String> response) {
-        var queryResult = httpContext.gson().fromJson(response.body(), QueryResult.class);
+        QueryResult queryResult = null;
+        try {
+            queryResult = httpContext.json().beanFrom(QueryResult.class, response.body());
+        } catch (IOException e) {
+            throw new BoltException("kaputt");
+        }
         var records = queryResult.data().values().stream()
                 .map(record -> record.stream()
                         .map(value -> asValue(value, valueFactory))
@@ -151,41 +159,57 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         return query;
     }
 
-    private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(Gson gson, RunMessage message) {
-        var jsonObject = new JsonObject();
+    private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(JSON json, RunMessage message) {
+        try {
+            var jsonBuilder = json.composeString()
+                .startObject();
 
-        jsonObject.addProperty("statement", message.query());
-        if (!message.parameters().isEmpty()) {
-            jsonObject.add("parameters", params(message.parameters()));
-        }
-
-        if (message.extra().isPresent()) {
-            var extra = message.extra().get();
-            if (extra.accessMode() == AccessMode.READ) {
-                jsonObject.addProperty("accessMode", "Read");
+            jsonBuilder.put("statement", message.query());
+            if (!message.parameters().isEmpty()) {
+                params(jsonBuilder, message.parameters());
             }
-            extra.impersonatedUser()
-                    .ifPresent(impersonatedUser -> jsonObject.addProperty("impersonatedUser", impersonatedUser));
-            if (!extra.bookmarks().isEmpty()) {
-                var jsonArray = new JsonArray();
-                extra.bookmarks().forEach(jsonArray::add);
-                jsonObject.add("bookmarks", jsonArray);
-            }
-        }
 
-        jsonObject.addProperty("includeCounters", true);
-        var jsonBody = gson.toJson(jsonObject);
-        log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
-        return HttpRequest.BodyPublishers.ofString(jsonBody);
+            if (message.extra().isPresent()) {
+                var extra = message.extra().get();
+                if (extra.accessMode() == AccessMode.READ) {
+                    jsonBuilder.put("accessMode", "Read");
+                }
+                extra.impersonatedUser()
+                    .ifPresent(impersonatedUser -> {
+                        try {
+                            jsonBuilder.put("impersonatedUser", impersonatedUser);
+                        } catch (IOException e) {
+                            throw new BoltException("kaputt");
+                        }
+                    });
+                if (!extra.bookmarks().isEmpty()) {
+                    var bookmarkArray = jsonBuilder.startArrayField("bookmarks");
+                    for (String bookmark : extra.bookmarks()) {
+                        bookmarkArray.add(bookmark);
+                    }
+                    bookmarkArray.end();
+                }
+            }
+
+            jsonBuilder.put("includeCounters", true);
+            var jsonBody = jsonBuilder.end().finish();
+            log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
+            return HttpRequest.BodyPublishers.ofString(jsonBody);
+        } catch (IOException e) {
+            throw new BoltException("kaputt");
+        }
     }
 
-    private static JsonObject params(Map<String, Value> parameters) {
-        var parametersObject = new JsonObject();
+    private static void params(ObjectComposer<JSONComposer<String>> jsonBuilder, Map<String, Value> parameters) throws IOException {
+        if (parameters.isEmpty()) {
+            return;
+        }
+        var jsonObject = jsonBuilder.startObjectField("parameters");
         for (var entry : parameters.entrySet()) {
             var key = entry.getKey();
             var value = entry.getValue();
-            parametersObject.add(key, asJsonObject(value));
+            jsonObject.put(key, asJsonObject(value));
         }
-        return parametersObject;
+        jsonObject.end();
     }
 }

@@ -16,7 +16,10 @@
  */
 package org.neo4j.bolt.connection.query.api;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.jr.annotationsupport.JacksonAnnotationExtension;
+import com.fasterxml.jackson.jr.ob.JSON;
+
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -41,11 +44,11 @@ import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.query.api.impl.QueryApiBoltConnection;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
-    private static final Gson GSON = new Gson();
     private final HttpClient httpClient;
     private final URI baseUri;
     private final LoggingProvider logging;
@@ -81,7 +84,12 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenCompose(response -> {
                     if (response.statusCode() == 200) {
-                        var discoveryResponse = GSON.fromJson(response.body(), DiscoveryResponse.class);
+                        DiscoveryResponse discoveryResponse = null;
+                        try {
+                            discoveryResponse = JSON.std.beanFrom(DiscoveryResponse.class, response.body());
+                        } catch (IOException e) {
+                            throw new BoltException("kaputt");
+                        }
                         var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
                         return authTokenStageSupplier
                                 .get()
@@ -108,9 +116,15 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
-                        var discoveryResponse = GSON.fromJson(response.body(), DiscoveryResponse.class);
-                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
-                        return null;
+                        try {
+                            var discoveryResponse = JSON.builder()
+                                .register(JacksonAnnotationExtension.std)
+                                .build().beanFrom(DiscoveryResponse.class, response.body());
+                            var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
+                            return null;
+                        } catch (IOException e) {
+                            throw new BoltException("kaputt");
+                        }
                     } else {
                         throw new BoltClientException("Unexpected response code: " + response.statusCode());
                     }

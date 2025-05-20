@@ -18,8 +18,6 @@ package org.neo4j.bolt.connection.query.api.impl;
 
 import static org.neo4j.bolt.connection.query.api.impl.FutureUtil.completionExceptionCause;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Clock;
@@ -35,6 +33,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import com.fasterxml.jackson.jr.ob.JSON;
 import org.neo4j.bolt.connection.AuthInfo;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BoltConnection;
@@ -58,8 +58,7 @@ import org.neo4j.bolt.connection.message.RunMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class QueryApiBoltConnection implements BoltConnection {
-    private static final Gson GSON =
-            new GsonBuilder().disableHtmlEscaping().serializeNulls().create();
+    private final JSON json = JSON.std.with();
     private final LoggingProvider logging;
     private final System.Logger log;
     private final ValueFactory valueFactory;
@@ -208,10 +207,10 @@ public final class QueryApiBoltConnection implements BoltConnection {
         log.log(System.Logger.Level.DEBUG, "Initializing message handlers %s".formatted(messages));
         for (var message : messages) {
             if (message instanceof BeginMessage beginMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, GSON, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
                 messageHandlers.add(new BeginMessageHandler(handler, httpContext, beginMessage, valueFactory, logging));
             } else if (message instanceof RunMessage runMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, GSON, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
                 messageHandlers.add(new RunMessageHandler(
                         handler, httpContext, valueFactory, runMessage, this::getTransactionInfo, logging));
             } else if (message instanceof PullMessage pullMessage) {
@@ -227,11 +226,11 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 messageHandlers.add(
                         new DiscardMessageHandler(handler, discardMessage, this::findById, this::deleteById, logging));
             } else if (message instanceof CommitMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, GSON, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
                 messageHandlers.add(new CommitMessageHandler(
                         handler, httpContext, valueFactory, this::getTransactionInfo, logging));
             } else if (message instanceof RollbackMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, GSON, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
                 messageHandlers.add(new RollbackMessageHandler(
                         handler, httpContext, this::getTransactionInfo, valueFactory, logging));
             } else {

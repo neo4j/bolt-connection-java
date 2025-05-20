@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.query.api;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-record DiscoveryResponse(@SerializedName("neo4j_version") String neo4jVersion) {}
+// todo the only reason we need the complete chain of annotation and annotation support is here ;(
+record DiscoveryResponse(@JsonProperty("neo4j_version") String neo4jVersion) {}

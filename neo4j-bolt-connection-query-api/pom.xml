@@ -17,6 +17,7 @@
         <maven.compiler.xlint.extras>,-try</maven.compiler.xlint.extras>
         <maven.deploy.skip>false</maven.deploy.skip>
         <rootDir>${project.basedir}/..</rootDir>
+        <jackson.version>2.19.0</jackson.version>
     </properties>
 
     <dependencyManagement>
@@ -28,14 +29,28 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.12.1</version>
+            <groupId>com.fasterxml.jackson.jr</groupId>
+            <artifactId>jackson-jr-objects</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.jr</groupId>
+            <artifactId>jackson-jr-annotation-support</artifactId>
         </dependency>
         <dependency>
             <groupId>org.neo4j.bolt</groupId>
