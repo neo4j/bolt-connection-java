@@ -5,13 +5,14 @@
     <parent>
         <groupId>org.neo4j.bolt</groupId>
         <artifactId>neo4j-bolt-connection-parent</artifactId>
-        <version>3.0-SNAPSHOT</version>
+        <version>4.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>neo4j-bolt-connection-netty</artifactId>
 
     <packaging>jar</packaging>
-    <name>Neo4j Bolt Connection (Netty reference impl)</name>
+    <name>Neo4j Bolt Connection (Bolt Provider reference impl)</name>
+    <description>Implements a provider that supports `bolt`, `bolt+s` and `bolt+ssc` schemes.</description>
 
     <properties>
         <maven.compiler.xlint.extras>,-try</maven.compiler.xlint.extras>

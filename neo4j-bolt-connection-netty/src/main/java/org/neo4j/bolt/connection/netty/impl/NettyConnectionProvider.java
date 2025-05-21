@@ -33,7 +33,6 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
@@ -84,13 +83,10 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             BoltServerAddress address,
             SecurityPlan securityPlan,
             RoutingContext routingContext,
-            String databaseName,
             Map<String, Value> authMap,
             BoltAgent boltAgent,
             String userAgent,
-            AccessMode mode,
             int connectTimeoutMillis,
-            String impersonatedUser,
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             MetricsListener metricsListener) {

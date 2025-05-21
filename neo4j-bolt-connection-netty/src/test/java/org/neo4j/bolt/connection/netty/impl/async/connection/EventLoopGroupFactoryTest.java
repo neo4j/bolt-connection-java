@@ -32,6 +32,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class EventLoopGroupFactoryTest {
+    private final EventLoopGroupFactory eventLoopGroupFactory = new EventLoopGroupFactory(null);
     private EventLoopGroup eventLoopGroup;
 
     @AfterEach
@@ -41,13 +42,13 @@ class EventLoopGroupFactoryTest {
 
     @Test
     void shouldReturnCorrectChannelClass() {
-        assertEquals(NioSocketChannel.class, EventLoopGroupFactory.channelClass());
+        assertEquals(NioSocketChannel.class, eventLoopGroupFactory.channelClass());
     }
 
     @Test
     void shouldCreateEventLoopGroupWithSpecifiedThreadCount() {
         var threadCount = 2;
-        eventLoopGroup = EventLoopGroupFactory.newEventLoopGroup(threadCount);
+        eventLoopGroup = eventLoopGroupFactory.newEventLoopGroup(threadCount);
         assertEquals(
                 threadCount,
                 StreamSupport.stream(eventLoopGroup.spliterator(), false).count());
@@ -56,7 +57,7 @@ class EventLoopGroupFactoryTest {
 
     @Test
     void shouldAssertNotInEventLoopThread() {
-        eventLoopGroup = EventLoopGroupFactory.newEventLoopGroup(1);
+        eventLoopGroup = eventLoopGroupFactory.newEventLoopGroup(1);
 
         // current thread is not an event loop thread, assertion should not throw
         EventLoopGroupFactory.assertNotInEventLoopThread();
@@ -73,7 +74,7 @@ class EventLoopGroupFactoryTest {
 
     @Test
     void shouldCheckIfEventLoopThread() throws Exception {
-        eventLoopGroup = EventLoopGroupFactory.newEventLoopGroup(1);
+        eventLoopGroup = eventLoopGroupFactory.newEventLoopGroup(1);
 
         var eventLoopThread = getThread(eventLoopGroup);
         assertTrue(EventLoopGroupFactory.isEventLoopThread(eventLoopThread));
@@ -88,7 +89,7 @@ class EventLoopGroupFactoryTest {
     @Test
     void shouldUseSameThreadClassAsNioEventLoopGroupDoesByDefault() throws Exception {
         var nioEventLoopGroup = new NioEventLoopGroup(1);
-        eventLoopGroup = EventLoopGroupFactory.newEventLoopGroup(1);
+        eventLoopGroup = eventLoopGroupFactory.newEventLoopGroup(1);
         try {
             var defaultThread = getThread(nioEventLoopGroup);
             var driverThread = getThread(eventLoopGroup);
