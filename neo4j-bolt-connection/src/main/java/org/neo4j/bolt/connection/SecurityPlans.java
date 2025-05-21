@@ -25,26 +25,24 @@ import org.neo4j.bolt.connection.ssl.SSLContexts;
 import org.neo4j.bolt.connection.ssl.TrustManagerFactories;
 
 public final class SecurityPlans {
-    private static final SecurityPlan UNENCRYPTED = new SecurityPlanImpl(false, false, null, false);
+    public static SecurityPlan encrypted(SSLContext sslContext, boolean requiresHostnameVerification) {
+        return encrypted(sslContext, requiresHostnameVerification, null);
+    }
 
     public static SecurityPlan encrypted(
-            boolean requiresClientAuth, SSLContext sslContext, boolean requiresHostnameVerification) {
-        return new SecurityPlanImpl(true, requiresClientAuth, sslContext, requiresHostnameVerification);
+            SSLContext sslContext, boolean requiresHostnameVerification, String hostnameForVerification) {
+        return new SecurityPlanImpl(sslContext, requiresHostnameVerification, hostnameForVerification);
     }
 
     public static SecurityPlan encryptedForAnyCertificate() throws GeneralSecurityException {
         var sslContext = SSLContexts.forAnyCertificate(new KeyManager[0]);
-        return encrypted(false, sslContext, false);
+        return encrypted(sslContext, false);
     }
 
     public static SecurityPlan encryptedForSystemCASignedCertificates() throws GeneralSecurityException, IOException {
         var trustManagerFactory = TrustManagerFactories.forSystemCertificates(RevocationCheckingStrategy.NO_CHECKS);
         var sslContext = SSLContexts.forTrustManagers(new KeyManager[0], trustManagerFactory.getTrustManagers());
-        return encrypted(false, sslContext, true);
-    }
-
-    public static SecurityPlan unencrypted() {
-        return UNENCRYPTED;
+        return encrypted(sslContext, true);
     }
 
     private SecurityPlans() {}

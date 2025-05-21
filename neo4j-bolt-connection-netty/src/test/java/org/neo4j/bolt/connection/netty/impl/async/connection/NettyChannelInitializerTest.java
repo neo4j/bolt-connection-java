@@ -66,8 +66,7 @@ class NettyChannelInitializerTest {
 
     @Test
     void shouldNotAddSslHandlerWhenDoesNotRequireEncryption() {
-        var security = SecurityPlans.unencrypted();
-        var initializer = newInitializer(security);
+        var initializer = newInitializer(null);
 
         initializer.initChannel(channel);
 
@@ -91,8 +90,7 @@ class NettyChannelInitializerTest {
     void shouldUpdateChannelAttributes() {
         var clock = mock(Clock.class);
         when(clock.millis()).thenReturn(42L);
-        var security = SecurityPlans.unencrypted();
-        var initializer = newInitializer(security, Integer.MAX_VALUE, clock);
+        var initializer = newInitializer(null, Integer.MAX_VALUE, clock);
 
         initializer.initChannel(channel);
 
@@ -154,47 +152,27 @@ class NettyChannelInitializerTest {
     }
 
     private static SecurityPlan trustAllCertificates(boolean enabled) {
-        return new SecurityPlan() {
-            @Override
-            public boolean requiresEncryption() {
-                return true;
-            }
+        SSLContext sslContext;
+        try {
+            sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(new KeyManager[0], new TrustManager[] {new TrustAllTrustManager()}, null);
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            throw new RuntimeException(e);
+        }
+        return SecurityPlans.encrypted(sslContext, enabled);
+    }
 
-            @Override
-            public boolean requiresClientAuth() {
-                return false;
-            }
+    private static class TrustAllTrustManager implements X509TrustManager {
+        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            throw new CertificateException("All client connections to this client are forbidden.");
+        }
 
-            @Override
-            public SSLContext sslContext() {
-                SSLContext sslContext;
-                try {
-                    sslContext = SSLContext.getInstance("TLS");
-                    sslContext.init(new KeyManager[0], new TrustManager[] {new TrustAllTrustManager()}, null);
-                } catch (NoSuchAlgorithmException | KeyManagementException e) {
-                    throw new RuntimeException(e);
-                }
-                return sslContext;
-            }
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+            // all fine, pass through
+        }
 
-            @Override
-            public boolean requiresHostnameVerification() {
-                return enabled;
-            }
-
-            private static class TrustAllTrustManager implements X509TrustManager {
-                public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                    throw new CertificateException("All client connections to this client are forbidden.");
-                }
-
-                public void checkServerTrusted(X509Certificate[] chain, String authType) {
-                    // all fine, pass through
-                }
-
-                public X509Certificate[] getAcceptedIssuers() {
-                    return new X509Certificate[0];
-                }
-            }
-        };
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
     }
 }

@@ -20,13 +20,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Supplier;
-import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 
 /**
  * A generic interface to access all routing tables as a whole.
@@ -39,14 +35,7 @@ public interface RoutingTableRegistry {
      * @return The future of a new routing table handler.
      */
     CompletionStage<RoutingTableHandler> ensureRoutingTable(
-            SecurityPlan securityPlan,
-            CompletableFuture<DatabaseName> databaseNameFuture,
-            AccessMode mode,
-            Set<String> rediscoveryBookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
-            String homeDatabaseHint);
+            CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters);
 
     /**
      * @return all servers in the registry
