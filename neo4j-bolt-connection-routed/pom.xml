@@ -5,13 +5,13 @@
     <parent>
         <groupId>org.neo4j.bolt</groupId>
         <artifactId>neo4j-bolt-connection-parent</artifactId>
-        <version>3.0-SNAPSHOT</version>
+        <version>4.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>neo4j-bolt-connection-routed</artifactId>
 
     <packaging>jar</packaging>
-    <name>Neo4j Bolt Connection (Routed provider impl)</name>
+    <name>Neo4j Bolt Connection (Routed source impl)</name>
 
     <properties>
         <maven.compiler.xlint.extras>,-try</maven.compiler.xlint.extras>

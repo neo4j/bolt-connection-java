@@ -16,19 +16,7 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.concurrent.CompletionStage;
-
-public interface BoltConnectionProvider {
-    CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
-
-    CompletionStage<Void> close();
+record BoltConnectionParametersImpl(AuthToken authToken, BoltProtocolVersion minVersion)
+        implements BoltConnectionParameters {
+    static BoltConnectionParameters DEFAULT = new BoltConnectionParametersImpl(null, null);
 }

@@ -33,7 +33,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.message.Message;
-import org.neo4j.bolt.connection.routed.RoutedBoltConnectionProvider;
+import org.neo4j.bolt.connection.routed.RoutedBoltConnectionSource;
 import org.neo4j.bolt.connection.routed.impl.cluster.RoutingTableHandler;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
 import org.neo4j.bolt.connection.summary.BeginSummary;
@@ -53,13 +53,13 @@ public class RoutedBoltConnection implements BoltConnection {
     private final BoltConnection delegate;
     private final RoutingTableHandler routingTableHandler;
     private final AccessMode accessMode;
-    private final RoutedBoltConnectionProvider provider;
+    private final RoutedBoltConnectionSource provider;
 
     public RoutedBoltConnection(
             BoltConnection delegate,
             RoutingTableHandler routingTableHandler,
             AccessMode accessMode,
-            RoutedBoltConnectionProvider provider) {
+            RoutedBoltConnectionSource provider) {
         this.delegate = Objects.requireNonNull(delegate);
         this.routingTableHandler = Objects.requireNonNull(routingTableHandler);
         this.accessMode = Objects.requireNonNull(accessMode);

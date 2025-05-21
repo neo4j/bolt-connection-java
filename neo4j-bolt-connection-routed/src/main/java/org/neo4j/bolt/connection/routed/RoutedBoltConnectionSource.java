@@ -20,7 +20,6 @@ import static java.lang.String.format;
 
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,25 +29,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
-import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.RoutingContext;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.exception.BoltConnectionAcquisitionException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
@@ -62,7 +56,7 @@ import org.neo4j.bolt.connection.routed.impl.cluster.loadbalancing.LeastConnecte
 import org.neo4j.bolt.connection.routed.impl.cluster.loadbalancing.LoadBalancingStrategy;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
 
-public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
+public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBoltConnectionParameters> {
     private static final String CONNECTION_ACQUISITION_COMPLETION_FAILURE_MESSAGE =
             "Connection acquisition failed for all available addresses.";
     private static final String CONNECTION_ACQUISITION_COMPLETION_EXCEPTION_MESSAGE =
@@ -70,76 +64,48 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     private static final String CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE =
             "Failed to obtain a connection towards address %s, will try other addresses if available. Complete failure is reported separately from this entry.";
     private final System.Logger log;
-    private final Function<BoltServerAddress, BoltConnectionProvider> boltConnectionProviderFunction;
-    private final Map<BoltServerAddress, BoltConnectionProvider> addressToProvider = new HashMap<>();
+    private final Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>>
+            boltConnectionProviderFunction;
+    private final Map<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> addressToProvider =
+            new HashMap<>();
     private final Map<BoltServerAddress, Integer> addressToInUseCount = new HashMap<>();
     private final LoadBalancingStrategy loadBalancingStrategy;
     private final RoutingTableRegistry registry;
-    private final RoutingContext routingContext;
-    private final BoltAgent boltAgent;
-    private final String userAgent;
-    private final int connectTimeoutMillis;
+    private final Rediscovery rediscovery;
 
-    private Rediscovery rediscovery;
     private CompletableFuture<Void> closeFuture;
 
-    public RoutedBoltConnectionProvider(
-            Function<BoltServerAddress, BoltConnectionProvider> boltConnectionProviderFunction,
+    public RoutedBoltConnectionSource(
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> boltConnectionProviderFunction,
             Function<BoltServerAddress, Set<BoltServerAddress>> resolver,
             DomainNameResolver domainNameResolver,
             long routingTablePurgeDelayMs,
             Rediscovery rediscovery,
             Clock clock,
             LoggingProvider logging,
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            MetricsListener metricsListener) {
+            BoltServerAddress address) {
         this.boltConnectionProviderFunction = Objects.requireNonNull(boltConnectionProviderFunction);
         this.log = logging.getLog(getClass());
         this.loadBalancingStrategy = new LeastConnectedLoadBalancingStrategy(this::getInUseCount, logging);
-        this.rediscovery = rediscovery;
-        this.routingContext = routingContext;
-        this.boltAgent = boltAgent;
-        this.userAgent = userAgent;
-        this.connectTimeoutMillis = connectTimeoutMillis;
-        if (this.rediscovery == null) {
-            this.rediscovery = new RediscoveryImpl(
-                    address,
-                    resolver,
-                    logging,
-                    domainNameResolver,
-                    routingContext,
-                    boltAgent,
-                    userAgent,
-                    connectTimeoutMillis);
-        }
+        this.rediscovery =
+                rediscovery != null ? rediscovery : new RediscoveryImpl(address, resolver, logging, domainNameResolver);
         this.registry = new RoutingTableRegistryImpl(
                 this::get, this.rediscovery, clock, logging, routingTablePurgeDelayMs, this::shutdownUnusedProviders);
     }
 
+    private static <T> T getConfigEntry(Map<String, ?> config, String key, Class<T> type, Supplier<T> defaultValue) {
+        var value = config.get(key);
+        return (value != null && type.isAssignableFrom(value.getClass())) ? type.cast(value) : defaultValue.get();
+    }
+
     @Override
-    public CompletionStage<BoltConnection> connect(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            DatabaseName databaseName,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            AccessMode mode,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer,
-            Map<String, Object> additionalParameters) {
+    public CompletionStage<BoltConnection> getConnection() {
+        return getConnection(RoutedBoltConnectionParameters.defaultParameters());
+    }
+
+    @Override
+    public CompletionStage<BoltConnection> getConnection(RoutedBoltConnectionParameters parameters) {
         RoutingTableRegistry registry;
-        var homeDatabaseHintObj = additionalParameters.get("homeDatabase");
-        var homeDatabaseHint = homeDatabaseHintObj instanceof String ? (String) homeDatabaseHintObj : null;
         synchronized (this) {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
@@ -147,45 +113,25 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             registry = this.registry;
         }
 
-        Supplier<CompletionStage<AuthToken>> supplier =
-                () -> authTokenStageSupplier.get().exceptionally(throwable -> {
-                    throw new AuthTokenManagerExecutionException(throwable);
-                });
-
         var handlerRef = new AtomicReference<RoutingTableHandler>();
+        var databaseName = parameters.databaseName();
         var databaseNameFuture = databaseName == null
                 ? new CompletableFuture<DatabaseName>()
                 : CompletableFuture.completedFuture(databaseName);
         databaseNameFuture.whenComplete((name, throwable) -> {
             if (name != null) {
-                databaseNameConsumer.accept(name);
+                parameters.databaseNameConsumer().accept(name);
             }
         });
-        return registry.ensureRoutingTable(
-                        securityPlan,
-                        databaseNameFuture,
-                        mode,
-                        bookmarks,
-                        impersonatedUser,
-                        supplier,
-                        minVersion,
-                        homeDatabaseHint)
+        return registry.ensureRoutingTable(databaseNameFuture, parameters)
                 .thenApply(routingTableHandler -> {
                     handlerRef.set(routingTableHandler);
                     return routingTableHandler;
                 })
-                .thenCompose(routingTableHandler -> acquire(
-                        securityPlan,
-                        mode,
-                        routingTableHandler.routingTable(),
-                        supplier,
-                        routingTableHandler.routingTable().database(),
-                        Set.of(),
-                        impersonatedUser,
-                        minVersion,
-                        notificationConfig))
-                .thenApply(boltConnection ->
-                        (BoltConnection) new RoutedBoltConnection(boltConnection, handlerRef.get(), mode, this))
+                .thenCompose(routingTableHandler ->
+                        acquire(parameters.accessMode(), routingTableHandler.routingTable(), parameters))
+                .thenApply(boltConnection -> (BoltConnection)
+                        new RoutedBoltConnection(boltConnection, handlerRef.get(), parameters.accessMode(), this))
                 .exceptionally(throwable -> {
                     throwable = FutureUtil.completionExceptionCause(throwable);
                     if (throwable instanceof AuthTokenManagerExecutionException) {
@@ -200,30 +146,22 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
+    public CompletionStage<Void> verifyConnectivity() {
         RoutingTableRegistry registry;
         synchronized (this) {
             registry = this.registry;
         }
-        return supportsMultiDb(null, null, null, null, 0, securityPlan, authToken)
+        return detectFeature(
+                        "Failed to perform multi-databases feature detection with the following servers: ",
+                        boltConnection ->
+                                boltConnection.protocolVersion().compareTo(new BoltProtocolVersion(4, 0)) >= 0)
                 .thenCompose(supports -> registry.ensureRoutingTable(
-                        securityPlan,
                         supports
                                 ? CompletableFuture.completedFuture(DatabaseNameUtil.database("system"))
                                 : CompletableFuture.completedFuture(DatabaseNameUtil.defaultDatabase()),
-                        AccessMode.READ,
-                        Collections.emptySet(),
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        null,
-                        null))
+                        RoutedBoltConnectionParameters.builder()
+                                .withAccessMode(AccessMode.READ)
+                                .build()))
                 .handle((ignored, error) -> {
                     if (error != null) {
                         var cause = FutureUtil.completionExceptionCause(error);
@@ -239,33 +177,15 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
+    public CompletionStage<Boolean> supportsMultiDb() {
         return detectFeature(
-                securityPlan,
-                authToken,
                 "Failed to perform multi-databases feature detection with the following servers: ",
                 (boltConnection -> boltConnection.protocolVersion().compareTo(new BoltProtocolVersion(4, 0)) >= 0));
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
+    public CompletionStage<Boolean> supportsSessionAuth() {
         return detectFeature(
-                securityPlan,
-                authToken,
                 "Failed to perform session auth feature detection with the following servers: ",
                 (boltConnection -> new BoltProtocolVersion(5, 1).compareTo(boltConnection.protocolVersion()) <= 0));
     }
@@ -283,10 +203,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private CompletionStage<Boolean> detectFeature(
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            String baseErrorMessagePrefix,
-            Function<BoltConnection, Boolean> featureDetectionFunction) {
+            String baseErrorMessagePrefix, Function<BoltConnection, Boolean> featureDetectionFunction) {
         Rediscovery rediscovery;
         synchronized (this) {
             rediscovery = this.rediscovery;
@@ -315,27 +232,10 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
                 } else if (error instanceof SSLHandshakeException) {
                     return CompletableFuture.failedFuture(error);
                 }
-                return get(address)
-                        .connect(
-                                address,
-                                routingContext,
-                                boltAgent,
-                                userAgent,
-                                connectTimeoutMillis,
-                                securityPlan,
-                                null,
-                                () -> CompletableFuture.completedStage(authToken),
-                                AccessMode.WRITE,
-                                Collections.emptySet(),
-                                null,
-                                null,
-                                null,
-                                (ignored) -> {},
-                                Collections.emptyMap())
-                        .thenCompose(boltConnection -> {
-                            var featureDetected = featureDetectionFunction.apply(boltConnection);
-                            return boltConnection.close().thenApply(ignored -> featureDetected);
-                        });
+                return get(address).getConnection().thenCompose(boltConnection -> {
+                    var featureDetected = featureDetectionFunction.apply(boltConnection);
+                    return boltConnection.close().thenApply(ignored -> featureDetected);
+                });
             });
         }
         return FutureUtil.onErrorContinue(result, baseError, completionError -> {
@@ -354,44 +254,19 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private CompletionStage<BoltConnection> acquire(
-            SecurityPlan securityPlan,
-            AccessMode mode,
-            RoutingTable routingTable,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            DatabaseName database,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig) {
+            AccessMode mode, RoutingTable routingTable, BoltConnectionParameters parameters) {
         var result = new CompletableFuture<BoltConnection>();
         List<Throwable> attemptExceptions = new ArrayList<>();
-        acquire(
-                securityPlan,
-                mode,
-                routingTable,
-                result,
-                authTokenStageSupplier,
-                attemptExceptions,
-                database,
-                bookmarks,
-                impersonatedUser,
-                minVersion,
-                notificationConfig);
+        acquire(mode, routingTable, result, attemptExceptions, parameters);
         return result;
     }
 
     private void acquire(
-            SecurityPlan securityPlan,
             AccessMode mode,
             RoutingTable routingTable,
             CompletableFuture<BoltConnection> result,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
             List<Throwable> attemptErrors,
-            DatabaseName database,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig) {
+            BoltConnectionParameters parameters) {
         var addresses = getAddressesByMode(mode, routingTable);
         log.log(System.Logger.Level.DEBUG, "Addresses: " + addresses);
         var address = selectAddress(mode, addresses);
@@ -406,52 +281,24 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
             return;
         }
 
-        get(address)
-                .connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        database,
-                        authTokenStageSupplier,
-                        mode,
-                        bookmarks,
-                        impersonatedUser,
-                        minVersion,
-                        notificationConfig,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .whenComplete((connection, completionError) -> {
-                    var error = FutureUtil.completionExceptionCause(completionError);
-                    if (error != null) {
-                        if (error instanceof BoltServiceUnavailableException) {
-                            var attemptMessage = format(CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE, address);
-                            log.log(System.Logger.Level.WARNING, attemptMessage);
-                            log.log(System.Logger.Level.DEBUG, attemptMessage, error);
-                            attemptErrors.add(error);
-                            routingTable.forget(address);
-                            CompletableFuture.runAsync(() -> acquire(
-                                    securityPlan,
-                                    mode,
-                                    routingTable,
-                                    result,
-                                    authTokenStageSupplier,
-                                    attemptErrors,
-                                    database,
-                                    bookmarks,
-                                    impersonatedUser,
-                                    minVersion,
-                                    notificationConfig));
-                        } else {
-                            result.completeExceptionally(error);
-                        }
-                    } else {
-                        incrementInUseCount(address);
-                        result.complete(connection);
-                    }
-                });
+        get(address).getConnection(parameters).whenComplete((connection, completionError) -> {
+            var error = FutureUtil.completionExceptionCause(completionError);
+            if (error != null) {
+                if (error instanceof BoltServiceUnavailableException) {
+                    var attemptMessage = format(CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE, address);
+                    log.log(System.Logger.Level.WARNING, attemptMessage);
+                    log.log(System.Logger.Level.DEBUG, attemptMessage, error);
+                    attemptErrors.add(error);
+                    routingTable.forget(address);
+                    CompletableFuture.runAsync(() -> acquire(mode, routingTable, result, attemptErrors, parameters));
+                } else {
+                    result.completeExceptionally(error);
+                }
+            } else {
+                incrementInUseCount(address);
+                result.complete(connection);
+            }
+        });
     }
 
     private BoltServerAddress selectAddress(AccessMode mode, List<BoltServerAddress> addresses) {
@@ -507,7 +354,7 @@ public class RoutedBoltConnectionProvider implements BoltConnectionProvider {
         return closeFuture;
     }
 
-    private synchronized BoltConnectionProvider get(BoltServerAddress address) {
+    private synchronized BoltConnectionSource<BoltConnectionParameters> get(BoltServerAddress address) {
         var provider = addressToProvider.get(address);
         if (provider == null) {
             provider = boltConnectionProviderFunction.apply(address);

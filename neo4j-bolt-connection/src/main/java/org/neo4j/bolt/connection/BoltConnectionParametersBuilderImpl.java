@@ -16,19 +16,24 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.concurrent.CompletionStage;
+class BoltConnectionParametersBuilderImpl implements BoltConnectionParameters.Builder {
+    protected AuthToken authToken;
+    protected BoltProtocolVersion minVersion;
 
-public interface BoltConnectionProvider {
-    CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
+    @Override
+    public BoltConnectionParameters.Builder withAuthToken(AuthToken authToken) {
+        this.authToken = authToken;
+        return this;
+    }
 
-    CompletionStage<Void> close();
+    @Override
+    public BoltConnectionParameters.Builder withMinVersion(BoltProtocolVersion minVersion) {
+        this.minVersion = minVersion;
+        return this;
+    }
+
+    @Override
+    public BoltConnectionParameters build() {
+        return new BoltConnectionParametersImpl(authToken, minVersion);
+    }
 }

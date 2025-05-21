@@ -19,7 +19,8 @@
  */
 @SuppressWarnings({"requires-automatic", "requires-transitive-automatic"})
 module org.neo4j.bolt.connection.netty {
-    exports org.neo4j.bolt.connection.netty;
+    provides org.neo4j.bolt.connection.BoltConnectionProviderFactory with
+            org.neo4j.bolt.connection.netty.NettyBoltConnectionProviderFactory;
 
     requires transitive org.neo4j.bolt.connection;
     requires io.netty.common;

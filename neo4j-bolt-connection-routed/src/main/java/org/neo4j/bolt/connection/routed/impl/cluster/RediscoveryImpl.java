@@ -23,7 +23,6 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 
 import java.net.UnknownHostException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -33,21 +32,16 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import javax.net.ssl.SSLHandshakeException;
-import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
-import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.ClusterComposition;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.RoutingContext;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.exception.BoltDiscoveryException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
@@ -81,75 +75,38 @@ public class RediscoveryImpl implements Rediscovery {
     private final System.Logger log;
     private final Function<BoltServerAddress, Set<BoltServerAddress>> resolver;
     private final DomainNameResolver domainNameResolver;
-    private final RoutingContext routingContext;
-    private final BoltAgent boltAgent;
-    private final String userAgent;
-    private final int connectTimeoutMillis;
 
     public RediscoveryImpl(
             BoltServerAddress initialRouter,
             Function<BoltServerAddress, Set<BoltServerAddress>> resolver,
             LoggingProvider logging,
-            DomainNameResolver domainNameResolver,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis) {
+            DomainNameResolver domainNameResolver) {
         this.initialRouter = initialRouter;
         this.log = logging.getLog(getClass());
         this.resolver = resolver;
         this.domainNameResolver = requireNonNull(domainNameResolver);
-        this.routingContext = routingContext;
-        this.boltAgent = boltAgent;
-        this.userAgent = userAgent;
-        this.connectTimeoutMillis = connectTimeoutMillis;
     }
 
     @Override
     public CompletionStage<ClusterCompositionLookupResult> lookupClusterComposition(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion) {
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
+            RoutedBoltConnectionParameters parameters) {
         var result = new CompletableFuture<ClusterCompositionLookupResult>();
         // if we failed discovery, we will chain all errors into this one.
         var baseError = new BoltServiceUnavailableException(
                 String.format(NO_ROUTERS_AVAILABLE, routingTable.database().description()));
-        lookupClusterComposition(
-                securityPlan,
-                routingTable,
-                connectionProviderGetter,
-                result,
-                bookmarks,
-                impersonatedUser,
-                authTokenStageSupplier,
-                minVersion,
-                baseError);
+        lookupClusterComposition(routingTable, connectionProviderGetter, result, parameters, baseError);
         return result;
     }
 
     private void lookupClusterComposition(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             CompletableFuture<ClusterCompositionLookupResult> result,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
-        lookup(
-                        securityPlan,
-                        routingTable,
-                        connectionProviderGetter,
-                        bookmarks,
-                        impersonatedUser,
-                        authTokenStageSupplier,
-                        minVersion,
-                        baseError)
+        lookup(routingTable, connectionProviderGetter, parameters, baseError)
                 .whenComplete((compositionLookupResult, completionError) -> {
                     var error = FutureUtil.completionExceptionCause(completionError);
                     if (error != null) {
@@ -163,124 +120,60 @@ public class RediscoveryImpl implements Rediscovery {
     }
 
     private CompletionStage<ClusterCompositionLookupResult> lookup(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
         CompletionStage<ClusterCompositionLookupResult> compositionStage;
 
         if (routingTable.preferInitialRouter()) {
             compositionStage = lookupOnInitialRouterThenOnKnownRouters(
-                    securityPlan,
-                    routingTable,
-                    connectionProviderGetter,
-                    bookmarks,
-                    impersonatedUser,
-                    authTokenStageSupplier,
-                    minVersion,
-                    baseError);
+                    routingTable, connectionProviderGetter, parameters, baseError);
         } else {
             compositionStage = lookupOnKnownRoutersThenOnInitialRouter(
-                    securityPlan,
-                    routingTable,
-                    connectionProviderGetter,
-                    bookmarks,
-                    impersonatedUser,
-                    authTokenStageSupplier,
-                    minVersion,
-                    baseError);
+                    routingTable, connectionProviderGetter, parameters, baseError);
         }
 
         return compositionStage;
     }
 
     private CompletionStage<ClusterCompositionLookupResult> lookupOnKnownRoutersThenOnInitialRouter(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
         Set<BoltServerAddress> seenServers = new HashSet<>();
-        return lookupOnKnownRouters(
-                        securityPlan,
-                        routingTable,
-                        connectionProviderGetter,
-                        seenServers,
-                        bookmarks,
-                        impersonatedUser,
-                        authTokenStageSupplier,
-                        minVersion,
-                        baseError)
+        return lookupOnKnownRouters(routingTable, connectionProviderGetter, seenServers, parameters, baseError)
                 .thenCompose(compositionLookupResult -> {
                     if (compositionLookupResult != null) {
                         return completedFuture(compositionLookupResult);
                     }
                     return lookupOnInitialRouter(
-                            securityPlan,
-                            routingTable,
-                            connectionProviderGetter,
-                            seenServers,
-                            bookmarks,
-                            impersonatedUser,
-                            authTokenStageSupplier,
-                            minVersion,
-                            baseError);
+                            routingTable, connectionProviderGetter, seenServers, parameters, baseError);
                 });
     }
 
     private CompletionStage<ClusterCompositionLookupResult> lookupOnInitialRouterThenOnKnownRouters(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
         Set<BoltServerAddress> seenServers = emptySet();
-        return lookupOnInitialRouter(
-                        securityPlan,
-                        routingTable,
-                        connectionProviderGetter,
-                        seenServers,
-                        bookmarks,
-                        impersonatedUser,
-                        authTokenStageSupplier,
-                        minVersion,
-                        baseError)
+        return lookupOnInitialRouter(routingTable, connectionProviderGetter, seenServers, parameters, baseError)
                 .thenCompose(compositionLookupResult -> {
                     if (compositionLookupResult != null) {
                         return completedFuture(compositionLookupResult);
                     }
                     return lookupOnKnownRouters(
-                            securityPlan,
-                            routingTable,
-                            connectionProviderGetter,
-                            new HashSet<>(),
-                            bookmarks,
-                            impersonatedUser,
-                            authTokenStageSupplier,
-                            minVersion,
-                            baseError);
+                            routingTable, connectionProviderGetter, new HashSet<>(), parameters, baseError);
                 });
     }
 
     private CompletionStage<ClusterCompositionLookupResult> lookupOnKnownRouters(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Set<BoltServerAddress> seenServers,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
         CompletableFuture<ClusterComposition> result = CompletableFuture.completedFuture(null);
         for (var address : routingTable.routers()) {
@@ -289,17 +182,7 @@ public class RediscoveryImpl implements Rediscovery {
                     return completedFuture(composition);
                 } else {
                     return lookupOnRouter(
-                            securityPlan,
-                            address,
-                            true,
-                            routingTable,
-                            connectionProviderGetter,
-                            seenServers,
-                            bookmarks,
-                            impersonatedUser,
-                            authTokenStageSupplier,
-                            minVersion,
-                            baseError);
+                            address, true, routingTable, connectionProviderGetter, seenServers, parameters, baseError);
                 }
             });
         }
@@ -308,14 +191,10 @@ public class RediscoveryImpl implements Rediscovery {
     }
 
     private CompletionStage<ClusterCompositionLookupResult> lookupOnInitialRouter(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Set<BoltServerAddress> seenServers,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
         List<BoltServerAddress> resolvedRouters;
         try {
@@ -333,17 +212,7 @@ public class RediscoveryImpl implements Rediscovery {
                     return completedFuture(composition);
                 }
                 return lookupOnRouter(
-                        securityPlan,
-                        address,
-                        false,
-                        routingTable,
-                        connectionProviderGetter,
-                        null,
-                        bookmarks,
-                        impersonatedUser,
-                        authTokenStageSupplier,
-                        minVersion,
-                        baseError);
+                        address, false, routingTable, connectionProviderGetter, null, parameters, baseError);
             });
         }
         return result.thenApply(composition ->
@@ -351,16 +220,12 @@ public class RediscoveryImpl implements Rediscovery {
     }
 
     private CompletionStage<ClusterComposition> lookupOnRouter(
-            SecurityPlan securityPlan,
             BoltServerAddress routerAddress,
             boolean resolveAddress,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Set<BoltServerAddress> seenServers,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
+            RoutedBoltConnectionParameters parameters,
             Throwable baseError) {
         var addressFuture = CompletableFuture.completedFuture(routerAddress);
 
@@ -372,24 +237,7 @@ public class RediscoveryImpl implements Rediscovery {
                 .thenApply(address ->
                         resolveAddress ? resolveByDomainNameOrThrowCompletionException(address, routingTable) : address)
                 .thenApply(address -> addAndReturn(seenServers, address))
-                .thenCompose(address -> connectionProviderGetter
-                        .apply(address)
-                        .connect(
-                                address,
-                                routingContext,
-                                boltAgent,
-                                userAgent,
-                                connectTimeoutMillis,
-                                securityPlan,
-                                null,
-                                authTokenStageSupplier,
-                                AccessMode.READ,
-                                bookmarks,
-                                null,
-                                minVersion,
-                                null,
-                                (ignored) -> {},
-                                Collections.emptyMap()))
+                .thenCompose(address -> connectionProviderGetter.apply(address).getConnection(parameters))
                 .thenApply(connection -> {
                     connectionRef.set(connection);
                     return connection;
@@ -419,7 +267,9 @@ public class RediscoveryImpl implements Rediscovery {
                             }
                         },
                         Messages.route(
-                                routingTable.database().databaseName().orElse(null), impersonatedUser, bookmarks)))
+                                routingTable.database().databaseName().orElse(null),
+                                parameters.impersonatedUser(),
+                                parameters.bookmarks())))
                 .thenCompose(ignored -> compositionFuture)
                 .thenApply(clusterComposition -> {
                     if (clusterComposition.routers().isEmpty()

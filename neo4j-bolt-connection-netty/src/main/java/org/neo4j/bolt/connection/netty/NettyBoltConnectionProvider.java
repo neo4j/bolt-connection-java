@@ -20,24 +20,17 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import java.time.Clock;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import org.neo4j.bolt.connection.AccessMode;
+import java.util.concurrent.TimeUnit;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
@@ -50,18 +43,18 @@ import org.neo4j.bolt.connection.netty.impl.ConnectionProvider;
 import org.neo4j.bolt.connection.netty.impl.ConnectionProviders;
 import org.neo4j.bolt.connection.netty.impl.NettyLogging;
 import org.neo4j.bolt.connection.netty.impl.NoopMetricsListener;
-import org.neo4j.bolt.connection.netty.impl.messaging.v4.BoltProtocolV4;
-import org.neo4j.bolt.connection.netty.impl.messaging.v51.BoltProtocolV51;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class NettyBoltConnectionProvider implements BoltConnectionProvider {
     private final LoggingProvider logging;
     private final System.Logger log;
+    private final EventLoopGroup eventLoopGroup;
     private final ConnectionProvider connectionProvider;
     private final MetricsListener metricsListener;
     private final Clock clock;
     private final ValueFactory valueFactory;
+    private final boolean shutdownEventLoopGroupOnClose;
 
     private CompletableFuture<Void> closeFuture;
 
@@ -72,16 +65,19 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             LocalAddress localAddress,
             LoggingProvider logging,
             ValueFactory valueFactory,
-            MetricsListener metricsListener) {
+            MetricsListener metricsListener,
+            boolean shutdownEventLoopGroupOnClose) {
         Objects.requireNonNull(eventLoopGroup);
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
         this.log = logging.getLog(getClass());
+        this.eventLoopGroup = Objects.requireNonNull(eventLoopGroup);
         this.connectionProvider = ConnectionProviders.netty(
                 eventLoopGroup, clock, domainNameResolver, localAddress, logging, valueFactory);
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.metricsListener = NoopMetricsListener.getInstance();
         InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));
+        this.shutdownEventLoopGroupOnClose = shutdownEventLoopGroupOnClose;
     }
 
     @Override
@@ -92,15 +88,9 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             String userAgent,
             int connectTimeoutMillis,
             SecurityPlan securityPlan,
-            DatabaseName databaseName,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            AccessMode mode,
-            Set<String> bookmarks,
-            String impersonatedUser,
+            AuthToken authToken,
             BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer,
-            Map<String, Object> additionalParameters) {
+            NotificationConfig notificationConfig) {
         synchronized (this) {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
@@ -108,26 +98,18 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         }
 
         var latestAuthMillisFuture = new CompletableFuture<Long>();
-        var authMapRef = new AtomicReference<AuthToken>();
-        return authTokenStageSupplier
-                .get()
-                .thenCompose(authToken -> {
-                    authMapRef.set(authToken);
-                    return this.connectionProvider.acquireConnection(
-                            address,
-                            securityPlan,
-                            routingContext,
-                            databaseName != null ? databaseName.databaseName().orElse(null) : null,
-                            authToken.asMap(),
-                            boltAgent,
-                            userAgent,
-                            mode,
-                            connectTimeoutMillis,
-                            impersonatedUser,
-                            latestAuthMillisFuture,
-                            notificationConfig,
-                            metricsListener);
-                })
+        return connectionProvider
+                .acquireConnection(
+                        address,
+                        securityPlan,
+                        routingContext,
+                        authToken.asMap(),
+                        boltAgent,
+                        userAgent,
+                        connectTimeoutMillis,
+                        latestAuthMillisFuture,
+                        notificationConfig,
+                        metricsListener)
                 .thenCompose(connection -> {
                     if (minVersion != null
                             && minVersion.compareTo(connection.protocol().version()) > 0) {
@@ -147,12 +129,11 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         log.log(System.Logger.Level.DEBUG, "Failed to establish BoltConnection " + address, throwable);
                         throw new CompletionException(throwable);
                     } else {
-                        databaseNameConsumer.accept(databaseName);
                         return new BoltConnectionImpl(
                                 connection.protocol(),
                                 connection,
                                 connection.eventLoop(),
-                                authMapRef.get(),
+                                authToken,
                                 latestAuthMillisFuture,
                                 routingContext,
                                 clock,
@@ -163,101 +144,18 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
-        return connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        AccessMode.WRITE,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        null,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .thenCompose(BoltConnection::close);
-    }
-
-    @Override
-    public CompletionStage<Boolean> supportsMultiDb(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
-        return connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        AccessMode.WRITE,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        null,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .thenCompose(boltConnection -> {
-                    var supports = boltConnection.protocolVersion().compareTo(BoltProtocolV4.VERSION) >= 0;
-                    return boltConnection.close().thenApply(ignored -> supports);
-                });
-    }
-
-    @Override
-    public CompletionStage<Boolean> supportsSessionAuth(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
-        return connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        AccessMode.WRITE,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        null,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .thenCompose(boltConnection -> {
-                    var supports = BoltProtocolV51.VERSION.compareTo(boltConnection.protocolVersion()) <= 0;
-                    return boltConnection.close().thenApply(ignored -> supports);
-                });
-    }
-
-    @Override
     public CompletionStage<Void> close() {
         CompletableFuture<Void> closeFuture;
         synchronized (this) {
             if (this.closeFuture == null) {
-                this.closeFuture = CompletableFuture.completedFuture(null);
+                this.closeFuture = new CompletableFuture<>();
+                if (shutdownEventLoopGroupOnClose) {
+                    eventLoopGroup
+                            .shutdownGracefully(200, 15_000, TimeUnit.MILLISECONDS)
+                            .addListener(future -> this.closeFuture.complete(null));
+                } else {
+                    this.closeFuture.complete(null);
+                }
             }
             closeFuture = this.closeFuture;
         }

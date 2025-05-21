@@ -16,19 +16,19 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.concurrent.CompletionStage;
+import java.util.Set;
+import java.util.function.Consumer;
 
-public interface BoltConnectionProvider {
-    CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
-
-    CompletionStage<Void> close();
+record RoutedBoltConnectionParametersImpl(
+        AuthToken authToken,
+        BoltProtocolVersion minVersion,
+        AccessMode accessMode,
+        DatabaseName databaseName,
+        Consumer<DatabaseName> databaseNameConsumer,
+        String homeDatabase,
+        Set<String> bookmarks,
+        String impersonatedUser)
+        implements RoutedBoltConnectionParameters {
+    static RoutedBoltConnectionParameters DEFAULT = new RoutedBoltConnectionParametersImpl(
+            null, null, AccessMode.WRITE, null, ignored -> {}, null, Set.of(), null);
 }

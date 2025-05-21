@@ -19,6 +19,8 @@
  */
 module org.neo4j.bolt.connection.routed {
     exports org.neo4j.bolt.connection.routed;
+    exports org.neo4j.bolt.connection.routed.impl;
 
     requires transitive org.neo4j.bolt.connection;
+    requires java.net.http;
 }

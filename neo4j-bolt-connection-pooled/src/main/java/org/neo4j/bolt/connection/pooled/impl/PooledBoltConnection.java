@@ -32,7 +32,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.Message;
 import org.neo4j.bolt.connection.message.Messages;
-import org.neo4j.bolt.connection.pooled.PooledBoltConnectionProvider;
+import org.neo4j.bolt.connection.pooled.PooledBoltConnectionSource;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.CommitSummary;
 import org.neo4j.bolt.connection.summary.DiscardSummary;
@@ -48,14 +48,14 @@ import org.neo4j.bolt.connection.values.Value;
 
 public class PooledBoltConnection implements BoltConnection {
     private final BoltConnection delegate;
-    private final PooledBoltConnectionProvider provider;
+    private final PooledBoltConnectionSource provider;
     private final Runnable releaseRunnable;
     private final Runnable purgeRunnable;
     private CompletableFuture<Void> closeFuture;
 
     public PooledBoltConnection(
             BoltConnection delegate,
-            PooledBoltConnectionProvider provider,
+            PooledBoltConnectionSource provider,
             Runnable releaseRunnable,
             Runnable purgeRunnable) {
         this.delegate = Objects.requireNonNull(delegate);
@@ -176,7 +176,7 @@ public class PooledBoltConnection implements BoltConnection {
         return delegate;
     }
 
-    private record PooledResponseHandler(PooledBoltConnectionProvider provider, ResponseHandler handler)
+    private record PooledResponseHandler(PooledBoltConnectionSource provider, ResponseHandler handler)
             implements ResponseHandler {
 
         @Override

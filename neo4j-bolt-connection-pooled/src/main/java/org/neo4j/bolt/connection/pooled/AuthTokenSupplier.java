@@ -14,21 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection;
+package org.neo4j.bolt.connection.pooled;
 
 import java.util.concurrent.CompletionStage;
+import org.neo4j.bolt.connection.AuthToken;
 
-public interface BoltConnectionProvider {
-    CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
-
-    CompletionStage<Void> close();
+@FunctionalInterface
+public interface AuthTokenSupplier {
+    CompletionStage<AuthToken> getToken();
 }

@@ -16,19 +16,19 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.concurrent.CompletionStage;
+import java.util.Map;
+import org.neo4j.bolt.connection.values.ValueFactory;
 
-public interface BoltConnectionProvider {
-    CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
+public interface BoltConnectionProviderFactory {
+    boolean supports(String scheme);
 
-    CompletionStage<Void> close();
+    BoltConnectionProvider create(
+            LoggingProvider loggingProvider,
+            ValueFactory valueFactory,
+            MetricsListener metricsListener,
+            Map<String, ?> additionalConfig);
+
+    default int getOrder() {
+        return Integer.MAX_VALUE;
+    }
 }

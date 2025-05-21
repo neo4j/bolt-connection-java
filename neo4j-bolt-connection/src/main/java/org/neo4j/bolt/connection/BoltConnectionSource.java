@@ -18,17 +18,16 @@ package org.neo4j.bolt.connection;
 
 import java.util.concurrent.CompletionStage;
 
-public interface BoltConnectionProvider {
-    CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
+public interface BoltConnectionSource<T extends BoltConnectionParameters> {
+    CompletionStage<BoltConnection> getConnection();
+
+    CompletionStage<BoltConnection> getConnection(T parameters);
+
+    CompletionStage<Void> verifyConnectivity();
+
+    CompletionStage<Boolean> supportsMultiDb();
+
+    CompletionStage<Boolean> supportsSessionAuth();
 
     CompletionStage<Void> close();
 }
