@@ -14,17 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection;
+package org.neo4j.bolt.connection.routed;
 
-import java.util.Objects;
-import javax.net.ssl.SSLContext;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/**
- * A SecurityPlan consists of encryption and trust details.
- */
-record SecurityPlanImpl(SSLContext sslContext, boolean verifyHostname, String expectedHostname)
-        implements SecurityPlan {
-    SecurityPlanImpl {
-        Objects.requireNonNull(sslContext);
-    }
-}
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface DiscoveryAbortingError {}

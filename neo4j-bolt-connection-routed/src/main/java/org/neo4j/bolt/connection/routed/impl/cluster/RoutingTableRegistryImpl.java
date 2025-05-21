@@ -34,14 +34,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
-import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
 
@@ -53,11 +52,11 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
     private final RoutingTableHandlerFactory factory;
     private final System.Logger log;
     private final Clock clock;
-    private final Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter;
+    private final Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter;
     private final Rediscovery rediscovery;
 
     public RoutingTableRegistryImpl(
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Rediscovery rediscovery,
             Clock clock,
             LoggingProvider logging,
@@ -82,7 +81,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
             ConcurrentMap<DatabaseName, RoutingTableHandler> routingTableHandlers,
             RoutingTableHandlerFactory factory,
             Clock clock,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Rediscovery rediscovery,
             LoggingProvider logging) {
         requireNonNull(rediscovery, "rediscovery must not be null");
@@ -97,61 +96,38 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
 
     @Override
     public CompletionStage<RoutingTableHandler> ensureRoutingTable(
-            SecurityPlan securityPlan,
-            CompletableFuture<DatabaseName> databaseNameFuture,
-            AccessMode mode,
-            Set<String> rediscoveryBookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion,
-            String homeDatabaseHint) {
+            CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters) {
         if (!databaseNameFuture.isDone()) {
-            if (homeDatabaseHint != null) {
-                var handler = routingTableHandlers.get(DatabaseNameUtil.database(homeDatabaseHint));
-                if (handler != null && !handler.isStaleFor(mode)) {
+            if (parameters.homeDatabase() != null) {
+                var handler = routingTableHandlers.get(DatabaseNameUtil.database(parameters.homeDatabase()));
+                if (handler != null && !handler.isStaleFor(parameters.accessMode())) {
                     return CompletableFuture.completedFuture(handler);
                 }
             }
         }
-        return ensureDatabaseNameIsCompleted(
-                        securityPlan,
-                        databaseNameFuture,
-                        mode,
-                        rediscoveryBookmarks,
-                        impersonatedUser,
-                        authTokenStageSupplier,
-                        minVersion)
-                .thenCompose(ctxAndHandler -> {
-                    var handler = ctxAndHandler.handler() != null
-                            ? ctxAndHandler.handler()
-                            : getOrCreate(FutureUtil.joinNowOrElseThrow(
-                                    ctxAndHandler.databaseNameFuture(), PENDING_DATABASE_NAME_EXCEPTION_SUPPLIER));
-                    return handler.ensureRoutingTable(
-                                    securityPlan, mode, rediscoveryBookmarks, authTokenStageSupplier, minVersion)
-                            .thenApply(ignored -> handler);
-                });
+        return ensureDatabaseNameIsCompleted(databaseNameFuture, parameters).thenCompose(ctxAndHandler -> {
+            var handler = ctxAndHandler.handler() != null
+                    ? ctxAndHandler.handler()
+                    : getOrCreate(FutureUtil.joinNowOrElseThrow(
+                            ctxAndHandler.databaseNameFuture(), PENDING_DATABASE_NAME_EXCEPTION_SUPPLIER));
+            return handler.ensureRoutingTable(parameters).thenApply(ignored -> handler);
+        });
     }
 
     private CompletionStage<ConnectionContextAndHandler> ensureDatabaseNameIsCompleted(
-            SecurityPlan securityPlan,
-            CompletableFuture<DatabaseName> databaseNameFutureS,
-            AccessMode mode,
-            Set<String> rediscoveryBookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion) {
+            CompletableFuture<DatabaseName> databaseNameFutureS, RoutedBoltConnectionParameters parameters) {
         CompletionStage<ConnectionContextAndHandler> contextAndHandlerStage;
 
         if (databaseNameFutureS.isDone()) {
-            contextAndHandlerStage = CompletableFuture.completedFuture(
-                    new ConnectionContextAndHandler(databaseNameFutureS, mode, rediscoveryBookmarks, null));
+            contextAndHandlerStage = CompletableFuture.completedFuture(new ConnectionContextAndHandler(
+                    databaseNameFutureS, parameters.accessMode(), parameters.bookmarks(), null));
         } else {
             synchronized (this) {
                 if (databaseNameFutureS.isDone()) {
-                    contextAndHandlerStage = CompletableFuture.completedFuture(
-                            new ConnectionContextAndHandler(databaseNameFutureS, mode, rediscoveryBookmarks, null));
+                    contextAndHandlerStage = CompletableFuture.completedFuture(new ConnectionContextAndHandler(
+                            databaseNameFutureS, parameters.accessMode(), parameters.bookmarks(), null));
                 } else {
-                    var principal = new Principal(impersonatedUser);
+                    var principal = new Principal(parameters.impersonatedUser());
                     var databaseNameStage = principalToDatabaseNameStage.get(principal);
                     var handlerRef = new AtomicReference<RoutingTableHandler>();
 
@@ -162,14 +138,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
 
                         var routingTable = new ClusterRoutingTable(DatabaseNameUtil.defaultDatabase(), clock);
                         rediscovery
-                                .lookupClusterComposition(
-                                        securityPlan,
-                                        routingTable,
-                                        connectionProviderGetter,
-                                        rediscoveryBookmarks,
-                                        impersonatedUser,
-                                        authTokenStageSupplier,
-                                        minVersion)
+                                .lookupClusterComposition(routingTable, connectionProviderGetter, parameters)
                                 .thenCompose(compositionLookupResult -> {
                                     var databaseName = DatabaseNameUtil.database(compositionLookupResult
                                             .getClusterComposition()
@@ -198,7 +167,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
                             databaseNameFutureS.complete(databaseName);
                         }
                         return new ConnectionContextAndHandler(
-                                databaseNameFutureS, mode, rediscoveryBookmarks, handlerRef.get());
+                                databaseNameFutureS, parameters.accessMode(), parameters.bookmarks(), handlerRef.get());
                     });
                 }
             }
@@ -261,7 +230,8 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
     }
 
     static class RoutingTableHandlerFactory {
-        private final Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter;
+        private final Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>>
+                connectionProviderGetter;
         private final Rediscovery rediscovery;
         private final LoggingProvider logging;
         private final Clock clock;
@@ -269,7 +239,7 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
         private final Consumer<Set<BoltServerAddress>> addressesToRetainConsumer;
 
         RoutingTableHandlerFactory(
-                Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+                Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
                 Rediscovery rediscovery,
                 Clock clock,
                 LoggingProvider logging,

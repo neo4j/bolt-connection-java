@@ -14,15 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.routed.impl;
+package org.neo4j.bolt.connection;
 
-import java.io.Serial;
-
-public class AuthTokenManagerExecutionException extends RuntimeException {
-    @Serial
-    private static final long serialVersionUID = -7415186795248189131L;
-
-    public AuthTokenManagerExecutionException(Throwable cause) {
-        super(cause);
-    }
+record BoltConnectionParametersImpl(AuthToken authToken, BoltProtocolVersion minVersion)
+        implements BoltConnectionParameters {
+    static BoltConnectionParameters DEFAULT = new BoltConnectionParametersImpl(null, null);
 }

@@ -14,17 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection;
+package org.neo4j.bolt.connection.routed;
 
-import java.util.Objects;
-import javax.net.ssl.SSLContext;
+import java.net.URI;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 
-/**
- * A SecurityPlan consists of encryption and trust details.
- */
-record SecurityPlanImpl(SSLContext sslContext, boolean verifyHostname, String expectedHostname)
-        implements SecurityPlan {
-    SecurityPlanImpl {
-        Objects.requireNonNull(sslContext);
-    }
+@FunctionalInterface
+public interface BoltConnectionSourceFactory {
+    BoltConnectionSource<BoltConnectionParameters> create(URI uri, String expectedVerificationHostname);
 }

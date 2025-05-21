@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -53,20 +52,17 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.AuthTokens;
 import org.neo4j.bolt.connection.BoltConnection;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.ClusterComposition;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.SecurityPlan;
-import org.neo4j.bolt.connection.SecurityPlans;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.Rediscovery;
@@ -76,6 +72,10 @@ import org.neo4j.bolt.connection.routed.impl.util.FakeClock;
 
 class RoutingTableHandlerTest {
     public static final long STALE_ROUTING_TABLE_PURGE_DELAY_MS = SECONDS.toMillis(30);
+    RoutedBoltConnectionParameters parameters = RoutedBoltConnectionParameters.builder()
+            .withAccessMode(AccessMode.READ)
+            .withMinVersion(new BoltProtocolVersion(4, 1))
+            .build();
 
     @Test
     void shouldRemoveAddressFromRoutingTableOnConnectionFailure() {
@@ -115,22 +115,14 @@ class RoutingTableHandlerTest {
         Set<BoltServerAddress> routers = new LinkedHashSet<>(singletonList(router1));
         var clusterComposition = new ClusterComposition(42, readers, writers, routers, null);
         Rediscovery rediscovery = Mockito.mock(RediscoveryImpl.class);
-        when(rediscovery.lookupClusterComposition(
-                        any(), eq(routingTable), eq(connectionPool), any(), any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any()))
                 .thenReturn(completedFuture(new ClusterCompositionLookupResult(clusterComposition)));
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionPool);
-        assertNotNull(handler.ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        READ,
-                        Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
-                        new BoltProtocolVersion(4, 1))
-                .toCompletableFuture()
-                .join());
+        assertNotNull(
+                handler.ensureRoutingTable(parameters).toCompletableFuture().join());
 
-        verify(rediscovery)
-                .lookupClusterComposition(any(), eq(routingTable), eq(connectionPool), any(), any(), any(), any());
+        verify(rediscovery).lookupClusterComposition(any(), any(), any());
         assertArrayEquals(
                 new BoltServerAddress[] {reader1, reader2},
                 routingTable.readers().toArray());
@@ -168,21 +160,14 @@ class RoutingTableHandlerTest {
         var connectionPool = newConnectionPoolMock();
 
         var rediscovery = newRediscoveryMock();
-        when(rediscovery.lookupClusterComposition(any(), any(), any(), any(), any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any()))
                 .thenReturn(completedFuture(new ClusterCompositionLookupResult(
                         new ClusterComposition(42, asOrderedSet(A, B), asOrderedSet(B, C), asOrderedSet(A, C), null))));
 
         var registry = new RoutingTableRegistry() {
             @Override
             public CompletionStage<RoutingTableHandler> ensureRoutingTable(
-                    SecurityPlan securityPlan,
-                    CompletableFuture<DatabaseName> databaseNameFuture,
-                    AccessMode mode,
-                    Set<String> rediscoveryBookmarks,
-                    String impersonatedUser,
-                    Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-                    BoltProtocolVersion minVersion,
-                    String homeDatabaseHint) {
+                    CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters) {
                 throw new UnsupportedOperationException();
             }
 
@@ -209,14 +194,8 @@ class RoutingTableHandlerTest {
         var handler =
                 newRoutingTableHandler(routingTable, rediscovery, connectionPool, registry, addressesToRetainRef::set);
 
-        var actual = handler.ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        READ,
-                        Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
-                        new BoltProtocolVersion(4, 1))
-                .toCompletableFuture()
-                .join();
+        var actual =
+                handler.ensureRoutingTable(parameters).toCompletableFuture().join();
         assertEquals(routingTable, actual);
 
         assertEquals(Set.of(A, B, C), addressesToRetainRef.get());
@@ -228,7 +207,7 @@ class RoutingTableHandlerTest {
         RoutingTable routingTable = new ClusterRoutingTable(defaultDatabase(), new FakeClock());
 
         var rediscovery = newRediscoveryMock();
-        when(rediscovery.lookupClusterComposition(any(), any(), any(), any(), any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Bang!")));
 
         var connectionPool = newConnectionPoolMock();
@@ -236,12 +215,7 @@ class RoutingTableHandlerTest {
         // When
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionPool, registry);
-        assertThrows(RuntimeException.class, () -> handler.ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        READ,
-                        Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
-                        new BoltProtocolVersion(4, 1))
+        assertThrows(RuntimeException.class, () -> handler.ensureRoutingTable(parameters)
                 .toCompletableFuture()
                 .join());
 
@@ -250,90 +224,56 @@ class RoutingTableHandlerTest {
     }
 
     private void testRediscoveryWhenStale(AccessMode mode) {
-        Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter = requestedAddress -> {
-            var boltConnectionProvider = mock(BoltConnectionProvider.class);
-            var connection = mock(BoltConnection.class);
-            given(boltConnectionProvider.connect(
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            Collections.emptyMap()))
-                    .willReturn(completedFuture(connection));
-            return boltConnectionProvider;
-        };
+        Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter =
+                requestedAddress -> {
+                    @SuppressWarnings("unchecked")
+                    BoltConnectionSource<BoltConnectionParameters> boltConnectionProvider =
+                            mock(BoltConnectionSource.class);
+                    var connection = mock(BoltConnection.class);
+                    given(boltConnectionProvider.getConnection(any())).willReturn(completedFuture(connection));
+                    return boltConnectionProvider;
+                };
 
         var routingTable = newStaleRoutingTableMock(mode);
         var rediscovery = newRediscoveryMock();
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionProviderGetter);
-        var actual = handler.ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        mode,
-                        Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
-                        new BoltProtocolVersion(4, 1))
+        var actual = handler.ensureRoutingTable(RoutedBoltConnectionParameters.builder()
+                        .withAccessMode(mode)
+                        .withMinVersion(new BoltProtocolVersion(4, 1))
+                        .build())
                 .toCompletableFuture()
                 .join();
         assertEquals(routingTable, actual);
 
         verify(routingTable).isStaleFor(mode);
-        verify(rediscovery)
-                .lookupClusterComposition(
-                        any(), eq(routingTable), eq(connectionProviderGetter), any(), any(), any(), any());
+        verify(rediscovery).lookupClusterComposition(any(), any(), any());
     }
 
     private void testNoRediscoveryWhenNotStale(AccessMode staleMode, AccessMode notStaleMode) {
-        Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter = requestedAddress -> {
-            var boltConnectionProvider = mock(BoltConnectionProvider.class);
-            var connection = mock(BoltConnection.class);
-            given(boltConnectionProvider.connect(
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            Collections.emptyMap()))
-                    .willReturn(completedFuture(connection));
-            return boltConnectionProvider;
-        };
+        Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter =
+                requestedAddress -> {
+                    @SuppressWarnings("unchecked")
+                    BoltConnectionSource<BoltConnectionParameters> boltConnectionProvider =
+                            mock(BoltConnectionSource.class);
+                    var connection = mock(BoltConnection.class);
+                    given(boltConnectionProvider.getConnection(any())).willReturn(completedFuture(connection));
+                    return boltConnectionProvider;
+                };
 
         var routingTable = newStaleRoutingTableMock(staleMode);
         var rediscovery = newRediscoveryMock();
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionProviderGetter);
 
-        assertNotNull(handler.ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        notStaleMode,
-                        Collections.emptySet(),
-                        () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
-                        new BoltProtocolVersion(4, 1))
+        assertNotNull(handler.ensureRoutingTable(RoutedBoltConnectionParameters.builder()
+                        .withAccessMode(notStaleMode)
+                        .withMinVersion(new BoltProtocolVersion(4, 1))
+                        .build())
                 .toCompletableFuture()
                 .join());
         verify(routingTable).isStaleFor(notStaleMode);
-        verify(rediscovery, never())
-                .lookupClusterComposition(
-                        any(), eq(routingTable), eq(connectionProviderGetter), any(), any(), any(), any());
+        verify(rediscovery, never()).lookupClusterComposition(any(), any(), any());
     }
 
     private static RoutingTable newStaleRoutingTableMock(AccessMode mode) {
@@ -352,65 +292,33 @@ class RoutingTableHandlerTest {
         return Mockito.mock(RoutingTableRegistry.class);
     }
 
-    @SuppressWarnings("unchecked")
     private static Rediscovery newRediscoveryMock() {
         Rediscovery rediscovery = Mockito.mock(RediscoveryImpl.class);
         Set<BoltServerAddress> noServers = Collections.emptySet();
         var clusterComposition = new ClusterComposition(1, noServers, noServers, noServers, null);
-        when(rediscovery.lookupClusterComposition(
-                        any(), any(RoutingTable.class), any(Function.class), any(), any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any()))
                 .thenReturn(completedFuture(new ClusterCompositionLookupResult(clusterComposition)));
         return rediscovery;
     }
 
-    private static Function<BoltServerAddress, BoltConnectionProvider> newConnectionPoolMock() {
+    private static Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> newConnectionPoolMock() {
         return newConnectionPoolMockWithFailures(emptySet());
     }
 
-    private static Function<BoltServerAddress, BoltConnectionProvider> newConnectionPoolMockWithFailures(
-            Set<BoltServerAddress> unavailableAddresses) {
+    private static Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>>
+            newConnectionPoolMockWithFailures(Set<BoltServerAddress> unavailableAddresses) {
         return requestedAddress -> {
-            var boltConnectionProvider = mock(BoltConnectionProvider.class);
+            @SuppressWarnings("unchecked")
+            BoltConnectionSource<BoltConnectionParameters> boltConnectionProvider = mock(BoltConnectionSource.class);
             if (unavailableAddresses.contains(requestedAddress)) {
-                given(boltConnectionProvider.connect(
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                any(),
-                                Collections.emptyMap()))
+                given(boltConnectionProvider.getConnection(any()))
                         .willReturn(CompletableFuture.failedFuture(
                                 new BoltServiceUnavailableException(requestedAddress + " is unavailable!")));
                 return boltConnectionProvider;
             }
             var connection = mock(BoltConnection.class);
             when(connection.serverAddress()).thenReturn(requestedAddress);
-            given(boltConnectionProvider.connect(
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            any(),
-                            Collections.emptyMap()))
-                    .willReturn(completedFuture(connection));
+            given(boltConnectionProvider.getConnection(any())).willReturn(completedFuture(connection));
             return boltConnectionProvider;
         };
     }
@@ -418,7 +326,7 @@ class RoutingTableHandlerTest {
     private static RoutingTableHandler newRoutingTableHandler(
             RoutingTable routingTable,
             Rediscovery rediscovery,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter) {
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter) {
         return new RoutingTableHandlerImpl(
                 routingTable,
                 rediscovery,
@@ -432,7 +340,7 @@ class RoutingTableHandlerTest {
     private static RoutingTableHandler newRoutingTableHandler(
             RoutingTable routingTable,
             Rediscovery rediscovery,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             RoutingTableRegistry routingTableRegistry) {
         return newRoutingTableHandler(
                 routingTable, rediscovery, connectionProviderGetter, routingTableRegistry, ignored -> {});
@@ -441,7 +349,7 @@ class RoutingTableHandlerTest {
     private static RoutingTableHandler newRoutingTableHandler(
             RoutingTable routingTable,
             Rediscovery rediscovery,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             RoutingTableRegistry routingTableRegistry,
             Consumer<Set<BoltServerAddress>> addressesToRetainConsumer) {
         return new RoutingTableHandlerImpl(

@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -61,9 +60,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
-import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.ClusterComposition;
@@ -72,19 +71,21 @@ import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.GqlStatusError;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.RoutingContext;
-import org.neo4j.bolt.connection.SecurityPlans;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.message.RouteMessage;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
-import org.neo4j.bolt.connection.routed.impl.AuthTokenManagerExecutionException;
 import org.neo4j.bolt.connection.routed.impl.NoopLoggingProvider;
 import org.neo4j.bolt.connection.routed.impl.util.FakeClock;
 
 class RediscoveryTest {
+    RoutedBoltConnectionParameters parameters = RoutedBoltConnectionParameters.builder()
+            .withMinVersion(new BoltProtocolVersion(4, 1))
+            .build();
+
     @Test
     void shouldUseFirstRouterInTable() {
         var expectedComposition =
@@ -99,14 +100,7 @@ class RediscoveryTest {
         var table = routingTableMock(B);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -131,14 +125,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -168,14 +155,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable error = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         error = error.getCause();
@@ -206,14 +186,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -248,14 +221,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualError = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         actualError = actualError.getCause();
@@ -277,14 +243,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualError = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         actualError = actualError.getCause();
@@ -310,14 +269,7 @@ class RediscoveryTest {
         var table = routingTableMock(B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -346,14 +298,7 @@ class RediscoveryTest {
         var table = routingTableMock(B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -384,14 +329,7 @@ class RediscoveryTest {
         var table = routingTableMock(B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -418,14 +356,7 @@ class RediscoveryTest {
         var table = routingTableMock();
 
         Throwable error = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         error = error.getCause();
@@ -450,14 +381,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         e = e.getCause();
@@ -486,14 +410,7 @@ class RediscoveryTest {
         table.update(noWritersComposition);
 
         var composition2 = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -514,14 +431,7 @@ class RediscoveryTest {
         var table = routingTableMock(true, B, C, D);
 
         var composition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -545,14 +455,7 @@ class RediscoveryTest {
         var table = routingTableMock(true, D, E);
 
         var composition = rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -570,26 +473,11 @@ class RediscoveryTest {
         var logging = mock(LoggingProvider.class);
         var logger = mock(System.Logger.class);
         when(logging.getLog(any(Class.class))).thenReturn(logger);
-        Rediscovery rediscovery = new RediscoveryImpl(
-                A,
-                resolver,
-                logging,
-                DefaultDomainNameResolver.getInstance(),
-                RoutingContext.EMPTY,
-                mock(BoltAgent.class),
-                "userAgent",
-                0);
+        Rediscovery rediscovery = new RediscoveryImpl(A, resolver, logging, DefaultDomainNameResolver.getInstance());
         var table = routingTableMock(A);
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         e = e.getCause();
@@ -608,15 +496,7 @@ class RediscoveryTest {
         var domainNameResolver = mock(DomainNameResolver.class);
         var localhost = InetAddress.getLocalHost();
         when(domainNameResolver.resolve(A.host())).thenReturn(new InetAddress[] {localhost});
-        Rediscovery rediscovery = new RediscoveryImpl(
-                A,
-                resolver,
-                NoopLoggingProvider.INSTANCE,
-                domainNameResolver,
-                RoutingContext.EMPTY,
-                mock(BoltAgent.class),
-                "userAgent",
-                0);
+        Rediscovery rediscovery = new RediscoveryImpl(A, resolver, NoopLoggingProvider.INSTANCE, domainNameResolver);
 
         var addresses = rediscovery.resolve();
 
@@ -626,34 +506,27 @@ class RediscoveryTest {
         assertEquals(new BoltServerAddress(A.host(), localhost.getHostAddress(), A.port()), addresses.get(0));
     }
 
-    @Test
-    void shouldFailImmediatelyOnAuthTokenManagerExecutionException() {
-        var exception = new AuthTokenManagerExecutionException(new RuntimeException());
-
-        Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
-        responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
-        responsesByAddress.put(B, exception); // second router -> fatal auth error
-
-        var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
-        var rediscovery = newRediscovery(A, Collections::singleton);
-        var table = routingTableMock(A, B, C);
-
-        Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
-                .toCompletableFuture()
-                .join());
-        actualException = actualException.getCause();
-        assertInstanceOf(AuthTokenManagerExecutionException.class, actualException);
-        assertEquals(exception, actualException);
-        verify(table).forget(A);
-    }
+    //    @Test
+    //    void shouldFailImmediatelyOnAuthTokenManagerExecutionException() {
+    //        var exception = new AuthTokenManagerExecutionException(new RuntimeException());
+    //
+    //        Map<BoltServerAddress, Object> responsesByAddress = new HashMap<>();
+    //        responsesByAddress.put(A, new RuntimeException("Hi!")); // first router -> non-fatal failure
+    //        responsesByAddress.put(B, exception); // second router -> fatal auth error
+    //
+    //        var connectionProviderGetter = connectionProviderGetter(responsesByAddress);
+    //        var rediscovery = newRediscovery(A, Collections::singleton);
+    //        var table = routingTableMock(A, B, C);
+    //
+    //        Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
+    //                .lookupClusterComposition(table, connectionProviderGetter, parameters)
+    //                .toCompletableFuture()
+    //                .join());
+    //        actualException = actualException.getCause();
+    //        assertInstanceOf(AuthTokenManagerExecutionException.class, actualException);
+    //        assertEquals(exception, actualException);
+    //        verify(table).forget(A);
+    //    }
 
     @Test
     void shouldFailImmediatelyOnUnsupportedFeatureException() {
@@ -668,14 +541,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         actualException = actualException.getCause();
@@ -695,37 +561,20 @@ class RediscoveryTest {
         given(address.getHostAddress()).willReturn("fe80:0:0:0:ce66:1564:db8q:94b6%6");
         given(domainNameResolver.resolve(initialRouter.host())).willReturn(new InetAddress[] {address});
         var table = routingTableMock(true);
-        var pool = mock(BoltConnectionProvider.class);
-        given(pool.connect(
-                        any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(),
-                        any(), any()))
-                .willReturn(failedFuture(new BoltServiceUnavailableException("not available")));
+        @SuppressWarnings("unchecked")
+        BoltConnectionSource<BoltConnectionParameters> pool = mock(BoltConnectionSource.class);
+        given(pool.getConnection(any())).willReturn(failedFuture(new BoltServiceUnavailableException("not available")));
         var logging = mock(LoggingProvider.class);
         var logger = mock(System.Logger.class);
         given(logging.getLog(any(Class.class))).willReturn(logger);
         doAnswer(invocationOnMock -> String.format(invocationOnMock.getArgument(0), invocationOnMock.getArgument(1)))
                 .when(logger)
                 .log(eq(System.Logger.Level.WARNING), anyString());
-        var rediscovery = new RediscoveryImpl(
-                initialRouter,
-                resolver,
-                logging,
-                domainNameResolver,
-                RoutingContext.EMPTY,
-                mock(BoltAgent.class),
-                "userAgent",
-                0);
+        var rediscovery = new RediscoveryImpl(initialRouter, resolver, logging, domainNameResolver);
 
         // WHEN & THEN
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(
-                        SecurityPlans.unencrypted(),
-                        table,
-                        connectionProviderGetter,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        new BoltProtocolVersion(4, 1))
+                .lookupClusterComposition(table, connectionProviderGetter, parameters)
                 .toCompletableFuture()
                 .join());
         e = e.getCause();
@@ -742,28 +591,18 @@ class RediscoveryTest {
             BoltServerAddress initialRouter,
             Function<BoltServerAddress, Set<BoltServerAddress>> resolver,
             LoggingProvider loggingProvider) {
-        return new RediscoveryImpl(
-                initialRouter,
-                resolver,
-                loggingProvider,
-                DefaultDomainNameResolver.getInstance(),
-                RoutingContext.EMPTY,
-                mock(BoltAgent.class),
-                "userAgent",
-                0);
+        return new RediscoveryImpl(initialRouter, resolver, loggingProvider, DefaultDomainNameResolver.getInstance());
     }
 
-    private Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter(
+    private Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter(
             Map<BoltServerAddress, Object> responsesByAddress) {
-        var addressToProvider = new HashMap<BoltServerAddress, BoltConnectionProvider>();
+        var addressToProvider = new HashMap<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>>();
         for (var entry : responsesByAddress.entrySet()) {
             var boltConnection = setupConnection(entry.getValue());
 
-            var boltConnectionProvider = mock(BoltConnectionProvider.class);
-            given(boltConnectionProvider.connect(
-                            any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(),
-                            any(), any(), any()))
-                    .willReturn(completedFuture(boltConnection));
+            @SuppressWarnings("unchecked")
+            BoltConnectionSource<BoltConnectionParameters> boltConnectionProvider = mock(BoltConnectionSource.class);
+            given(boltConnectionProvider.getConnection(any())).willReturn(completedFuture(boltConnection));
 
             addressToProvider.put(entry.getKey(), boltConnectionProvider);
         }
