@@ -16,26 +16,21 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import static org.neo4j.bolt.connection.query.api.impl.ValueUtil.asJsonObject;
-import static org.neo4j.bolt.connection.query.api.impl.ValueUtil.asValue;
-
+import com.fasterxml.jackson.jr.ob.JSON;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-
-import com.fasterxml.jackson.jr.ob.JSON;
-import com.fasterxml.jackson.jr.ob.JSONComposer;
-import com.fasterxml.jackson.jr.ob.comp.ObjectComposer;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
@@ -110,15 +105,12 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     protected Query handleResponse(HttpResponse<String> response) {
         QueryResult queryResult = null;
         try {
-            queryResult = httpContext.json().beanFrom(QueryResult.class, response.body());
+            String body = response.body();
+            log.log(System.Logger.Level.DEBUG, "received body: " + body);
+            queryResult = httpContext.json().beanFrom(QueryResult.class, body);
         } catch (IOException e) {
-            throw new BoltException("kaputt");
+            throw new BoltException("kaputt", e);
         }
-        var records = queryResult.data().values().stream()
-                .map(record -> record.stream()
-                        .map(value -> asValue(value, valueFactory))
-                        .toArray(Value[]::new))
-                .collect(Collectors.toList());
         var id = new Random().nextLong();
         var counters = queryResult.counters();
         var statsMap = Map.ofEntries(
@@ -154,62 +146,89 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         if (notifications != null && !notifications.isEmpty()) {
             metadata.put("notifications", valueFactory.value(notifications));
         }
-        var query = new Query(id, queryResult.data().fields(), records, Collections.unmodifiableMap(metadata));
+        var query = new Query(
+                id, queryResult.data().fields(), queryResult.data().values(), Collections.unmodifiableMap(metadata));
         handler.onRunSummary(new RunSummaryImpl(query.id(), query.fields(), -1, databaseName));
         return query;
     }
 
     private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(JSON json, RunMessage message) {
         try {
-            var jsonBuilder = json.composeString()
-                .startObject();
-
-            jsonBuilder.put("statement", message.query());
+            String statement = message.query();
+            Map<String, Value> parameters = null;
             if (!message.parameters().isEmpty()) {
-                params(jsonBuilder, message.parameters());
+                parameters = message.parameters();
             }
 
+            String accessMode = "Write";
+            String impersonatedUser = null;
+            List<String> bookmarks = null;
             if (message.extra().isPresent()) {
                 var extra = message.extra().get();
                 if (extra.accessMode() == AccessMode.READ) {
-                    jsonBuilder.put("accessMode", "Read");
+                    accessMode = "Read";
                 }
-                extra.impersonatedUser()
-                    .ifPresent(impersonatedUser -> {
-                        try {
-                            jsonBuilder.put("impersonatedUser", impersonatedUser);
-                        } catch (IOException e) {
-                            throw new BoltException("kaputt");
-                        }
-                    });
+                impersonatedUser = extra.impersonatedUser().orElseGet(() -> null);
                 if (!extra.bookmarks().isEmpty()) {
-                    var bookmarkArray = jsonBuilder.startArrayField("bookmarks");
-                    for (String bookmark : extra.bookmarks()) {
-                        bookmarkArray.add(bookmark);
-                    }
-                    bookmarkArray.end();
+                    bookmarks = new ArrayList<>(extra.bookmarks());
                 }
             }
 
-            jsonBuilder.put("includeCounters", true);
-            var jsonBody = jsonBuilder.end().finish();
-            log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
+            QueryAPIRequestPayload payload =
+                    new QueryAPIRequestPayload(statement, parameters, bookmarks, impersonatedUser, accessMode);
+            var jsonBody = json.asString(payload);
+            //          fails right now with SDN's ScrollingIT *shrug*
+            //            log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
             return HttpRequest.BodyPublishers.ofString(jsonBody);
         } catch (IOException e) {
-            throw new BoltException("kaputt");
+            throw new BoltException("kaputt", e);
         }
     }
 
-    private static void params(ObjectComposer<JSONComposer<String>> jsonBuilder, Map<String, Value> parameters) throws IOException {
-        if (parameters.isEmpty()) {
-            return;
+    private static class QueryAPIRequestPayload {
+
+        private final String statement;
+        private final Map<String, Value> parameters;
+        private final List<String> bookmarks;
+        private final String impersonatedUser;
+        private final String accessMode;
+        private final Boolean includeCounters = true;
+
+        public QueryAPIRequestPayload(
+                String statement,
+                Map<String, Value> parameters,
+                List<String> bookmarks,
+                String impersonatedUser,
+                String accessMode) {
+            this.statement = statement;
+            this.parameters = parameters;
+            this.bookmarks = bookmarks;
+            this.impersonatedUser = impersonatedUser;
+            this.accessMode = accessMode;
         }
-        var jsonObject = jsonBuilder.startObjectField("parameters");
-        for (var entry : parameters.entrySet()) {
-            var key = entry.getKey();
-            var value = entry.getValue();
-            jsonObject.put(key, asJsonObject(value));
+
+        public Map<String, Value> getParameters() {
+            return parameters;
         }
-        jsonObject.end();
+
+        public String getStatement() {
+            return statement;
+        }
+
+        public List<String> getBookmarks() {
+            return bookmarks;
+        }
+
+        public String getAccessMode() {
+            return accessMode;
+        }
+
+        public Boolean getIncludeCounters() {
+            return includeCounters;
+        }
+
+        public String getImpersonatedUser() {
+            return impersonatedUser;
+        }
     }
 }

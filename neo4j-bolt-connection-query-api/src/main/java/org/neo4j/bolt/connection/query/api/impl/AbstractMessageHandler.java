@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.query.api.impl;
 import static org.neo4j.bolt.connection.query.api.impl.FutureUtil.completionExceptionCause;
 import static org.neo4j.bolt.connection.query.api.impl.HttpUtil.mapToString;
 
+import com.fasterxml.jackson.jr.ob.JSON;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -26,8 +27,6 @@ import java.net.http.HttpResponse;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
-
-import com.fasterxml.jackson.jr.ob.JSON;
 import org.neo4j.bolt.connection.GqlStatusError;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
@@ -83,14 +82,19 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                             case 200, 202 -> {
                                 // Query API may return an error
                                 try {
-                                    var jsonObject = json.mapFrom(response.body());
+                                    String body = response.body();
+                                    // transaction DELETE
+                                    if (body == null || body.isEmpty()) {
+                                        yield handleResponse(response);
+                                    }
+                                    var jsonObject = json.mapFrom(body);
                                     if (jsonObject != null && jsonObject.get("errors") != null) {
                                         yield handleFailureResponse(response);
                                     } else {
                                         yield handleResponse(response);
                                     }
                                 } catch (IOException e) {
-                                    throw new BoltException("kaputt");
+                                    throw new BoltException("kaputt", e);
                                 }
                             }
                             case 400, 401, 404, 500 -> handleFailureResponse(response);
@@ -110,18 +114,18 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
             var errorsData = json.beanFrom(ErrorsData.class, response.body());
             var error = errorsData.errors().get(0);
             var diagnosticRecord = Map.ofEntries(
-                Map.entry("CURRENT_SCHEMA", valueFactory.value("/")),
-                Map.entry("OPERATION", valueFactory.value("")),
-                Map.entry("OPERATION_CODE", valueFactory.value("0")));
+                    Map.entry("CURRENT_SCHEMA", valueFactory.value("/")),
+                    Map.entry("OPERATION", valueFactory.value("")),
+                    Map.entry("OPERATION_CODE", valueFactory.value("0")));
             throw new BoltFailureException(
-                error.code(),
-                error.message(),
-                GqlStatusError.UNKNOWN.getStatus(),
-                GqlStatusError.UNKNOWN.getStatusDescription(error.message()),
-                diagnosticRecord,
-                null);
+                    error.code(),
+                    error.message(),
+                    GqlStatusError.UNKNOWN.getStatus(),
+                    GqlStatusError.UNKNOWN.getStatusDescription(error.message()),
+                    diagnosticRecord,
+                    null);
         } catch (IOException e) {
-            throw new BoltException("kaputt");
+            throw new BoltException("kaputt", e);
         }
     }
 }
