@@ -21,8 +21,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.Objects;
-
-import com.fasterxml.jackson.jr.ob.JSON;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
@@ -81,34 +79,34 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     protected TransactionInfo handleResponse(HttpResponse<String> response) {
         try {
             var transactionEntry = httpContext.json().beanFrom(TransactionEntry.class, response.body());
-            var affinity = response.headers().firstValue("neo4j-cluster-affinity").orElse(null);
+            var affinity =
+                    response.headers().firstValue("neo4j-cluster-affinity").orElse(null);
             var info = new TransactionInfo(
-                databaseName,
-                transactionEntry.transaction().id(),
-                Instant.parse(transactionEntry.transaction().expires()),
-                affinity);
+                    databaseName,
+                    transactionEntry.transaction().id(),
+                    Instant.parse(transactionEntry.transaction().expires()),
+                    affinity);
             handler.onBeginSummary(new BeginSummaryImpl(databaseName));
             return info;
         } catch (IOException e) {
-            throw new BoltException("kaputt");
+            throw new BoltException("kaputt", e);
         }
     }
 
     private static HttpRequest.BodyPublisher newHttpRequestBodyPublisher(
             HttpContext httpContext, BeginMessage message, String databaseName) throws IOException {
-        var jsonObject = JSON.std.composeString().startObject();
+        var jsonObject = httpContext.json().composeString().startObject();
 
         if (message.accessMode() == AccessMode.READ) {
             jsonObject.put("accessMode", "Read");
         }
-        message.impersonatedUser()
-                .ifPresent(impersonatedUser -> {
-                    try {
-                        jsonObject.put("impersonatedUser", impersonatedUser);
-                    } catch (IOException e) {
-                        throw new BoltException("kaputt");
-                    }
-                });
+        message.impersonatedUser().ifPresent(impersonatedUser -> {
+            try {
+                jsonObject.put("impersonatedUser", impersonatedUser);
+            } catch (IOException e) {
+                throw new BoltException("kaputt", e);
+            }
+        });
         if (!message.bookmarks().isEmpty()) {
             var jsonArray = jsonObject.startArrayField("bookmarks");
             for (String bookmark : message.bookmarks()) {

@@ -16,7 +16,4 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-// todo the only reason we need the complete chain of annotation and annotation support is here ;(
-record DiscoveryResponse(@JsonProperty("neo4j_version") String neo4jVersion) {}
+record DiscoveryResponse(String neo4j_version) {}
