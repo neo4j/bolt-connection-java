@@ -88,7 +88,7 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
             handler.onCommitSummary(new CommitSummaryImpl(bookmark));
             return null;
         } catch (IOException e) {
-           throw new BoltException("kaputt");
+            throw new BoltException("kaputt", e);
         }
     }
 

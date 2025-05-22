@@ -17,6 +17,6 @@
 package org.neo4j.bolt.connection.query.api.impl;
 
 import java.util.List;
-import java.util.Map;
+import org.neo4j.bolt.connection.values.Value;
 
-record QueryData(List<String> fields, List<List<Map<String, Object>>> values) {}
+public record QueryData(List<String> fields, List<Value[]> values) {}
