@@ -20,8 +20,11 @@
 module org.neo4j.bolt.connection.query.api {
     exports org.neo4j.bolt.connection.query.api;
 
+    opens org.neo4j.bolt.connection.query.api;
+    opens org.neo4j.bolt.connection.query.api.impl;
+
     requires transitive org.neo4j.bolt.connection;
     requires java.net.http;
-    requires com.google.gson;
     requires java.naming;
+    requires com.fasterxml.jackson.jr.ob;
 }

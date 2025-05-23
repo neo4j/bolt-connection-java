@@ -16,7 +16,8 @@
  */
 package org.neo4j.bolt.connection.query.api;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.jr.ob.JSON;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -45,11 +46,11 @@ import org.neo4j.bolt.connection.query.api.impl.QueryApiBoltConnection;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
-    private static final Gson GSON = new Gson();
     private final HttpClient httpClient;
     private final URI baseUri;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
+    private boolean closed;
 
     public QueryApiBoltConnectionProvider(URI baseUri, LoggingProvider logging, ValueFactory valueFactory) {
         this.httpClient = HttpClient.newBuilder().build();
@@ -75,14 +76,22 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             NotificationConfig notificationConfig,
             Consumer<DatabaseName> databaseNameConsumer,
             Map<String, Object> additionalParameters) {
-
+        if (closed) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
+        }
         var request = HttpRequest.newBuilder(baseUri).build();
         return httpClient
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenCompose(response -> {
                     if (response.statusCode() == 200) {
-                        var discoveryResponse = GSON.fromJson(response.body(), DiscoveryResponse.class);
-                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
+                        DiscoveryResponse discoveryResponse = null;
+                        try {
+                            discoveryResponse = JSON.std.beanFrom(DiscoveryResponse.class, response.body());
+                        } catch (IOException e) {
+                            throw new BoltClientException(
+                                    "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);
+                        }
+                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
                         return authTokenStageSupplier
                                 .get()
                                 .thenApply(authToken -> new QueryApiBoltConnection(
@@ -103,14 +112,23 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             int connectTimeoutMillis,
             SecurityPlan securityPlan,
             AuthToken authToken) {
+        if (closed) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
+        }
         var request = HttpRequest.newBuilder(baseUri).build();
         return httpClient
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
-                        var discoveryResponse = GSON.fromJson(response.body(), DiscoveryResponse.class);
-                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
-                        return null;
+                        try {
+                            var discoveryResponse =
+                                    JSON.builder().build().beanFrom(DiscoveryResponse.class, response.body());
+                            var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
+                            return null;
+                        } catch (IOException e) {
+                            throw new BoltClientException(
+                                    "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);
+                        }
                     } else {
                         throw new BoltClientException("Unexpected response code: " + response.statusCode());
                     }
@@ -143,6 +161,8 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
 
     @Override
     public CompletionStage<Void> close() {
+        // hard hack to align with general driver behaviour
+        this.closed = true;
         return CompletableFuture.completedStage(null);
     }
 }
