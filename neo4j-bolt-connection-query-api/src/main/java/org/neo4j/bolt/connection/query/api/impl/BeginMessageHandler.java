@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
@@ -94,31 +96,22 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
     private static HttpRequest.BodyPublisher newHttpRequestBodyPublisher(
             HttpContext httpContext, BeginMessage message, String databaseName) throws IOException {
-        var jsonObject = httpContext.json().composeString().startObject();
 
-        if (message.accessMode() == AccessMode.READ) {
-            jsonObject.put("accessMode", "Read");
-        }
-        message.impersonatedUser().ifPresent(impersonatedUser -> {
-            try {
-                jsonObject.put("impersonatedUser", impersonatedUser);
-            } catch (IOException e) {
-                throw new BoltClientException("Cannot add impersonation to request", e);
-            }
-        });
+        String accessMode = message.accessMode() == AccessMode.READ ? "Read" : null;
+        String impersonatedUser = message.impersonatedUser().orElseGet(() -> null);
+        List<String> bookmarks = null;
+
         if (!message.bookmarks().isEmpty()) {
-            var jsonArray = jsonObject.startArrayField("bookmarks");
-            for (String bookmark : message.bookmarks()) {
-                jsonArray.add(bookmark);
-            }
-            jsonArray.end();
+            bookmarks = new ArrayList<>(message.bookmarks());
         }
 
-        var jsonBody = jsonObject.end().finish();
+        var jsonBody = httpContext.json().asString(new BeginMessageWrapper(accessMode, impersonatedUser, bookmarks));
         return HttpRequest.BodyPublishers.ofString(jsonBody);
     }
 
     record TransactionEntry(Transaction transaction) {}
 
     record Transaction(String id, String expires) {}
+
+    record BeginMessageWrapper(String accessMode, String impersonatedUser, List<String> bookmarks) {}
 }
