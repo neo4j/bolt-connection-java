@@ -27,7 +27,6 @@ import java.util.function.Supplier;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
-import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class CommitMessageHandler extends AbstractMessageHandler<Void> {
@@ -88,7 +87,7 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
             handler.onCommitSummary(new CommitSummaryImpl(bookmark));
             return null;
         } catch (IOException e) {
-            throw new BoltException("kaputt", e);
+            throw new BoltClientException("Cannot parse %s to BookmarksWrapper".formatted(response.body()), e);
         }
     }
 

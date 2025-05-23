@@ -31,9 +31,6 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 
-import com.fasterxml.jackson.jr.ob.JSON;
-import com.fasterxml.jackson.jr.ob.JacksonJrExtension;
-import com.fasterxml.jackson.jr.ob.api.ExtensionContext;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -105,25 +102,6 @@ abstract class AbstractQueryApi {
     }
 
     @Test
-    void asdf() throws Exception {
-        var input =
-                """
-{"data":{"fields":["r"],"values":[[{"$type":"Point","_value":"SRID=9157;POINT Z (30.0 -40.0 50.0)"}]]},"counters":{"containsUpdates":false,"nodesCreated":0,"nodesDeleted":0,"propertiesSet":0,"relationshipsCreated":0,"relationshipsDeleted":0,"labelsAdded":0,"labelsRemoved":0,"indexesAdded":0,"indexesRemoved":0,"constraintsAdded":0,"constraintsRemoved":0,"containsSystemUpdates":false,"systemUpdates":0},"bookmarks":["FB:kcwQf5VdBjZzRUGbkFDsMAtSXskD85A="]}
-            """;
-        var json = JSON.builder()
-                .register(new JacksonJrExtension() {
-                    @Override
-                    protected void register(ExtensionContext ctxt) {
-                        ctxt.appendProvider(new DriverValueProvider(TestValueFactory.INSTANCE));
-                    }
-                })
-                .build();
-
-        var result = json.beanFrom(QueryResult.class, input);
-        System.out.println(result);
-    }
-
-    @Test
     void shouldRunAutocommit() {
         // given
         var responseFuture = new CompletableFuture<>();
@@ -138,7 +116,7 @@ abstract class AbstractQueryApi {
                 AccessMode.WRITE,
                 null,
                 Set.of(),
-                "CALL dbms.components() YIELD versions RETURN 'Neo4j/' + versions[0] as version",
+                "RETURN 1",
                 Map.of(),
                 null,
                 Map.of(),
@@ -167,7 +145,7 @@ abstract class AbstractQueryApi {
     }
 
     @Test
-    void shouldRunAutocommitWithParameters() {
+    void shoulRunAutocommitWithParameters() {
         // given
         var responseFuture = new CompletableFuture<>();
         willAnswer(invocation -> {
@@ -181,29 +159,8 @@ abstract class AbstractQueryApi {
                 AccessMode.WRITE,
                 null,
                 Set.of(),
-                """
-					WITH 'ParentDB' AS name
-					
-					
-					CREATE (p:PUI {id: randomUUID(), name: name})
-					CREATE (p) -[:HAS_SINGLE_CUI]-> (sCUI:CUI {name: name + '.singleCUI'})
-					CREATE (p) -[:HAS_SINGLE_CUE]-> (sCUE:CUE {name: name + '.singleCUE', id: randomUUID()})
-					CREATE (p) -[:HAS_MANY_CUI]->   (mCUI1:CUI {name: name + '.cUI1'})
-					CREATE (p) -[:HAS_MANY_CUI]->   (mCUI2:CUI {name: name + '.cUI2'})
-					CREATE (p) -[:HAS_SINGLE_CVI]-> (sCVI:CVI {name: name + '.singleCVI', version: 0})
-					CREATE (p) -[:HAS_SINGLE_CVE]-> (sCVE:CVE {name: name + '.singleCVE', version: 0, id: randomUUID()})
-					CREATE (p) -[:HAS_MANY_CVI]->   (mCVI1:CVI {name: name + '.cVI1', version: 0})
-					CREATE (p) -[:HAS_MANY_CVI]->   (mCVI2:CVI {name: name + '.cVI2', version: 0})
-					CREATE (sCUI) -[:HAS_NESTED_CHILDREN]-> (:CUI {name: name + '.singleCUI.c1'})
-					CREATE (sCUI) -[:HAS_NESTED_CHILDREN]-> (:CUI {name: name + '.singleCUI.c2'})
-					CREATE (mCUI1) -[:HAS_NESTED_CHILDREN]-> (:CUI {name: name + '.cUI1.cc1'})
-					CREATE (mCUI1) -[:HAS_NESTED_CHILDREN]-> (:CUI {name: name + '.cUI1.cc2'})
-					CREATE (mCUI2) -[:HAS_NESTED_CHILDREN]-> (:CUI {name: name + '.cUI2.cc1'})
-					CREATE (mCUI2) -[:HAS_NESTED_CHILDREN]-> (:CUI {name: name + '.cUI2.cc2'})
-					RETURN elementId(p) AS id
-					""",
-                //                Map.of("param", TestValueFactory.INSTANCE.value(1)),
-                Map.of("param", TestValueFactory.INSTANCE.value(Map.of("test", List.of("nested", "dings")))),
+                "RETURN $param as test",
+                Map.of("param", TestValueFactory.INSTANCE.value(1)),
                 null,
                 Map.of(),
                 NotificationConfig.defaultConfig());

@@ -198,6 +198,7 @@
                     <configuration>
                         <java>
                             <palantirJavaFormat />
+                            <toggleOffOn />
                         </java>
                     </configuration>
                     <executions>
