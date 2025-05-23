@@ -30,6 +30,7 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.GqlStatusError;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
@@ -81,8 +82,8 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                         return switch (response.statusCode()) {
                             case 200, 202 -> {
                                 // Query API may return an error
+                                String body = response.body();
                                 try {
-                                    String body = response.body();
                                     // transaction DELETE
                                     if (body == null || body.isEmpty()) {
                                         yield handleResponse(response);
@@ -94,7 +95,7 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                                         yield handleResponse(response);
                                     }
                                 } catch (IOException e) {
-                                    throw new BoltException("kaputt", e);
+                                    throw new BoltClientException("Cannot parse response %s".formatted(body), e);
                                 }
                             }
                             case 400, 401, 404, 500 -> handleFailureResponse(response);
@@ -125,7 +126,7 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                     diagnosticRecord,
                     null);
         } catch (IOException e) {
-            throw new BoltException("kaputt", e);
+            throw new BoltClientException("Cannot parse %s to ErrorsData".formatted(response.body()), e);
         }
     }
 }

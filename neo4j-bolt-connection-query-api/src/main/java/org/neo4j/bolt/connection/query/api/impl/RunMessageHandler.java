@@ -35,7 +35,6 @@ import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
-import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.message.RunMessage;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -104,12 +103,12 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     @Override
     protected Query handleResponse(HttpResponse<String> response) {
         QueryResult queryResult = null;
+        String body = response.body();
         try {
-            String body = response.body();
             log.log(System.Logger.Level.DEBUG, "received body: " + body);
             queryResult = httpContext.json().beanFrom(QueryResult.class, body);
         } catch (IOException e) {
-            throw new BoltException("kaputt", e);
+            throw new BoltClientException("Cannot parse response %s to QueryResult".formatted(body), e);
         }
         var id = new Random().nextLong();
         var counters = queryResult.counters();
@@ -153,35 +152,35 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     }
 
     private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(JSON json, RunMessage message) {
+        String statement = message.query();
+        Map<String, Value> parameters = null;
+        if (!message.parameters().isEmpty()) {
+            parameters = message.parameters();
+        }
+
+        String accessMode = "Write";
+        String impersonatedUser = null;
+        List<String> bookmarks = null;
+        if (message.extra().isPresent()) {
+            var extra = message.extra().get();
+            if (extra.accessMode() == AccessMode.READ) {
+                accessMode = "Read";
+            }
+            impersonatedUser = extra.impersonatedUser().orElseGet(() -> null);
+            if (!extra.bookmarks().isEmpty()) {
+                bookmarks = new ArrayList<>(extra.bookmarks());
+            }
+        }
+
+        QueryAPIRequestPayload payload =
+                new QueryAPIRequestPayload(statement, parameters, bookmarks, impersonatedUser, accessMode);
         try {
-            String statement = message.query();
-            Map<String, Value> parameters = null;
-            if (!message.parameters().isEmpty()) {
-                parameters = message.parameters();
-            }
-
-            String accessMode = "Write";
-            String impersonatedUser = null;
-            List<String> bookmarks = null;
-            if (message.extra().isPresent()) {
-                var extra = message.extra().get();
-                if (extra.accessMode() == AccessMode.READ) {
-                    accessMode = "Read";
-                }
-                impersonatedUser = extra.impersonatedUser().orElseGet(() -> null);
-                if (!extra.bookmarks().isEmpty()) {
-                    bookmarks = new ArrayList<>(extra.bookmarks());
-                }
-            }
-
-            QueryAPIRequestPayload payload =
-                    new QueryAPIRequestPayload(statement, parameters, bookmarks, impersonatedUser, accessMode);
             var jsonBody = json.asString(payload);
             //          fails right now with SDN's ScrollingIT *shrug*
             //            log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
             return HttpRequest.BodyPublishers.ofString(jsonBody);
         } catch (IOException e) {
-            throw new BoltException("kaputt", e);
+            throw new BoltClientException("Cannot serialize payload %s".formatted(payload), e);
         }
     }
 

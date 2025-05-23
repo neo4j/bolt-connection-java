@@ -27,6 +27,4 @@ module org.neo4j.bolt.connection.query.api {
     requires java.net.http;
     requires java.naming;
     requires com.fasterxml.jackson.jr.ob;
-    requires java.sql;
-    requires java.desktop;
 }

@@ -30,75 +30,127 @@ import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-public enum CypherTypes {
-    Null(Type.NULL, (v, i) -> v.value((Object) null), (i) -> null),
+enum CypherTypes {
+    // spotless:off
+    Null(
+        Type.NULL,
+        (v, i) -> v.value((Object) null),
+        (i) -> null
+    ),
 
     List(
-            Type.LIST,
-            null, // manually handled in JSON converter
-            (v) -> v.values()),
+        Type.LIST,
+        null, // manually handled in JSON converter
+        (v) -> v.values()
+    ),
 
     Map(
-            Type.MAP,
-            null, // manually handled in JSON converter
-            (v) -> v.asMap(Function.identity())),
+        Type.MAP,
+        null, // manually handled in JSON converter
+        (v) -> v.asMap(Function.identity())
+    ),
 
-    Boolean(Type.BOOLEAN, (v, i) -> v.value(java.lang.Boolean.parseBoolean(i)), Value::asBoolean),
+    Boolean(
+        Type.BOOLEAN,
+        (v, i) -> v.value(java.lang.Boolean.parseBoolean(i)),
+        Value::asBoolean
+    ),
 
-    Integer(Type.INTEGER, (v, i) -> v.value(java.lang.Long.parseLong(i)), Value::asLong),
+    Integer(
+        Type.INTEGER,
+        (v, i) -> v.value(java.lang.Long.parseLong(i)),
+        Value::asLong
+    ),
 
-    Float(Type.FLOAT, (v, i) -> v.value(Double.parseDouble(i)), Value::asDouble),
+    Float(
+        Type.FLOAT,
+        (v, i) -> v.value(Double.parseDouble(i)),
+        Value::asDouble
+    ),
 
-    String(Type.STRING, ValueFactory::value, Value::asString),
+    String(
+        Type.STRING,
+        ValueFactory::value,
+        Value::asString
+    ),
 
-    Base64(Type.BYTES, (v, i) -> v.value(java.util.Base64.getDecoder().decode(i)), v -> java.util.Base64.getEncoder()
-            .encodeToString(v.asByteArray())),
+    Base64(Type.BYTES,
+        (v, i) -> v.value(java.util.Base64.getDecoder().decode(i)),
+        v -> java.util.Base64.getEncoder().encodeToString(v.asByteArray())
+    ),
 
     Date(
-            Type.DATE,
-            (v, i) -> v.value(LocalDate.parse(i, DateTimeFormatter.ISO_LOCAL_DATE)),
-            v -> DateTimeFormatter.ISO_LOCAL_DATE.format(v.asLocalDate())),
+        Type.DATE,
+        (v, i) -> v.value(LocalDate.parse(i, DateTimeFormatter.ISO_LOCAL_DATE)),
+        v -> DateTimeFormatter.ISO_LOCAL_DATE.format(v.asLocalDate())
+    ),
 
     Time(
-            Type.TIME,
-            (v, i) -> v.value(OffsetTime.parse(i, DateTimeFormatter.ISO_OFFSET_TIME)),
-            v -> DateTimeFormatter.ISO_OFFSET_TIME.format(v.asOffsetTime())),
+        Type.TIME,
+        (v, i) -> v.value(OffsetTime.parse(i, DateTimeFormatter.ISO_OFFSET_TIME)),
+        v -> DateTimeFormatter.ISO_OFFSET_TIME.format(v.asOffsetTime())
+    ),
 
     LocalTime(
-            Type.LOCAL_TIME,
-            (v, i) -> v.value(java.time.LocalTime.parse(i, DateTimeFormatter.ISO_LOCAL_TIME)),
-            v -> DateTimeFormatter.ISO_LOCAL_TIME.format(v.asLocalTime())),
+        Type.LOCAL_TIME,
+        (v, i) -> v.value(java.time.LocalTime.parse(i, DateTimeFormatter.ISO_LOCAL_TIME)),
+        v -> DateTimeFormatter.ISO_LOCAL_TIME.format(v.asLocalTime())
+    ),
 
     DateTime(
             Type.DATE_TIME,
             (v, i) -> v.value(java.time.ZonedDateTime.parse(i, DateTimeFormatter.ISO_ZONED_DATE_TIME)),
-            v -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(v.asZonedDateTime())),
+            v -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(v.asZonedDateTime())
+    ),
 
     OffsetDateTime(
             Type.DATE_TIME,
             (v, i) -> v.value(java.time.OffsetDateTime.parse(i, DateTimeFormatter.ISO_OFFSET_DATE_TIME)),
-            v -> DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(v.asZonedDateTime())),
+            v -> DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(v.asZonedDateTime())
+    ),
 
     ZonedDateTime(
             Type.DATE_TIME,
             (v, i) -> v.value(java.time.ZonedDateTime.parse(i, DateTimeFormatter.ISO_ZONED_DATE_TIME)),
-            v -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(v.asZonedDateTime())),
+            v -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(v.asZonedDateTime())
+    ),
 
     LocalDateTime(
             Type.LOCAL_DATE_TIME,
             (v, i) -> v.value(java.time.LocalDateTime.parse(i, DateTimeFormatter.ISO_LOCAL_DATE_TIME)),
-            v -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(v.asLocalDateTime())),
+            v -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(v.asLocalDateTime())
+    ),
 
-    Duration(Type.DURATION, CypherTypes::parseDuration, (v) -> v.asIsoDuration().toString()),
+    Duration(
+        Type.DURATION,
+        CypherTypes::parseDuration,
+        (v) -> v.asIsoDuration().toString()
+    ),
 
-    Point(Type.POINT, CypherTypes::parsePoint, CypherTypes::writePoint),
+    Point(
+        Type.POINT,
+        CypherTypes::parsePoint,
+        CypherTypes::writePoint
+    ),
 
-    Node(Type.NODE, null, CypherTypes::unsupported),
+    Node(
+        Type.NODE,
+        null, // handled in DriverValueProvider
+        CypherTypes::unsupported
+    ),
 
-    Relationship(Type.RELATIONSHIP, null, CypherTypes::unsupported),
+    Relationship(
+        Type.RELATIONSHIP,
+        null, // handled in DriverValueProvider
+        CypherTypes::unsupported
+    ),
 
-    Path(Type.PATH, null, CypherTypes::unsupported);
+    Path(
+        Type.PATH,
+        null, // handled in DriverValueProvider
+        CypherTypes::unsupported);
 
+    // spotless:on
     private final BiFunction<ValueFactory, String, Value> reader;
     private final Function<Value, Object> writer;
     private final Type type;

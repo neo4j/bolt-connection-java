@@ -35,7 +35,6 @@ import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
-import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
@@ -70,7 +69,8 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                         try {
                             discoveryResponse = JSON.std.beanFrom(DiscoveryResponse.class, response.body());
                         } catch (IOException e) {
-                            throw new BoltException("kaputt", e);
+                            throw new BoltClientException(
+                                    "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);
                         }
                         var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
                         return new QueryApiBoltConnection(

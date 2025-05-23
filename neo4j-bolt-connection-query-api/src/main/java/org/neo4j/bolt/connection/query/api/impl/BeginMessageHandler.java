@@ -26,7 +26,6 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
-import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.message.BeginMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -89,7 +88,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
             handler.onBeginSummary(new BeginSummaryImpl(databaseName));
             return info;
         } catch (IOException e) {
-            throw new BoltException("kaputt", e);
+            throw new BoltClientException("Cannot parse %s to TransactionEntry".formatted(response.body()), e);
         }
     }
 
@@ -104,7 +103,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
             try {
                 jsonObject.put("impersonatedUser", impersonatedUser);
             } catch (IOException e) {
-                throw new BoltException("kaputt", e);
+                throw new BoltClientException("Cannot add impersonation to request", e);
             }
         });
         if (!message.bookmarks().isEmpty()) {
