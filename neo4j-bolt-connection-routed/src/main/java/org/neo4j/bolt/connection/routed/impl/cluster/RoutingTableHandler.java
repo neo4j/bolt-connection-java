@@ -18,12 +18,9 @@ package org.neo4j.bolt.connection.routed.impl.cluster;
 
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Supplier;
 import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.RoutingTable;
 
@@ -32,12 +29,7 @@ public interface RoutingTableHandler extends RoutingErrorHandler {
 
     boolean isRoutingTableAged();
 
-    CompletionStage<RoutingTable> ensureRoutingTable(
-            SecurityPlan securityPlan,
-            AccessMode mode,
-            Set<String> rediscoveryBookmarks,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion);
+    CompletionStage<RoutingTable> ensureRoutingTable(RoutedBoltConnectionParameters parameters);
 
     CompletionStage<RoutingTable> updateRoutingTable(ClusterCompositionLookupResult compositionLookupResult);
 

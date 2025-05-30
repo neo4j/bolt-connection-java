@@ -16,15 +16,19 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.Objects;
-import javax.net.ssl.SSLContext;
+import java.util.Set;
+import java.util.function.Consumer;
 
-/**
- * A SecurityPlan consists of encryption and trust details.
- */
-record SecurityPlanImpl(SSLContext sslContext, boolean verifyHostname, String expectedHostname)
-        implements SecurityPlan {
-    SecurityPlanImpl {
-        Objects.requireNonNull(sslContext);
-    }
+record RoutedBoltConnectionParametersImpl(
+        AuthToken authToken,
+        BoltProtocolVersion minVersion,
+        AccessMode accessMode,
+        DatabaseName databaseName,
+        Consumer<DatabaseName> databaseNameConsumer,
+        String homeDatabase,
+        Set<String> bookmarks,
+        String impersonatedUser)
+        implements RoutedBoltConnectionParameters {
+    static RoutedBoltConnectionParameters DEFAULT = new RoutedBoltConnectionParametersImpl(
+            null, null, AccessMode.WRITE, null, ignored -> {}, null, Set.of(), null);
 }

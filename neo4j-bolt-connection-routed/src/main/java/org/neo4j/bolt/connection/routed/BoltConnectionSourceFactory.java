@@ -16,23 +16,24 @@
  */
 package org.neo4j.bolt.connection.routed;
 
-import java.net.UnknownHostException;
-import java.util.List;
-import java.util.concurrent.CompletionStage;
-import java.util.function.Function;
+import java.net.URI;
 import org.neo4j.bolt.connection.BoltConnectionParameters;
 import org.neo4j.bolt.connection.BoltConnectionSource;
-import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 
 /**
- * Provides cluster composition lookup capabilities and initial router address resolution.
+ * A factory for {@link BoltConnectionSource} instances used by {@link RoutedBoltConnectionSource}.
+ * @since 4.0.0
  */
-public interface Rediscovery {
-    CompletionStage<ClusterCompositionLookupResult> lookupClusterComposition(
-            RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionSourceGetter,
-            RoutedBoltConnectionParameters parameters);
-
-    List<BoltServerAddress> resolve() throws UnknownHostException;
+@FunctionalInterface
+public interface BoltConnectionSourceFactory {
+    /**
+     * Creates a {@link BoltConnectionSource} for a specofic {@link URI} provided by the {@link RoutedBoltConnectionSource}.
+     * <p>
+     * As {@link URI} instances provided by the {@link RoutedBoltConnectionSource} use {@code bolt} schemes,
+     * {@link BoltConnectionSource} instances MUST support such schemes.
+     * @param uri the URI
+     * @param expectedHostname the expected hostname for verification purposes
+     * @return a new {@link BoltConnectionSource}
+     */
+    BoltConnectionSource<BoltConnectionParameters> create(URI uri, String expectedHostname);
 }

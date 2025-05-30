@@ -16,15 +16,24 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.Objects;
-import javax.net.ssl.SSLContext;
+class BoltConnectionParametersBuilderImpl implements BoltConnectionParameters.Builder {
+    protected AuthToken authToken;
+    protected BoltProtocolVersion minVersion;
 
-/**
- * A SecurityPlan consists of encryption and trust details.
- */
-record SecurityPlanImpl(SSLContext sslContext, boolean verifyHostname, String expectedHostname)
-        implements SecurityPlan {
-    SecurityPlanImpl {
-        Objects.requireNonNull(sslContext);
+    @Override
+    public BoltConnectionParameters.Builder withAuthToken(AuthToken authToken) {
+        this.authToken = authToken;
+        return this;
+    }
+
+    @Override
+    public BoltConnectionParameters.Builder withMinVersion(BoltProtocolVersion minVersion) {
+        this.minVersion = minVersion;
+        return this;
+    }
+
+    @Override
+    public BoltConnectionParameters build() {
+        return new BoltConnectionParametersImpl(authToken, minVersion);
     }
 }

@@ -25,15 +25,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
-import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
@@ -44,7 +42,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
     private final DatabaseName databaseName;
     private final RoutingTableRegistry routingTableRegistry;
     private volatile CompletableFuture<RoutingTable> refreshRoutingTableFuture;
-    private final Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter;
+    private final Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionSourceGetter;
     private final Rediscovery rediscovery;
     private final System.Logger log;
     private final long routingTablePurgeDelayMs;
@@ -54,7 +52,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
     public RoutingTableHandlerImpl(
             RoutingTable routingTable,
             Rediscovery rediscovery,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionSourceGetter,
             RoutingTableRegistry routingTableRegistry,
             LoggingProvider logging,
             long routingTablePurgeDelayMs,
@@ -62,7 +60,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
         this.routingTable = routingTable;
         this.databaseName = routingTable.database();
         this.rediscovery = rediscovery;
-        this.connectionProviderGetter = connectionProviderGetter;
+        this.connectionSourceGetter = connectionSourceGetter;
         this.routingTableRegistry = routingTableRegistry;
         this.log = logging.getLog(getClass());
         this.routingTablePurgeDelayMs = routingTablePurgeDelayMs;
@@ -81,16 +79,11 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
     }
 
     @Override
-    public synchronized CompletionStage<RoutingTable> ensureRoutingTable(
-            SecurityPlan securityPlan,
-            AccessMode mode,
-            Set<String> rediscoveryBookmarks,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion) {
+    public synchronized CompletionStage<RoutingTable> ensureRoutingTable(RoutedBoltConnectionParameters parameters) {
         if (refreshRoutingTableFuture != null) {
             // refresh is already happening concurrently, just use it's result
             return refreshRoutingTableFuture;
-        } else if (routingTable.isStaleFor(mode)) {
+        } else if (routingTable.isStaleFor(parameters.accessMode())) {
             // existing routing table is not fresh and should be updated
             log.log(
                     System.Logger.Level.DEBUG,
@@ -102,14 +95,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
             refreshRoutingTableFuture = resultFuture;
 
             rediscovery
-                    .lookupClusterComposition(
-                            securityPlan,
-                            routingTable,
-                            connectionProviderGetter,
-                            rediscoveryBookmarks,
-                            null,
-                            authTokenStageSupplier,
-                            minVersion)
+                    .lookupClusterComposition(routingTable, connectionSourceGetter, parameters)
                     .whenComplete((composition, completionError) -> {
                         var error = FutureUtil.completionExceptionCause(completionError);
                         if (error != null) {

@@ -20,16 +20,30 @@ import javax.net.ssl.SSLContext;
 
 /**
  * A SecurityPlan consists of encryption and trust details.
+ * @since 1.0.0
  */
-public interface SecurityPlan {
-
-    @SuppressWarnings("SameReturnValue")
-    boolean requiresEncryption();
-
-    @SuppressWarnings("SameReturnValue")
-    boolean requiresClientAuth();
-
+public sealed interface SecurityPlan permits SecurityPlanImpl {
+    /**
+     * Returns {@link SSLContext} that must be used.
+     * @return the {@link SSLContext}, must not be {@code null}
+     */
     SSLContext sslContext();
 
-    boolean requiresHostnameVerification();
+    /**
+     * Indicates if hostname verification must be done.
+     * @return {@code true} if enabled, {@code false} if disabled
+     */
+    boolean verifyHostname();
+
+    /**
+     * An optional hostname that is used for hostname verification when the {@link #verifyHostname()} option is enabled.
+     * <p>
+     * When {@code null} value is used, the hostname provided in the connection {@link java.net.URI} is used for
+     * verification. Therefore, this option should only be used if a diferrent name should be used for verification.
+     * For example, when the {@link java.net.URI} contains an IP address, but a domain name should be used for
+     * verification purposes.
+     * @since 4.0.0
+     * @return the expected hostname
+     */
+    String expectedHostname();
 }

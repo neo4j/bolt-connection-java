@@ -48,7 +48,7 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
 
     @Override
     protected void initChannel(Channel channel) {
-        if (securityPlan.requiresEncryption()) {
+        if (securityPlan != null) {
             var sslHandler = createSslHandler();
             channel.pipeline().addFirst(sslHandler);
         }
@@ -65,10 +65,13 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
 
     private SSLEngine createSslEngine() {
         var sslContext = securityPlan.sslContext();
-        var sslEngine = sslContext.createSSLEngine(address.host(), address.port());
-        sslEngine.setNeedClientAuth(securityPlan.requiresClientAuth());
+        var host = securityPlan.expectedHostname();
+        if (host == null) {
+            host = address.host();
+        }
+        var sslEngine = sslContext.createSSLEngine(host, address.port());
         sslEngine.setUseClientMode(true);
-        if (securityPlan.requiresHostnameVerification()) {
+        if (securityPlan.verifyHostname()) {
             var sslParameters = sslEngine.getSSLParameters();
             sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
             sslEngine.setSSLParameters(sslParameters);
