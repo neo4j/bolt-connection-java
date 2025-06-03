@@ -22,6 +22,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -50,6 +51,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
+    @SuppressWarnings("resource") // not AutoCloseable in Java 17
     @Override
     public CompletionStage<BoltConnection> connect(
             URI uri,
@@ -65,28 +67,18 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             return CompletableFuture.failedStage(
                     new MinVersionAcquisitionException("lower version", BOLT_PROTOCOL_VERSION));
         }
-        var httpClientBuilder = HttpClient.newBuilder();
-        if (securityPlan != null) {
-            httpClientBuilder = httpClientBuilder.sslContext(securityPlan.sslContext());
-            String endpointIdentificationAlgorithm;
-            if (securityPlan.verifyHostname()) {
-                if (securityPlan.expectedHostname() != null) {
-                    // not needed at the moment
-                    return CompletableFuture.failedStage(
-                            new BoltClientException("SecurityPlan with expectedHostname is not supported"));
-                }
-                endpointIdentificationAlgorithm = "HTTPS";
-            } else {
-                endpointIdentificationAlgorithm = null;
+        HttpClient httpClientWithTimeout;
+        try {
+            var builder = newHttpClientBuilder(securityPlan);
+            if (connectTimeoutMillis > 0) {
+                builder.connectTimeout(Duration.ofMillis(connectTimeoutMillis));
             }
-            var sslParameters = new SSLParameters();
-            sslParameters.setEndpointIdentificationAlgorithm(endpointIdentificationAlgorithm);
-            httpClientBuilder = httpClientBuilder.sslParameters(sslParameters);
+            httpClientWithTimeout = builder.build();
+        } catch (Exception ex) {
+            return CompletableFuture.failedStage(ex);
         }
-        @SuppressWarnings("resource") // not AutoCloseable in Java 17
-        var httpClient = httpClientBuilder.build();
         var request = HttpRequest.newBuilder(uri).build();
-        return httpClient
+        return httpClientWithTimeout
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
@@ -95,6 +87,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                                     JSON.std.beanFrom(DiscoveryResponse.class, response.body());
 
                             var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
+                            var httpClient = newHttpClientBuilder(securityPlan).build();
                             return new QueryApiBoltConnection(
                                     valueFactory,
                                     httpClient,
@@ -111,6 +104,27 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                         throw new BoltClientException("Unexpected response code: " + response.statusCode());
                     }
                 });
+    }
+
+    private HttpClient.Builder newHttpClientBuilder(SecurityPlan securityPlan) {
+        var httpClientBuilder = HttpClient.newBuilder();
+        if (securityPlan != null) {
+            httpClientBuilder = httpClientBuilder.sslContext(securityPlan.sslContext());
+            String endpointIdentificationAlgorithm;
+            if (securityPlan.verifyHostname()) {
+                if (securityPlan.expectedHostname() != null) {
+                    // not needed at the moment
+                    throw new BoltClientException("SecurityPlan with expectedHostname is not supported");
+                }
+                endpointIdentificationAlgorithm = "HTTPS";
+            } else {
+                endpointIdentificationAlgorithm = null;
+            }
+            var sslParameters = new SSLParameters();
+            sslParameters.setEndpointIdentificationAlgorithm(endpointIdentificationAlgorithm);
+            httpClientBuilder = httpClientBuilder.sslParameters(sslParameters);
+        }
+        return httpClientBuilder;
     }
 
     @Override
