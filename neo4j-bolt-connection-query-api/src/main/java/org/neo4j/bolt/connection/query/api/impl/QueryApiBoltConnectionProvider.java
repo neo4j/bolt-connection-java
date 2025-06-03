@@ -36,11 +36,14 @@ import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
+    // Higher versions of Bolt require GQL support that it not available in Query API.
+    private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
 
     public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory) {
         this.logging = Objects.requireNonNull(logging);
@@ -58,6 +61,10 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             AuthToken authToken,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig) {
+        if (minVersion != null && minVersion.compareTo(BOLT_PROTOCOL_VERSION) > 0) {
+            return CompletableFuture.failedStage(
+                    new MinVersionAcquisitionException("lower version", BOLT_PROTOCOL_VERSION));
+        }
         var httpClientBuilder = HttpClient.newBuilder();
         if (securityPlan != null) {
             httpClientBuilder = httpClientBuilder.sslContext(securityPlan.sslContext());
@@ -89,7 +96,13 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
 
                             var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
                             return new QueryApiBoltConnection(
-                                    valueFactory, httpClient, uri, authToken, serverAgent, logging);
+                                    valueFactory,
+                                    httpClient,
+                                    uri,
+                                    authToken,
+                                    serverAgent,
+                                    BOLT_PROTOCOL_VERSION,
+                                    logging);
                         } catch (IOException e) {
                             throw new BoltClientException(
                                     "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);

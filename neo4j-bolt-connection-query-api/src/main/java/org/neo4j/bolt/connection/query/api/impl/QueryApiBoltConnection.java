@@ -68,6 +68,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private final String authHeader;
     private final AuthInfo authInfo;
     private final String serverAgent;
+    private final BoltProtocolVersion boltProtocolVersion;
 
     // synchronized
     private final List<Message> messages = new ArrayList<>();
@@ -82,6 +83,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
             URI baseUri,
             AuthToken authToken,
             String serverAgent,
+            BoltProtocolVersion boltProtocolVersion,
             LoggingProvider logging) {
         this.logging = logging;
         this.log = logging.getLog(getClass());
@@ -104,6 +106,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
                     }
                 })
                 .build();
+        this.boltProtocolVersion = Objects.requireNonNull(boltProtocolVersion);
     }
 
     @Override
@@ -176,8 +179,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
 
     @Override
     public BoltProtocolVersion protocolVersion() {
-        // Higher versions of Bolt require GQL support that it not available in Query API.
-        return new BoltProtocolVersion(5, 4);
+        return boltProtocolVersion;
     }
 
     @Override
