@@ -28,6 +28,8 @@ import org.neo4j.bolt.connection.DefaultDomainNameResolver;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
+import org.neo4j.bolt.connection.netty.impl.BootstrapFactory;
+import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class NettyBoltConnectionProviderFactory implements BoltConnectionProviderFactory {

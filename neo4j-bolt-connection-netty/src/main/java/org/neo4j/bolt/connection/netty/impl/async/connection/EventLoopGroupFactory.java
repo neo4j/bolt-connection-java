@@ -26,7 +26,7 @@ import io.netty.util.concurrent.FastThreadLocalThread;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
-import org.neo4j.bolt.connection.netty.EventLoopThread;
+import org.neo4j.bolt.connection.netty.impl.EventLoopThread;
 
 /**
  * Manages creation of Netty {@link EventLoopGroup}s, which are basically {@link Executor}s that perform IO operations.
