@@ -25,6 +25,7 @@ import java.net.http.HttpResponse;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import javax.net.ssl.SSLParameters;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
@@ -38,12 +39,10 @@ import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
-    private final HttpClient httpClient;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
 
     public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory) {
-        this.httpClient = HttpClient.newBuilder().build();
         this.logging = Objects.requireNonNull(logging);
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
@@ -59,7 +58,26 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             AuthToken authToken,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig) {
-
+        var httpClientBuilder = HttpClient.newBuilder();
+        if (securityPlan != null) {
+            httpClientBuilder = httpClientBuilder.sslContext(securityPlan.sslContext());
+            String endpointIdentificationAlgorithm;
+            if (securityPlan.verifyHostname()) {
+                if (securityPlan.expectedHostname() != null) {
+                    // not needed at the moment
+                    return CompletableFuture.failedStage(
+                            new BoltClientException("SecurityPlan with expectedHostname is not supported"));
+                }
+                endpointIdentificationAlgorithm = "HTTPS";
+            } else {
+                endpointIdentificationAlgorithm = null;
+            }
+            var sslParameters = new SSLParameters();
+            sslParameters.setEndpointIdentificationAlgorithm(endpointIdentificationAlgorithm);
+            httpClientBuilder = httpClientBuilder.sslParameters(sslParameters);
+        }
+        @SuppressWarnings("resource") // not AutoCloseable in Java 17
+        var httpClient = httpClientBuilder.build();
         var request = HttpRequest.newBuilder(uri).build();
         return httpClient
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
