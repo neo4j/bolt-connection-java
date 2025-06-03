@@ -54,7 +54,7 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
         if (transactionInfo == null) {
             throw new BoltClientException("No transaction found");
         }
-        var headers = this.headers;
+        var headers = httpContext.headers();
         if (transactionInfo.affinity() != null) {
             headers = Arrays.copyOf(headers, headers.length + 2);
             headers[headers.length - 2] = "neo4j-cluster-affinity";

@@ -67,6 +67,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private final URI baseUri;
     private final String authHeader;
     private final AuthInfo authInfo;
+    private final String userAgent;
     private final String serverAgent;
     private final BoltProtocolVersion boltProtocolVersion;
 
@@ -82,6 +83,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
             HttpClient httpClient,
             URI baseUri,
             AuthToken authToken,
+            String userAgent,
             String serverAgent,
             BoltProtocolVersion boltProtocolVersion,
             LoggingProvider logging) {
@@ -91,6 +93,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
         this.httpClient = Objects.requireNonNull(httpClient);
         this.baseUri = Objects.requireNonNull(baseUri);
         this.authInfo = new AuthInfoImpl(authToken, Clock.systemUTC().millis());
+        this.userAgent = userAgent;
         var authMap = authToken.asMap();
         var username = authMap.get("principal").asString();
         var password = authMap.get("credentials").asString();
@@ -217,10 +220,10 @@ public final class QueryApiBoltConnection implements BoltConnection {
         var messageHandlers = new ArrayList<MessageHandler<?>>(messages.size());
         for (var message : messages) {
             if (message instanceof BeginMessage beginMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new BeginMessageHandler(handler, httpContext, beginMessage, valueFactory, logging));
             } else if (message instanceof RunMessage runMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new RunMessageHandler(
                         handler, httpContext, valueFactory, runMessage, this::getTransactionInfo, logging));
             } else if (message instanceof PullMessage pullMessage) {
@@ -236,11 +239,11 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 messageHandlers.add(
                         new DiscardMessageHandler(handler, discardMessage, this::findById, this::deleteById, logging));
             } else if (message instanceof CommitMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new CommitMessageHandler(
                         handler, httpContext, valueFactory, this::getTransactionInfo, logging));
             } else if (message instanceof RollbackMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
+                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new RollbackMessageHandler(
                         handler, httpContext, this::getTransactionInfo, valueFactory, logging));
             } else {

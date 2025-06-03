@@ -55,7 +55,7 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
         }
         var uri = URI.create("%s/db/%s/query/v2/tx/%s"
                 .formatted(httpContext.baseUri().toString(), transactionInfo.databaseName(), transactionInfo.id()));
-        var headers = this.headers;
+        var headers = httpContext.headers();
         if (transactionInfo.affinity() != null) {
             headers = Arrays.copyOf(headers, headers.length + 2);
             headers[headers.length - 2] = "neo4j-cluster-affinity";

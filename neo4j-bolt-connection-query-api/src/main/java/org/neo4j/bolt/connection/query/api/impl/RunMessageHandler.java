@@ -78,7 +78,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         var transactionInfo = transactionInfoSupplier.get();
         String databaseName;
         URI uri;
-        var headers = this.headers;
+        var headers = httpContext.headers();
         if (transactionInfo != null) {
             databaseName = transactionInfo.databaseName();
             uri = URI.create("%s/db/%s/query/v2/tx/%s"

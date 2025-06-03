@@ -77,9 +77,12 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
         } catch (Exception ex) {
             return CompletableFuture.failedStage(ex);
         }
-        var request = HttpRequest.newBuilder(uri).build();
+        var requestBuilder = HttpRequest.newBuilder(uri);
+        if (userAgent != null) {
+            requestBuilder.header("User-Agent", userAgent);
+        }
         return httpClientWithTimeout
-                .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
                         try {
@@ -93,6 +96,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                                     httpClient,
                                     uri,
                                     authToken,
+                                    userAgent,
                                     serverAgent,
                                     BOLT_PROTOCOL_VERSION,
                                     logging);

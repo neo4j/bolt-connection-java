@@ -69,9 +69,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     protected HttpRequest newHttpRequest() {
         var runUri = httpContext.baseUri().resolve("db/%s/query/v2/tx".formatted(databaseName));
         return HttpRequest.newBuilder(runUri)
-                .header("Content-Type", "application/vnd.neo4j.query")
-                .header("Accept", "application/vnd.neo4j.query")
-                .header("Authorization", httpContext.authHeader())
+                .headers(httpContext.headers())
                 .POST(bodyPublisher)
                 .build();
     }

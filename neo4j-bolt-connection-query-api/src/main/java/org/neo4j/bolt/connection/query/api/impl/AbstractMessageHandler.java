@@ -40,7 +40,6 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
     private final System.Logger log;
     private final HttpClient httpClient;
     private final JSON json;
-    protected final String[] headers;
     protected final ResponseHandler handler;
     protected final ValueFactory valueFactory;
 
@@ -49,11 +48,6 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
         this.log = logging.getLog(getClass());
         this.httpClient = Objects.requireNonNull(httpContext.httpClient());
         this.json = Objects.requireNonNull(httpContext.json());
-        this.headers = new String[] {
-            "Content-Type", "application/vnd.neo4j.query",
-            "Accept", "application/vnd.neo4j.query",
-            "Authorization", Objects.requireNonNull(httpContext.authHeader())
-        };
         this.handler = Objects.requireNonNull(handler);
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }

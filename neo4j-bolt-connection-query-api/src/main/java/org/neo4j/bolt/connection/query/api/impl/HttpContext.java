@@ -19,5 +19,25 @@ package org.neo4j.bolt.connection.query.api.impl;
 import com.fasterxml.jackson.jr.ob.JSON;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.util.Objects;
 
-public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String authHeader) {}
+public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[] headers) {
+    public HttpContext(HttpClient httpClient, URI baseUri, JSON json, String authHeader, String userAgent) {
+        this(httpClient, baseUri, json, headers(authHeader, userAgent));
+    }
+
+    private static String[] headers(String authHeader, String userAgent) {
+        var headers = new String[userAgent != null ? 8 : 6];
+        headers[0] = "Content-Type";
+        headers[1] = "application/vnd.neo4j.query";
+        headers[2] = "Accept";
+        headers[3] = "application/vnd.neo4j.query";
+        headers[4] = "Authorization";
+        headers[5] = Objects.requireNonNull(authHeader);
+        if (userAgent != null) {
+            headers[6] = "User-Agent";
+            headers[7] = userAgent;
+        }
+        return headers;
+    }
+}
