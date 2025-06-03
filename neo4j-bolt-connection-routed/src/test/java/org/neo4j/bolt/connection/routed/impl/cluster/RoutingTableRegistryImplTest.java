@@ -57,13 +57,17 @@ import org.neo4j.bolt.connection.AuthTokens;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.SecurityPlans;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
 import org.neo4j.bolt.connection.routed.impl.NoopLoggingProvider;
 
 class RoutingTableRegistryImplTest {
     public static final long STALE_ROUTING_TABLE_PURGE_DELAY_MS = SECONDS.toMillis(30);
+    RoutedBoltConnectionParameters parameters = RoutedBoltConnectionParameters.builder()
+            .withAccessMode(AccessMode.READ)
+            .withMinVersion(new BoltProtocolVersion(4, 1))
+            .build();
 
     @Test
     void factoryShouldCreateARoutingTableWithSameDatabaseName() {
@@ -99,15 +103,7 @@ class RoutingTableRegistryImplTest {
 
         // When
         var database = database(databaseName);
-        routingTables.ensureRoutingTable(
-                SecurityPlans.unencrypted(),
-                CompletableFuture.completedFuture(database),
-                AccessMode.READ,
-                Collections.emptySet(),
-                null,
-                () -> CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())),
-                new BoltProtocolVersion(4, 1),
-                null);
+        routingTables.ensureRoutingTable(CompletableFuture.completedFuture(database), parameters);
 
         // Then
         assertTrue(map.containsKey(database));
@@ -130,26 +126,12 @@ class RoutingTableRegistryImplTest {
 
         // When
         var actual = routingTables
-                .ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        CompletableFuture.completedFuture(database),
-                        AccessMode.READ,
-                        Collections.emptySet(),
-                        null,
-                        authStageSupplier,
-                        new BoltProtocolVersion(4, 1),
-                        null)
+                .ensureRoutingTable(CompletableFuture.completedFuture(database), parameters)
                 .toCompletableFuture()
                 .join();
 
         // Then it is the one we put in map that is picked up.
-        verify(handler)
-                .ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        AccessMode.READ,
-                        Collections.emptySet(),
-                        authStageSupplier,
-                        new BoltProtocolVersion(4, 1));
+        verify(handler).ensureRoutingTable(parameters);
         // Then it is the one we put in map that is picked up.
         assertEquals(handler, actual);
     }
@@ -168,26 +150,12 @@ class RoutingTableRegistryImplTest {
 
         // When
         routingTables
-                .ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        CompletableFuture.completedFuture(defaultDatabase()),
-                        mode,
-                        Collections.emptySet(),
-                        null,
-                        authStageSupplier,
-                        new BoltProtocolVersion(4, 1),
-                        null)
+                .ensureRoutingTable(CompletableFuture.completedFuture(defaultDatabase()), parameters)
                 .toCompletableFuture()
                 .join();
 
         // Then
-        verify(handler)
-                .ensureRoutingTable(
-                        SecurityPlans.unencrypted(),
-                        mode,
-                        Collections.emptySet(),
-                        authStageSupplier,
-                        new BoltProtocolVersion(4, 1));
+        verify(handler).ensureRoutingTable(parameters);
     }
 
     @Test
@@ -281,8 +249,7 @@ class RoutingTableRegistryImplTest {
 
     private RoutingTableHandler mockedRoutingTableHandler() {
         var handler = Mockito.mock(RoutingTableHandler.class);
-        when(handler.ensureRoutingTable(any(), any(), any(), any(), any()))
-                .thenReturn(completedFuture(Mockito.mock(RoutingTable.class)));
+        when(handler.ensureRoutingTable(any())).thenReturn(completedFuture(Mockito.mock(RoutingTable.class)));
         return handler;
     }
 }

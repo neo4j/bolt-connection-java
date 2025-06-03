@@ -18,20 +18,16 @@ package org.neo4j.bolt.connection.netty;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
 import org.neo4j.bolt.connection.netty.impl.async.connection.EventLoopGroupFactory;
 
 public final class BootstrapFactory {
     private BootstrapFactory() {}
 
-    public static Bootstrap newBootstrap(int threadCount) {
-        return newBootstrap(EventLoopGroupFactory.newEventLoopGroup(threadCount));
-    }
-
-    public static Bootstrap newBootstrap(EventLoopGroup eventLoopGroup) {
+    public static Bootstrap newBootstrap(int threadCount, String threadNamePrefix) {
+        var eventLoopGroupFactory = new EventLoopGroupFactory(threadNamePrefix);
         var bootstrap = new Bootstrap();
-        bootstrap.group(eventLoopGroup);
-        bootstrap.channel(EventLoopGroupFactory.channelClass());
+        bootstrap.group(eventLoopGroupFactory.newEventLoopGroup(threadCount));
+        bootstrap.channel(eventLoopGroupFactory.channelClass());
         bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
         bootstrap.option(ChannelOption.SO_REUSEADDR, true);
         return bootstrap;

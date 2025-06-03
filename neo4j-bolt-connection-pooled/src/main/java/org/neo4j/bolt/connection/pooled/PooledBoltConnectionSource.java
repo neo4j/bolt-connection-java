@@ -16,15 +16,13 @@
  */
 package org.neo4j.bolt.connection.pooled;
 
+import java.net.URI;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
@@ -32,19 +30,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
-import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BasicResponseHandler;
 import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
@@ -56,7 +52,11 @@ import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.pooled.impl.PooledBoltConnection;
 import org.neo4j.bolt.connection.pooled.impl.util.FutureUtil;
 
-public class PooledBoltConnectionProvider implements BoltConnectionProvider {
+/**
+ * A pooled {@link BoltConnectionSource} implementation that automatically pools {@link BoltConnection} instances.
+ * @since 4.0.0
+ */
+public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConnectionParameters> {
     private final System.Logger log;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final BoltConnectionProvider boltConnectionProvider;
@@ -68,31 +68,38 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     private final long idleBeforeTest;
     private final Clock clock;
     private final MetricsListener metricsListener;
+    private final URI uri;
     private final BoltServerAddress address;
     private final RoutingContext routingContext;
     private final BoltAgent boltAgent;
     private final String userAgent;
     private final int connectTimeoutMillis;
     private final String poolId;
+    private final AuthTokenSupplier authTokenSupplier;
+    private final SecurityPlanSupplier securityPlanSupplier;
+    private final NotificationConfig notificationConfig;
 
     private CompletionStage<Void> closeStage;
     private long minAuthTimestamp;
 
-    public PooledBoltConnectionProvider(
+    public PooledBoltConnectionSource(
+            LoggingProvider loggingProvider,
+            Clock clock,
+            URI uri,
             BoltConnectionProvider boltConnectionProvider,
+            AuthTokenSupplier authTokenSupplier,
+            SecurityPlanSupplier securityPlanSupplier,
             int maxSize,
             long acquisitionTimeout,
             long maxLifetime,
             long idleBeforeTest,
-            Clock clock,
-            LoggingProvider logging,
             MetricsListener metricsListener,
-            BoltServerAddress address,
             RoutingContext routingContext,
             BoltAgent boltAgent,
             String userAgent,
-            int connectTimeoutMillis) {
-        this.boltConnectionProvider = boltConnectionProvider;
+            int connectTimeoutMillis,
+            NotificationConfig notificationConfig) {
+        this.boltConnectionProvider = Objects.requireNonNull(boltConnectionProvider);
         this.pooledConnectionEntries = new ArrayList<>();
         this.pendingAcquisitions = new ArrayDeque<>(100);
         this.maxSize = maxSize;
@@ -100,13 +107,19 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
         this.maxLifetime = maxLifetime;
         this.idleBeforeTest = idleBeforeTest;
         this.clock = Objects.requireNonNull(clock);
-        this.log = logging.getLog(getClass());
+        this.log = loggingProvider.getLog(getClass());
         this.metricsListener = Objects.requireNonNull(metricsListener);
-        this.address = Objects.requireNonNull(address);
+        this.uri = Objects.requireNonNull(uri);
+        this.address = switch (uri.getScheme()) {
+            case "bolt", "bolt+s", "bolt+ssc" -> new BoltServerAddress(uri);
+            default -> new BoltServerAddress(uri.getHost(), 0);};
         this.routingContext = Objects.requireNonNull(routingContext);
         this.boltAgent = Objects.requireNonNull(boltAgent);
         this.userAgent = Objects.requireNonNull(userAgent);
         this.connectTimeoutMillis = connectTimeoutMillis;
+        this.authTokenSupplier = Objects.requireNonNull(authTokenSupplier);
+        this.securityPlanSupplier = Objects.requireNonNull(securityPlanSupplier);
+        this.notificationConfig = Objects.requireNonNull(notificationConfig);
         this.poolId = poolId(address);
         metricsListener.registerPoolMetrics(
                 poolId,
@@ -127,33 +140,25 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 });
     }
 
+    @Override
+    public CompletionStage<BoltConnection> getConnection() {
+        return getConnection(BoltConnectionParameters.defaultParameters());
+    }
+
     @SuppressWarnings({"ReassignedVariable"})
     @Override
-    public CompletionStage<BoltConnection> connect(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            DatabaseName databaseName,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            AccessMode mode,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer,
-            Map<String, Object> additionalParameters) {
+    public CompletionStage<BoltConnection> getConnection(BoltConnectionParameters parameters) {
         synchronized (this) {
             if (closeStage != null) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
+                return CompletableFuture.failedFuture(new IllegalStateException("Connection source is closed."));
             }
         }
 
         var acquisitionFuture = new CompletableFuture<PooledBoltConnection>();
-
-        authTokenStageSupplier.get().whenComplete((authToken, authThrowable) -> {
+        var authTokenSupplier = parameters.authToken() != null
+                ? CompletableFuture.completedStage(parameters.authToken())
+                : this.authTokenSupplier.getToken();
+        authTokenSupplier.whenComplete((authToken, authThrowable) -> {
             if (authThrowable != null) {
                 acquisitionFuture.completeExceptionally(authThrowable);
                 return;
@@ -172,38 +177,16 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 }
                 metricsListener.afterAcquiringOrCreating(poolId);
             });
-            connect(
-                    acquisitionFuture,
-                    securityPlan,
-                    databaseName,
-                    authToken,
-                    authTokenStageSupplier,
-                    mode,
-                    bookmarks,
-                    impersonatedUser,
-                    minVersion,
-                    notificationConfig);
+            connect(acquisitionFuture, authToken, parameters.minVersion(), notificationConfig);
         });
 
-        return acquisitionFuture
-                .whenComplete((ignored, throwable) -> {
-                    if (throwable == null) {
-                        databaseNameConsumer.accept(databaseName);
-                    }
-                })
-                .thenApply(Function.identity());
+        return acquisitionFuture.thenApply(Function.identity());
     }
 
     @SuppressWarnings({"DuplicatedCode", "ConstantValue"})
     private void connect(
             CompletableFuture<PooledBoltConnection> acquisitionFuture,
-            SecurityPlan securityPlan,
-            DatabaseName databaseName,
             AuthToken authToken,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            AccessMode mode,
-            Set<String> bookmarks,
-            String impersonatedUser,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig) {
 
@@ -288,17 +271,7 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                     if (throwable != null) {
                         // liveness check failed
                         purge(entry);
-                        connect(
-                                acquisitionFuture,
-                                securityPlan,
-                                databaseName,
-                                authToken,
-                                authTokenStageSupplier,
-                                mode,
-                                bookmarks,
-                                impersonatedUser,
-                                minVersion,
-                                notificationConfig);
+                        connect(acquisitionFuture, authToken, minVersion, notificationConfig);
                     } else {
                         // liveness check green or not needed
                         var inUseEvent = metricsListener.createListenerEvent();
@@ -340,25 +313,26 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
                 var createEvent = metricsListener.createListenerEvent();
                 metricsListener.beforeCreating(poolId, createEvent);
                 var entry = connectionEntryWithMetadata.connectionEntry;
-                boltConnectionProvider
-                        .connect(
-                                address,
+                var authStage = securityPlanSupplier.getPlan().thenCompose(securityPlan -> {
+                    if (empty.get()) {
+                        return CompletableFuture.completedStage(new SecurityPlanAndAuthToken(securityPlan, authToken));
+                    } else {
+                        return authTokenSupplier
+                                .getToken()
+                                .thenApply(token -> new SecurityPlanAndAuthToken(securityPlan, token));
+                    }
+                });
+                authStage
+                        .thenCompose(auth -> boltConnectionProvider.connect(
+                                uri,
                                 routingContext,
                                 boltAgent,
                                 userAgent,
                                 connectTimeoutMillis,
-                                securityPlan,
-                                databaseName,
-                                empty.get()
-                                        ? () -> CompletableFuture.completedStage(authToken)
-                                        : authTokenStageSupplier,
-                                mode,
-                                bookmarks,
-                                impersonatedUser,
+                                auth.securityPlan(),
+                                auth.authToken(),
                                 minVersion,
-                                notificationConfig,
-                                (ignored) -> {},
-                                Collections.emptyMap())
+                                notificationConfig))
                         .whenComplete((boltConnection, throwable) -> {
                             var error = FutureUtil.completionExceptionCause(throwable);
                             if (error != null) {
@@ -513,93 +487,24 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     @Override
-    public CompletionStage<Void> verifyConnectivity(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
-        return connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        AccessMode.WRITE,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        null,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .thenCompose(BoltConnection::close);
+    public CompletionStage<Void> verifyConnectivity() {
+        return getConnection().thenCompose(BoltConnection::close);
     }
 
     @Override
-    public CompletionStage<Boolean> supportsMultiDb(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
-        return connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        AccessMode.WRITE,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        null,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .thenCompose(boltConnection -> {
-                    var supports = boltConnection.protocolVersion().compareTo(new BoltProtocolVersion(4, 0)) >= 0;
-                    return boltConnection.close().thenApply(ignored -> supports);
-                });
+    public CompletionStage<Boolean> supportsMultiDb() {
+        return getConnection().thenCompose(boltConnection -> {
+            var supports = boltConnection.protocolVersion().compareTo(new BoltProtocolVersion(4, 0)) >= 0;
+            return boltConnection.close().thenApply(ignored -> supports);
+        });
     }
 
     @Override
-    public CompletionStage<Boolean> supportsSessionAuth(
-            BoltServerAddress ignoredAddress,
-            RoutingContext ignoredRoutingContext,
-            BoltAgent ignoredBoltAgent,
-            String ignoredUserAgent,
-            int ignoredConnectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken) {
-        return connect(
-                        address,
-                        routingContext,
-                        boltAgent,
-                        userAgent,
-                        connectTimeoutMillis,
-                        securityPlan,
-                        null,
-                        () -> CompletableFuture.completedStage(authToken),
-                        AccessMode.WRITE,
-                        Collections.emptySet(),
-                        null,
-                        null,
-                        null,
-                        (ignored) -> {},
-                        Collections.emptyMap())
-                .thenCompose(boltConnection -> {
-                    var supports = new BoltProtocolVersion(5, 1).compareTo(boltConnection.protocolVersion()) <= 0;
-                    return boltConnection.close().thenApply(ignored -> supports);
-                });
+    public CompletionStage<Boolean> supportsSessionAuth() {
+        return getConnection().thenCompose(boltConnection -> {
+            var supports = new BoltProtocolVersion(5, 1).compareTo(boltConnection.protocolVersion()) <= 0;
+            return boltConnection.close().thenApply(ignored -> supports);
+        });
     }
 
     @Override
@@ -640,7 +545,9 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private String poolId(BoltServerAddress serverAddress) {
-        return String.format("%s:%d-%d", serverAddress.host(), serverAddress.port(), this.hashCode());
+        return serverAddress.port() == 0
+                ? String.format("%s-%d", serverAddress.host(), this.hashCode())
+                : String.format("%s:%d-%d", serverAddress.host(), serverAddress.port(), this.hashCode());
     }
 
     private void release(ConnectionEntry entry) {
@@ -692,6 +599,8 @@ public class PooledBoltConnectionProvider implements BoltConnectionProvider {
         private long createdTimestamp;
         private long lastUsedTimestamp;
     }
+
+    private record SecurityPlanAndAuthToken(SecurityPlan securityPlan, AuthToken authToken) {}
 
     private record ConnectionEntryWithMetadata(ConnectionEntry connectionEntry, boolean reauthNeeded) {}
 }
