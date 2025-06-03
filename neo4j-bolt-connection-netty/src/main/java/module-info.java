@@ -22,6 +22,8 @@ module org.neo4j.bolt.connection.netty {
     provides org.neo4j.bolt.connection.BoltConnectionProviderFactory with
             org.neo4j.bolt.connection.netty.NettyBoltConnectionProviderFactory;
 
+    exports org.neo4j.bolt.connection.netty;
+
     requires org.neo4j.bolt.connection;
     requires io.netty.common;
     requires io.netty.handler;

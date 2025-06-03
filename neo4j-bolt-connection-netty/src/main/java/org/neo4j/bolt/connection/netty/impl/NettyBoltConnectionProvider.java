@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty;
+package org.neo4j.bolt.connection.netty.impl;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
@@ -40,11 +40,6 @@ import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
-import org.neo4j.bolt.connection.netty.impl.BoltConnectionImpl;
-import org.neo4j.bolt.connection.netty.impl.ConnectionProvider;
-import org.neo4j.bolt.connection.netty.impl.ConnectionProviders;
-import org.neo4j.bolt.connection.netty.impl.NettyLogging;
-import org.neo4j.bolt.connection.netty.impl.NoopMetricsListener;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
 import org.neo4j.bolt.connection.values.ValueFactory;
 

@@ -22,7 +22,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 /**
  * A factory for creating instances of {@link BoltConnectionProvider}.
  * <p>
- * It should be discovered using the {@link java.util.ServiceLoader}.
+ * Implementations MUST be loadable by the {@link java.util.ServiceLoader}.
  * @since 4.0.0
  */
 public interface BoltConnectionProviderFactory {
