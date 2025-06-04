@@ -158,7 +158,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
             parameters = message.parameters();
         }
 
-        String accessMode = "Write";
+        String accessMode = null;
         String impersonatedUser = null;
         List<String> bookmarks = null;
         if (message.extra().isPresent()) {
