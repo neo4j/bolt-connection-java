@@ -65,16 +65,17 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
-                        DiscoveryResponse discoveryResponse = null;
                         try {
-                            discoveryResponse = JSON.std.beanFrom(DiscoveryResponse.class, response.body());
+                            DiscoveryResponse discoveryResponse =
+                                    JSON.std.beanFrom(DiscoveryResponse.class, response.body());
+
+                            var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
+                            return new QueryApiBoltConnection(
+                                    valueFactory, httpClient, uri, authToken, serverAgent, logging);
                         } catch (IOException e) {
                             throw new BoltClientException(
                                     "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);
                         }
-                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
-                        return new QueryApiBoltConnection(
-                                valueFactory, httpClient, uri, authToken, serverAgent, logging);
                     } else {
                         throw new BoltClientException("Unexpected response code: " + response.statusCode());
                     }
