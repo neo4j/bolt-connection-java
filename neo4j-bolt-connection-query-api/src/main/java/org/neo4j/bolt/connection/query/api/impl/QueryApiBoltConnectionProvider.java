@@ -78,6 +78,11 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                     System.Logger.Level.WARNING,
                     "Setting notification config is not supported, server default will be used instead");
         }
+        if ("http".equals(uri.getScheme()) && securityPlan != null) {
+            logger.log(
+                    System.Logger.Level.WARNING,
+                    "Setting security plan when using http scheme is not supported, it will be ignored");
+        }
         HttpClient httpClientWithTimeout;
         try {
             var builder = newHttpClientBuilder(securityPlan);
