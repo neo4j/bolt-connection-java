@@ -2,7 +2,7 @@
 
 This experimental module implements `BoltConnectionProvider` that communicates with [Neo4j Query API](https://neo4j.com/docs/query-api/current/).
 
-It supports `http` and `https` schemes.
+It supports `http` and `https` URI schemes.
 
 ## Limitataions
 
