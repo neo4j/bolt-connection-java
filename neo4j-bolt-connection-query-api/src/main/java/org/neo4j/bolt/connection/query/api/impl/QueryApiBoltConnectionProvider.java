@@ -42,12 +42,14 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     private final LoggingProvider logging;
+    private final System.Logger logger;
     private final ValueFactory valueFactory;
     // Higher versions of Bolt require GQL support that it not available in Query API.
     private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
 
     public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory) {
         this.logging = Objects.requireNonNull(logging);
+        this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
@@ -66,6 +68,11 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
         if (minVersion != null && minVersion.compareTo(BOLT_PROTOCOL_VERSION) > 0) {
             return CompletableFuture.failedStage(
                     new MinVersionAcquisitionException("lower version", BOLT_PROTOCOL_VERSION));
+        }
+        if (notificationConfig != null && !notificationConfig.equals(NotificationConfig.defaultConfig())) {
+            logger.log(
+                    System.Logger.Level.WARNING,
+                    "Setting notification config is not supported, server default will be used instead");
         }
         HttpClient httpClientWithTimeout;
         try {
