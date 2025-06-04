@@ -26,6 +26,8 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import javax.net.ssl.SSLParameters;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BoltAgent;
@@ -46,11 +48,13 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     private final ValueFactory valueFactory;
     // Higher versions of Bolt require GQL support that it not available in Query API.
     private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
+    private final Executor httpExecutor;
 
     public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory) {
         this.logging = Objects.requireNonNull(logging);
         this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
+        this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     }
 
     @SuppressWarnings("resource") // not AutoCloseable in Java 17
@@ -118,7 +122,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     }
 
     private HttpClient.Builder newHttpClientBuilder(SecurityPlan securityPlan) {
-        var httpClientBuilder = HttpClient.newBuilder();
+        var httpClientBuilder = HttpClient.newBuilder().executor(httpExecutor);
         if (securityPlan != null) {
             httpClientBuilder = httpClientBuilder.sslContext(securityPlan.sslContext());
             String endpointIdentificationAlgorithm;
