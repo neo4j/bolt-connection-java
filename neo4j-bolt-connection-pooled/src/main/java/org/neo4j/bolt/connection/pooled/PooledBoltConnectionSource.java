@@ -46,6 +46,7 @@ import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltTransientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.message.Messages;
@@ -54,6 +55,7 @@ import org.neo4j.bolt.connection.pooled.impl.util.FutureUtil;
 
 /**
  * A pooled {@link BoltConnectionSource} implementation that automatically pools {@link BoltConnection} instances.
+ *
  * @since 4.0.0
  */
 public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConnectionParameters> {
@@ -75,7 +77,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     private final String userAgent;
     private final int connectTimeoutMillis;
     private final String poolId;
-    private final AuthTokenSupplier authTokenSupplier;
+    private final AuthTokenManager authTokenManager;
     private final SecurityPlanSupplier securityPlanSupplier;
     private final NotificationConfig notificationConfig;
 
@@ -87,7 +89,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             Clock clock,
             URI uri,
             BoltConnectionProvider boltConnectionProvider,
-            AuthTokenSupplier authTokenSupplier,
+            AuthTokenManager authTokenManager,
             SecurityPlanSupplier securityPlanSupplier,
             int maxSize,
             long acquisitionTimeout,
@@ -117,7 +119,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         this.boltAgent = Objects.requireNonNull(boltAgent);
         this.userAgent = Objects.requireNonNull(userAgent);
         this.connectTimeoutMillis = connectTimeoutMillis;
-        this.authTokenSupplier = Objects.requireNonNull(authTokenSupplier);
+        this.authTokenManager = Objects.requireNonNull(authTokenManager);
         this.securityPlanSupplier = Objects.requireNonNull(securityPlanSupplier);
         this.notificationConfig = Objects.requireNonNull(notificationConfig);
         this.poolId = poolId(address);
@@ -157,7 +159,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         var acquisitionFuture = new CompletableFuture<PooledBoltConnection>();
         var authTokenSupplier = parameters.authToken() != null
                 ? CompletableFuture.completedStage(parameters.authToken())
-                : this.authTokenSupplier.getToken();
+                : this.authTokenManager.getToken();
         authTokenSupplier.whenComplete((authToken, authThrowable) -> {
             if (authThrowable != null) {
                 acquisitionFuture.completeExceptionally(authThrowable);
@@ -317,7 +319,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                     if (empty.get()) {
                         return CompletableFuture.completedStage(new SecurityPlanAndAuthToken(securityPlan, authToken));
                     } else {
-                        return authTokenSupplier
+                        return authTokenManager
                                 .getToken()
                                 .thenApply(token -> new SecurityPlanAndAuthToken(securityPlan, token));
                     }
@@ -340,6 +342,14 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                     pooledConnectionEntries.remove(entry);
                                 }
                                 metricsListener.afterFailedToCreate(poolId);
+                                if (error instanceof BoltFailureException boltFailureException) {
+                                    var usedAuth =
+                                            authStage.toCompletableFuture().getNow(null);
+                                    if (usedAuth != null) {
+                                        error = authTokenManager.handleBoltFailureException(
+                                                usedAuth.authToken(), boltFailureException);
+                                    }
+                                }
                                 acquisitionFuture.completeExceptionally(error);
                             } else {
                                 synchronized (this) {
