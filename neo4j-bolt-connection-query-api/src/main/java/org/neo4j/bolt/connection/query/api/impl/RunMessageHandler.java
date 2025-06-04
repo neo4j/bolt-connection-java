@@ -176,8 +176,6 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
                 new QueryAPIRequestPayload(statement, parameters, bookmarks, impersonatedUser, accessMode);
         try {
             var jsonBody = json.asString(payload);
-            //          fails right now with SDN's ScrollingIT *shrug*
-            //            log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
             return HttpRequest.BodyPublishers.ofString(jsonBody);
         } catch (IOException e) {
             throw new BoltClientException("Cannot serialize payload %s".formatted(payload), e);

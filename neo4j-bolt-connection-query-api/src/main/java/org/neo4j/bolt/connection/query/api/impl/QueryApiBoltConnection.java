@@ -213,8 +213,6 @@ public final class QueryApiBoltConnection implements BoltConnection {
 
     private synchronized List<MessageHandler<?>> initMessageHandlers(ResponseHandler handler, List<Message> messages) {
         var messageHandlers = new ArrayList<MessageHandler<?>>(messages.size());
-        // fails with SDN ScrollingIT
-        //        log.log(System.Logger.Level.DEBUG, "Initializing message handlers %s".formatted(messages));
         for (var message : messages) {
             if (message instanceof BeginMessage beginMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, authHeader);
