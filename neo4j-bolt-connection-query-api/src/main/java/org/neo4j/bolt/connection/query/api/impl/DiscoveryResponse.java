@@ -16,6 +16,4 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.annotations.SerializedName;
-
-record DiscoveryResponse(@SerializedName("neo4j_version") String neo4jVersion) {}
+record DiscoveryResponse(String neo4j_version) {}

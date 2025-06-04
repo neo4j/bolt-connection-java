@@ -4,8 +4,8 @@ libraries. For an overview of the licenses see the NOTICE.txt file.
 
 ------------------------------------------------------------------------------
 Apache Software License, Version 2.0
-  error-prone annotations
-  Gson
+  Jackson-core
+  jackson-jr-objects
   Neo4j Bolt Connection (Provider SPI)
 ------------------------------------------------------------------------------
 

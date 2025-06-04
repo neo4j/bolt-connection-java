@@ -140,6 +140,49 @@ abstract class AbstractQueryApi {
     }
 
     @Test
+    void shoulRunAutocommitWithParameters() {
+        // given
+        var responseFuture = new CompletableFuture<>();
+        willAnswer(invocation -> {
+                    responseFuture.complete(null);
+                    return null;
+                })
+                .given(responseHandler)
+                .onComplete();
+        var message = Messages.run(
+                database(),
+                AccessMode.WRITE,
+                null,
+                Set.of(),
+                "RETURN $param as test",
+                Map.of("param", TestValueFactory.INSTANCE.value(1)),
+                null,
+                Map.of(),
+                NotificationConfig.defaultConfig());
+
+        // when
+        connection
+                .writeAndFlush(responseHandler, message)
+                .thenCompose(ignored -> responseFuture)
+                .toCompletableFuture()
+                .join();
+
+        // then
+        var runSummaryCaptor = ArgumentCaptor.forClass(RunSummary.class);
+        var responseHandlerInOrder = inOrder(responseHandler);
+        responseHandlerInOrder.verify(responseHandler).onRunSummary(runSummaryCaptor.capture());
+        responseHandlerInOrder.verify(responseHandler).onComplete();
+        then(responseHandler).shouldHaveNoMoreInteractions();
+
+        var runSummary = runSummaryCaptor.getValue();
+        assertNotNull(runSummary);
+        assertTrue(runSummary.queryId() != 0);
+        assertEquals(runSummary.keys(), List.of("test"));
+        assertEquals(-1, runSummary.resultAvailableAfter());
+        assertEquals(database(), runSummary.databaseName().orElse(null));
+    }
+
+    @Test
     void shouldFailRunAutocommitWhenDatabaseNameIsNull() {
         // given
         var message = Messages.run(

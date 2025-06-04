@@ -16,11 +16,12 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import java.io.IOException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
@@ -57,7 +58,11 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
         if (message.transactionType() != TransactionType.DEFAULT) {
             throw new BoltClientException("Only TransactionType.DEFAULT is supported");
         }
-        this.bodyPublisher = newHttpRequestBodyPublisher(httpContext, message, this.databaseName);
+        try {
+            this.bodyPublisher = newHttpRequestBodyPublisher(httpContext, message, this.databaseName);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -73,37 +78,40 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
     @Override
     protected TransactionInfo handleResponse(HttpResponse<String> response) {
-        var transactionEntry = httpContext.gson().fromJson(response.body(), TransactionEntry.class);
-        var affinity = response.headers().firstValue("neo4j-cluster-affinity").orElse(null);
-        var info = new TransactionInfo(
-                databaseName,
-                transactionEntry.transaction().id(),
-                Instant.parse(transactionEntry.transaction().expires()),
-                affinity);
-        handler.onBeginSummary(new BeginSummaryImpl(databaseName));
-        return info;
+        try {
+            var transactionEntry = httpContext.json().beanFrom(TransactionEntry.class, response.body());
+            var affinity =
+                    response.headers().firstValue("neo4j-cluster-affinity").orElse(null);
+            var info = new TransactionInfo(
+                    databaseName,
+                    transactionEntry.transaction().id(),
+                    Instant.parse(transactionEntry.transaction().expires()),
+                    affinity);
+            handler.onBeginSummary(new BeginSummaryImpl(databaseName));
+            return info;
+        } catch (IOException e) {
+            throw new BoltClientException("Cannot parse %s to TransactionEntry".formatted(response.body()), e);
+        }
     }
 
     private static HttpRequest.BodyPublisher newHttpRequestBodyPublisher(
-            HttpContext httpContext, BeginMessage message, String databaseName) {
-        var jsonObject = new JsonObject();
+            HttpContext httpContext, BeginMessage message, String databaseName) throws IOException {
 
-        if (message.accessMode() == AccessMode.READ) {
-            jsonObject.addProperty("accessMode", "Read");
-        }
-        message.impersonatedUser()
-                .ifPresent(impersonatedUser -> jsonObject.addProperty("impersonatedUser", impersonatedUser));
+        String accessMode = message.accessMode() == AccessMode.READ ? "Read" : null;
+        String impersonatedUser = message.impersonatedUser().orElseGet(() -> null);
+        List<String> bookmarks = null;
+
         if (!message.bookmarks().isEmpty()) {
-            var jsonArray = new JsonArray();
-            message.bookmarks().forEach(jsonArray::add);
-            jsonObject.add("bookmarks", jsonArray);
+            bookmarks = new ArrayList<>(message.bookmarks());
         }
 
-        var jsonBody = httpContext.gson().toJson(jsonObject);
+        var jsonBody = httpContext.json().asString(new BeginMessageWrapper(accessMode, impersonatedUser, bookmarks));
         return HttpRequest.BodyPublishers.ofString(jsonBody);
     }
 
     record TransactionEntry(Transaction transaction) {}
 
     record Transaction(String id, String expires) {}
+
+    record BeginMessageWrapper(String accessMode, String impersonatedUser, List<String> bookmarks) {}
 }

@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -69,21 +70,25 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
 
     @Override
     protected Void handleResponse(HttpResponse<String> response) {
-        var bookmarksWrapper = httpContext.gson().fromJson(response.body(), BookmarksWrapper.class);
-        var bookmarks = bookmarksWrapper.bookmarks();
-        String bookmark = null;
-        if (bookmarks == null) {
-            log.log(System.Logger.Level.INFO, "No bookmarks found");
-        } else if (bookmarks.isEmpty()) {
-            log.log(System.Logger.Level.INFO, "No bookmarks found");
-        } else if (bookmarks.size() > 1) {
-            log.log(System.Logger.Level.INFO, "Multiple bookmarks found");
-            bookmark = bookmarks.get(0);
-        } else {
-            bookmark = bookmarks.get(0);
+        try {
+            var bookmarksWrapper = httpContext.json().beanFrom(BookmarksWrapper.class, response.body());
+            var bookmarks = bookmarksWrapper.bookmarks();
+            String bookmark = null;
+            if (bookmarks == null) {
+                log.log(System.Logger.Level.INFO, "No bookmarks found");
+            } else if (bookmarks.isEmpty()) {
+                log.log(System.Logger.Level.INFO, "No bookmarks found");
+            } else if (bookmarks.size() > 1) {
+                log.log(System.Logger.Level.INFO, "Multiple bookmarks found");
+                bookmark = bookmarks.get(0);
+            } else {
+                bookmark = bookmarks.get(0);
+            }
+            handler.onCommitSummary(new CommitSummaryImpl(bookmark));
+            return null;
+        } catch (IOException e) {
+            throw new BoltClientException("Cannot parse %s to BookmarksWrapper".formatted(response.body()), e);
         }
-        handler.onCommitSummary(new CommitSummaryImpl(bookmark));
-        return null;
     }
 
     record BookmarksWrapper(List<String> bookmarks) {}

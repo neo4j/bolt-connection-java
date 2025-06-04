@@ -16,8 +16,8 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.jr.ob.JSON;
 import java.net.URI;
 import java.net.http.HttpClient;
 
-public record HttpContext(HttpClient httpClient, URI baseUri, Gson gson, String authHeader) {}
+public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String authHeader) {}

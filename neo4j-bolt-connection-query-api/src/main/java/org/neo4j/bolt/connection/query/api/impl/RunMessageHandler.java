@@ -16,24 +16,21 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import static org.neo4j.bolt.connection.query.api.impl.ValueUtil.asJsonObject;
-import static org.neo4j.bolt.connection.query.api.impl.ValueUtil.asValue;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.jr.ob.JSON;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
@@ -73,7 +70,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
                 throw new BoltClientException("Database name must be specified");
             }
         }
-        this.bodyPublisher = newHttpRequestBodyPublisher(httpContext.gson(), message);
+        this.bodyPublisher = newHttpRequestBodyPublisher(httpContext.json(), message);
     }
 
     @Override
@@ -105,12 +102,14 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
 
     @Override
     protected Query handleResponse(HttpResponse<String> response) {
-        var queryResult = httpContext.gson().fromJson(response.body(), QueryResult.class);
-        var records = queryResult.data().values().stream()
-                .map(record -> record.stream()
-                        .map(value -> asValue(value, valueFactory))
-                        .toArray(Value[]::new))
-                .collect(Collectors.toList());
+        QueryResult queryResult = null;
+        String body = response.body();
+        try {
+            log.log(System.Logger.Level.DEBUG, "received body: " + body);
+            queryResult = httpContext.json().beanFrom(QueryResult.class, body);
+        } catch (IOException e) {
+            throw new BoltClientException("Cannot parse response %s to QueryResult".formatted(body), e);
+        }
         var id = new Random().nextLong();
         var counters = queryResult.counters();
         var statsMap = Map.ofEntries(
@@ -146,46 +145,87 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         if (notifications != null && !notifications.isEmpty()) {
             metadata.put("notifications", valueFactory.value(notifications));
         }
-        var query = new Query(id, queryResult.data().fields(), records, Collections.unmodifiableMap(metadata));
+        var query = new Query(
+                id, queryResult.data().fields(), queryResult.data().values(), Collections.unmodifiableMap(metadata));
         handler.onRunSummary(new RunSummaryImpl(query.id(), query.fields(), -1, databaseName));
         return query;
     }
 
-    private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(Gson gson, RunMessage message) {
-        var jsonObject = new JsonObject();
-
-        jsonObject.addProperty("statement", message.query());
+    private HttpRequest.BodyPublisher newHttpRequestBodyPublisher(JSON json, RunMessage message) {
+        String statement = message.query();
+        Map<String, Value> parameters = null;
         if (!message.parameters().isEmpty()) {
-            jsonObject.add("parameters", params(message.parameters()));
+            parameters = message.parameters();
         }
 
+        String accessMode = null;
+        String impersonatedUser = null;
+        List<String> bookmarks = null;
         if (message.extra().isPresent()) {
             var extra = message.extra().get();
             if (extra.accessMode() == AccessMode.READ) {
-                jsonObject.addProperty("accessMode", "Read");
+                accessMode = "Read";
             }
-            extra.impersonatedUser()
-                    .ifPresent(impersonatedUser -> jsonObject.addProperty("impersonatedUser", impersonatedUser));
+            impersonatedUser = extra.impersonatedUser().orElseGet(() -> null);
             if (!extra.bookmarks().isEmpty()) {
-                var jsonArray = new JsonArray();
-                extra.bookmarks().forEach(jsonArray::add);
-                jsonObject.add("bookmarks", jsonArray);
+                bookmarks = new ArrayList<>(extra.bookmarks());
             }
         }
 
-        jsonObject.addProperty("includeCounters", true);
-        var jsonBody = gson.toJson(jsonObject);
-        log.log(System.Logger.Level.DEBUG, "json body: " + jsonBody);
-        return HttpRequest.BodyPublishers.ofString(jsonBody);
+        QueryAPIRequestPayload payload =
+                new QueryAPIRequestPayload(statement, parameters, bookmarks, impersonatedUser, accessMode);
+        try {
+            var jsonBody = json.asString(payload);
+            return HttpRequest.BodyPublishers.ofString(jsonBody);
+        } catch (IOException e) {
+            throw new BoltClientException("Cannot serialize payload %s".formatted(payload), e);
+        }
     }
 
-    private static JsonObject params(Map<String, Value> parameters) {
-        var parametersObject = new JsonObject();
-        for (var entry : parameters.entrySet()) {
-            var key = entry.getKey();
-            var value = entry.getValue();
-            parametersObject.add(key, asJsonObject(value));
+    private static class QueryAPIRequestPayload {
+
+        private final String statement;
+        private final Map<String, Value> parameters;
+        private final List<String> bookmarks;
+        private final String impersonatedUser;
+        private final String accessMode;
+        private final Boolean includeCounters = true;
+
+        public QueryAPIRequestPayload(
+                String statement,
+                Map<String, Value> parameters,
+                List<String> bookmarks,
+                String impersonatedUser,
+                String accessMode) {
+            this.statement = statement;
+            this.parameters = parameters;
+            this.bookmarks = bookmarks;
+            this.impersonatedUser = impersonatedUser;
+            this.accessMode = accessMode;
         }
-        return parametersObject;
+
+        public Map<String, Value> getParameters() {
+            return parameters;
+        }
+
+        public String getStatement() {
+            return statement;
+        }
+
+        public List<String> getBookmarks() {
+            return bookmarks;
+        }
+
+        public String getAccessMode() {
+            return accessMode;
+        }
+
+        public Boolean getIncludeCounters() {
+            return includeCounters;
+        }
+
+        public String getImpersonatedUser() {
+            return impersonatedUser;
+        }
     }
 }

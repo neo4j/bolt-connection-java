@@ -25,6 +25,6 @@ module org.neo4j.bolt.connection.query.api {
 
     requires org.neo4j.bolt.connection;
     requires java.net.http;
-    requires com.google.gson;
     requires java.naming;
+    requires com.fasterxml.jackson.jr.ob;
 }

@@ -16,7 +16,8 @@
  */
 package org.neo4j.bolt.connection.query.api.impl;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.jr.ob.JSON;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -37,7 +38,6 @@ import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
-    private static final Gson GSON = new Gson();
     private final HttpClient httpClient;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
@@ -65,10 +65,17 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
-                        var discoveryResponse = GSON.fromJson(response.body(), DiscoveryResponse.class);
-                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4jVersion());
-                        return new QueryApiBoltConnection(
-                                valueFactory, httpClient, uri, authToken, serverAgent, logging);
+                        try {
+                            DiscoveryResponse discoveryResponse =
+                                    JSON.std.beanFrom(DiscoveryResponse.class, response.body());
+
+                            var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
+                            return new QueryApiBoltConnection(
+                                    valueFactory, httpClient, uri, authToken, serverAgent, logging);
+                        } catch (IOException e) {
+                            throw new BoltClientException(
+                                    "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);
+                        }
                     } else {
                         throw new BoltClientException("Unexpected response code: " + response.statusCode());
                     }
