@@ -14,15 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection;
+package org.neo4j.bolt.connection.netty.impl;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableMap;
-import static org.neo4j.bolt.connection.Scheme.isRoutingScheme;
+import static org.neo4j.bolt.connection.netty.impl.Scheme.isRoutingScheme;
 
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import org.neo4j.bolt.connection.BoltServerAddress;
 
 public class RoutingContext {
 
@@ -37,9 +38,9 @@ public class RoutingContext {
         this.context = emptyMap();
     }
 
-    public RoutingContext(URI uri) {
+    public RoutingContext(URI uri, String routingContextAddress) {
         this.isServerRoutingEnabled = isRoutingScheme(uri.getScheme());
-        this.context = unmodifiableMap(parseParameters(uri));
+        this.context = unmodifiableMap(parseParameters(uri, routingContextAddress));
     }
 
     public boolean isDefined() {
@@ -59,14 +60,18 @@ public class RoutingContext {
         return "RoutingContext" + context + " isServerRoutingEnabled=" + isServerRoutingEnabled;
     }
 
-    private static Map<String, String> parseParameters(URI uri) {
+    private static Map<String, String> parseParameters(URI uri, String routingContextAddress) {
         var query = uri.getQuery();
         String address;
 
-        if (uri.getPort() == -1) {
-            address = String.format("%s:%s", uri.getHost(), BoltServerAddress.DEFAULT_PORT);
+        if (routingContextAddress != null) {
+            address = routingContextAddress;
         } else {
-            address = String.format("%s:%s", uri.getHost(), uri.getPort());
+            if (uri.getPort() == -1) {
+                address = String.format("%s:%s", uri.getHost(), BoltServerAddress.DEFAULT_PORT);
+            } else {
+                address = String.format("%s:%s", uri.getHost(), uri.getPort());
+            }
         }
 
         Map<String, String> parameters = new HashMap<>();

@@ -36,7 +36,6 @@ import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
@@ -80,7 +79,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     @Override
     public CompletionStage<BoltConnection> connect(
             URI uri,
-            RoutingContext routingContext,
+            String routingContextAddress,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
@@ -105,6 +104,18 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         var address = securityPlan != null && securityPlan.expectedHostname() != null
                 ? new BoltServerAddress(securityPlan.expectedHostname(), uriAddress.connectionHost(), uriAddress.port())
                 : uriAddress;
+
+        // determine routingContext
+        RoutingContext routingContext;
+        try {
+            routingContext = new RoutingContext(uri, routingContextAddress);
+        } catch (Exception e) {
+            return CompletableFuture.failedStage(e);
+        }
+        if (!Scheme.isRoutingScheme(uri.getScheme()) && routingContext.isDefined()) {
+            return CompletableFuture.failedStage(new IllegalArgumentException(
+                    "%s scheme must not contain routing context".formatted(uri.getScheme())));
+        }
 
         var latestAuthMillisFuture = new CompletableFuture<Long>();
         return connectionProvider
