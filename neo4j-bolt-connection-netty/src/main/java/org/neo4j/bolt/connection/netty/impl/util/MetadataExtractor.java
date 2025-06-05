@@ -70,11 +70,6 @@ public class MetadataExtractor {
         if (versionValue == null || versionValue.isNull()) {
             throw new BoltUntrustedServerException("Server provides no product identifier");
         }
-        var serverAgent = versionValue.asString();
-        if (!serverAgent.startsWith("Neo4j/")) {
-            throw new BoltUntrustedServerException(
-                    "Server does not identify as a genuine Neo4j instance: '" + serverAgent + "'");
-        }
         return versionValue;
     }
 
