@@ -94,7 +94,7 @@ class PooledBoltConnectionSourceTest {
     BoltConnection connection;
 
     @Mock
-    AuthTokenSupplier authTokenSupplier;
+    AuthTokenManager authTokenManager;
 
     @Mock
     SecurityPlanSupplier securityPlanSupplier;
@@ -122,14 +122,14 @@ class PooledBoltConnectionSourceTest {
     void beforeEach() {
         openMocks(this);
         given(loggingProvider.getLog(any(Class.class))).willReturn(mock(System.Logger.class));
-        given(authTokenSupplier.getToken()).willReturn(CompletableFuture.completedStage(authToken));
+        given(authTokenManager.getToken()).willReturn(CompletableFuture.completedStage(authToken));
         given(securityPlanSupplier.getPlan()).willReturn(CompletableFuture.completedStage(securityPlan));
         boltConnectionSource = new PooledBoltConnectionSource(
                 loggingProvider,
                 clock,
                 uri,
                 upstreamProvider,
-                authTokenSupplier,
+                authTokenManager,
                 securityPlanSupplier,
                 maxSize,
                 acquisitionTimeout,
@@ -188,7 +188,7 @@ class PooledBoltConnectionSourceTest {
                 clock,
                 uri,
                 upstreamProvider,
-                authTokenSupplier,
+                authTokenManager,
                 securityPlanSupplier,
                 1,
                 acquisitionTimeout,
@@ -539,7 +539,7 @@ class PooledBoltConnectionSourceTest {
         given(authInfo.authAckMillis()).willReturn(0L);
         given(authInfo.authToken()).willReturn(AuthTokens.custom(Collections.emptyMap()));
         given(connection.authInfo()).willReturn(CompletableFuture.completedStage(authInfo));
-        given(authTokenSupplier.getToken())
+        given(authTokenManager.getToken())
                 .willReturn(CompletableFuture.completedStage(AuthTokens.custom(Collections.emptyMap())))
                 .willReturn(CompletableFuture.completedStage(authToken));
         boltConnectionSource
