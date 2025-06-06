@@ -26,7 +26,6 @@ import java.util.Objects;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.message.BeginMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -55,9 +54,6 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
             throw new BoltClientException("Database name must be specified");
         }
 
-        if (message.transactionType() != TransactionType.DEFAULT) {
-            throw new BoltClientException("Only TransactionType.DEFAULT is supported");
-        }
         try {
             this.bodyPublisher = newHttpRequestBodyPublisher(httpContext, message, this.databaseName);
         } catch (IOException e) {
