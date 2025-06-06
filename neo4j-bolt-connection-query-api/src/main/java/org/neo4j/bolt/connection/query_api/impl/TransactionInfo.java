@@ -14,17 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * The Neo4j Bolt Connection Query API implementation module.
- */
-module org.neo4j.bolt.connection.query_api {
-    provides org.neo4j.bolt.connection.BoltConnectionProviderFactory with
-            org.neo4j.bolt.connection.query_api.QueryApiBoltConnectionProviderFactory;
+package org.neo4j.bolt.connection.query_api.impl;
 
-    exports org.neo4j.bolt.connection.query_api;
+import java.time.Instant;
 
-    requires org.neo4j.bolt.connection;
-    requires java.net.http;
-    requires java.naming;
-    requires com.fasterxml.jackson.jr.ob;
-}
+record TransactionInfo(String databaseName, String id, Instant expiresAt, String affinity) {}
