@@ -36,7 +36,6 @@ import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
@@ -61,7 +60,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     @Override
     public CompletionStage<BoltConnection> connect(
             URI uri,
-            RoutingContext routingContext,
+            String routingContextAddress,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,

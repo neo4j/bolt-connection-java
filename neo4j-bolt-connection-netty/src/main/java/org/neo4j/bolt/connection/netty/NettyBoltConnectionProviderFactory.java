@@ -18,22 +18,47 @@ package org.neo4j.bolt.connection.netty;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
+import java.net.URI;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltConnectionProviderFactory;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.DefaultDomainNameResolver;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.netty.impl.BootstrapFactory;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
+/**
+ * A factory for creating instances of {@link BoltConnectionProvider}.
+ * <p>
+ * The created instances support the following URI schemes:
+ * <ul>
+ *     <li><b>bolt</b>, <b>bolt+s</b>, <b>bolt+ssc</b> - establishes a {@link BoltConnection} to a given address without
+ *     routing context. In a clustered Neo4j DBMS the absense of routing context instructs the server to <b>NOT</b>
+ *     carry out server-side routing even if it might be needed. The {@link URI#getQuery()} part is prohibited as
+ *     routing context is not supported.</li>
+ *     <li><b>neo4j</b>, <b>neo4j+s</b>, <b>neo4j+ssc</b> - establishes a {@link BoltConnection} to a given address with
+ *     routing context, which is automatically parsed from the connection {@link URI}. In a clustered Neo4j DBMS the
+ *     presence of routing context enables the server to perform server-side routing within the cluster if necessary.
+ *     Effectively, using these schemes is sufficient for establishing a connection to a clustered Neo4j DBMS <b>that
+ *     has server-side routing enabled</b>. However, it should <b>NOT</b> be confused with client-side routing that
+ *     requires more contextual awareness and fits {@link BoltConnectionSource} with
+ *     {@link RoutedBoltConnectionParameters} support better.</li>
+ * </ul>
+ *
+ * @since 4.0.0
+ */
 public final class NettyBoltConnectionProviderFactory implements BoltConnectionProviderFactory {
-    private static final Set<String> SUPPORTED_SCHEMES = Set.of("bolt", "bolt+s", "bolt+ssc");
+    private static final Set<String> SUPPORTED_SCHEMES =
+            Set.of("bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc");
 
     /**
      * Creates a new instance of this factory.

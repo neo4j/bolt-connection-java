@@ -64,7 +64,6 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.message.Messages;
@@ -104,7 +103,7 @@ class PooledBoltConnectionSourceTest {
     final long maxLifetime = 60000;
     final long idleBeforeTest = 30000;
     final URI uri = URI.create("bolt://localhost:7687");
-    final RoutingContext context = RoutingContext.EMPTY;
+    final String routingContextAddress = "%s:%d".formatted(uri.getHost(), uri.getPort());
     final BoltAgent boltAgent = new BoltAgent("agent", null, null, null);
     final String userAgent = "agent";
     final int timeout = 1000;
@@ -136,14 +135,14 @@ class PooledBoltConnectionSourceTest {
                 maxLifetime,
                 idleBeforeTest,
                 metricsListener,
-                context,
+                routingContextAddress,
                 boltAgent,
                 userAgent,
                 timeout,
                 notificationConfig);
         given(upstreamProvider.connect(
                         eq(uri),
-                        eq(context),
+                        eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
@@ -167,7 +166,7 @@ class PooledBoltConnectionSourceTest {
                 .should()
                 .connect(
                         eq(uri),
-                        eq(context),
+                        eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
@@ -195,7 +194,7 @@ class PooledBoltConnectionSourceTest {
                 maxLifetime,
                 idleBeforeTest,
                 metricsListener,
-                context,
+                routingContextAddress,
                 boltAgent,
                 userAgent,
                 timeout,
@@ -318,7 +317,7 @@ class PooledBoltConnectionSourceTest {
                 .should()
                 .connect(
                         eq(uri),
-                        eq(context),
+                        eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
@@ -352,7 +351,7 @@ class PooledBoltConnectionSourceTest {
                 .should()
                 .connect(
                         eq(uri),
-                        eq(context),
+                        eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
@@ -392,7 +391,7 @@ class PooledBoltConnectionSourceTest {
                 .should()
                 .connect(
                         eq(uri),
-                        eq(context),
+                        eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
@@ -455,7 +454,7 @@ class PooledBoltConnectionSourceTest {
         var connection2 = mock(BoltConnection.class);
         given(upstreamProvider.connect(
                         eq(uri),
-                        eq(context),
+                        eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),

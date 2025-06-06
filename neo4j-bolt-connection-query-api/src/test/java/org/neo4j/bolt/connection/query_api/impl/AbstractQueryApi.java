@@ -51,7 +51,6 @@ import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlans;
 import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
@@ -84,7 +83,7 @@ abstract class AbstractQueryApi {
         var provider = new QueryApiBoltConnectionProvider(logging, valueFactory);
         connection = (QueryApiBoltConnection) provider.connect(
                         uri(),
-                        RoutingContext.EMPTY,
+                        null,
                         null,
                         null,
                         0,

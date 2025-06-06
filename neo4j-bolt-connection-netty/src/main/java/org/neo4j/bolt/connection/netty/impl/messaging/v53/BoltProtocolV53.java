@@ -27,7 +27,7 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.RoutingContext;
+import org.neo4j.bolt.connection.netty.impl.RoutingContext;
 import org.neo4j.bolt.connection.netty.impl.handlers.HelloV51ResponseHandler;
 import org.neo4j.bolt.connection.netty.impl.handlers.LogonResponseHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.BoltProtocol;

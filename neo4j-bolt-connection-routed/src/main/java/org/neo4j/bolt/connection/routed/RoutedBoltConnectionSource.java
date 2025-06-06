@@ -71,7 +71,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             "Failed to obtain a connection towards address %s, will try other addresses if available. Complete failure is reported separately from this entry.";
     private final System.Logger log;
     private final BoltConnectionSourceFactory boltConnectionSourceFactory;
-    private final String providerScheme;
+    private final URI uri;
     private final Map<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> addressToSource =
             new HashMap<>();
     private final Map<BoltServerAddress, Integer> addressToInUseCount = new HashMap<>();
@@ -100,11 +100,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                         new BoltServerAddress(uri), resolver, logging, domainNameResolver, discoveryAbortingErrors);
         this.registry = new RoutingTableRegistryImpl(
                 this::get, this.rediscovery, clock, logging, routingTablePurgeDelayMs, this::shutdownUnusedProviders);
-        this.providerScheme = switch (uri.getScheme()) {
-            case "neo4j" -> "bolt";
-            case "neo4j+ssc" -> "bolt+ssc";
-            case "neo4j+s" -> "bolt+s";
-            default -> throw new IllegalArgumentException("Unsupported URI scheme: " + uri.getScheme());};
+        this.uri = Objects.requireNonNull(uri);
     }
 
     @Override
@@ -362,7 +358,14 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         if (provider == null) {
             URI uri;
             try {
-                uri = new URI(providerScheme, null, address.connectionHost(), address.port(), null, null, null);
+                uri = new URI(
+                        this.uri.getScheme(),
+                        null,
+                        address.connectionHost(),
+                        address.port(),
+                        null,
+                        this.uri.getQuery(),
+                        null);
             } catch (URISyntaxException e) {
                 throw new BoltClientException("Failed to create URI for address: " + address, e);
             }

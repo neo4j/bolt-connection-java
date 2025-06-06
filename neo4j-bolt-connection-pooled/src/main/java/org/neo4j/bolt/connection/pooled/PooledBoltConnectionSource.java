@@ -44,7 +44,6 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltTransientException;
@@ -72,7 +71,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     private final MetricsListener metricsListener;
     private final URI uri;
     private final BoltServerAddress address;
-    private final RoutingContext routingContext;
+    private final String routingContextAddress;
     private final BoltAgent boltAgent;
     private final String userAgent;
     private final int connectTimeoutMillis;
@@ -96,7 +95,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             long maxLifetime,
             long idleBeforeTest,
             MetricsListener metricsListener,
-            RoutingContext routingContext,
+            String routingContextAddress,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
@@ -113,9 +112,9 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         this.metricsListener = Objects.requireNonNull(metricsListener);
         this.uri = Objects.requireNonNull(uri);
         this.address = switch (uri.getScheme()) {
-            case "bolt", "bolt+s", "bolt+ssc" -> new BoltServerAddress(uri);
+            case "bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc" -> new BoltServerAddress(uri);
             default -> new BoltServerAddress(uri.getHost(), 0);};
-        this.routingContext = Objects.requireNonNull(routingContext);
+        this.routingContextAddress = routingContextAddress;
         this.boltAgent = Objects.requireNonNull(boltAgent);
         this.userAgent = Objects.requireNonNull(userAgent);
         this.connectTimeoutMillis = connectTimeoutMillis;
@@ -327,7 +326,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                 authStage
                         .thenCompose(auth -> boltConnectionProvider.connect(
                                 uri,
-                                routingContext,
+                                routingContextAddress,
                                 boltAgent,
                                 userAgent,
                                 connectTimeoutMillis,
