@@ -16,7 +16,6 @@
  */
 package org.neo4j.bolt.connection.query_api.impl;
 
-import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Arrays;
@@ -53,8 +52,7 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
         if (transactionInfo == null) {
             throw new BoltClientException("No transaction found");
         }
-        var uri = URI.create("%s/db/%s/query/v2/tx/%s"
-                .formatted(httpContext.baseUri().toString(), transactionInfo.databaseName(), transactionInfo.id()));
+        var uri = httpContext.txUrl(transactionInfo);
         var headers = httpContext.headers();
         if (transactionInfo.affinity() != null) {
             headers = Arrays.copyOf(headers, headers.length + 2);
