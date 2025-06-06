@@ -67,8 +67,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
     @Override
     protected HttpRequest newHttpRequest() {
-        var runUri = httpContext.baseUri().resolve("db/%s/query/v2/tx".formatted(databaseName));
-        return HttpRequest.newBuilder(runUri)
+        return HttpRequest.newBuilder(httpContext.txUrl(databaseName))
                 .headers(httpContext.headers())
                 .POST(bodyPublisher)
                 .build();

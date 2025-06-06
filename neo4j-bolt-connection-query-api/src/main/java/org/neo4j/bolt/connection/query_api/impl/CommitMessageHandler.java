@@ -17,7 +17,6 @@
 package org.neo4j.bolt.connection.query_api.impl;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Arrays;
@@ -60,8 +59,7 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
             headers[headers.length - 2] = "neo4j-cluster-affinity";
             headers[headers.length - 1] = transactionInfo.affinity();
         }
-        var uri = URI.create("%s/db/%s/query/v2/tx/%s/commit"
-                .formatted(httpContext.baseUri().toString(), transactionInfo.databaseName(), transactionInfo.id()));
+        var uri = httpContext.commitUrl(transactionInfo);
         return HttpRequest.newBuilder(uri)
                 .headers(headers)
                 .POST(HttpRequest.BodyPublishers.noBody())

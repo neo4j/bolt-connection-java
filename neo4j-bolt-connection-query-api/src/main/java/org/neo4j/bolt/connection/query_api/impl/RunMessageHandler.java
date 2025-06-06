@@ -81,8 +81,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         var headers = httpContext.headers();
         if (transactionInfo != null) {
             databaseName = transactionInfo.databaseName();
-            uri = URI.create("%s/db/%s/query/v2/tx/%s"
-                    .formatted(httpContext.baseUri().toString(), databaseName, transactionInfo.id()));
+            uri = httpContext.txUrl(transactionInfo);
             if (transactionInfo.affinity() != null) {
                 headers = Arrays.copyOf(headers, headers.length + 2);
                 headers[headers.length - 2] = "neo4j-cluster-affinity";
@@ -94,7 +93,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
             if (databaseName == null) {
                 throw new BoltClientException("Database not specified");
             }
-            uri = URI.create("%s/db/%s/query/v2".formatted(httpContext.baseUri().toString(), databaseName));
+            uri = httpContext.queryUrl(databaseName);
         }
         this.databaseName.set(databaseName);
         return HttpRequest.newBuilder(uri).headers(headers).POST(bodyPublisher).build();

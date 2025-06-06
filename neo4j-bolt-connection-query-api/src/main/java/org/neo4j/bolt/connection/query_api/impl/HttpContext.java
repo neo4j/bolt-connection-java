@@ -22,6 +22,14 @@ import java.net.http.HttpClient;
 import java.util.Objects;
 
 public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[] headers) {
+
+    public HttpContext {
+        var path = baseUri.getPath();
+        if (path.endsWith("/")) {
+            baseUri = baseUri.resolve(path.substring(0, path.length() - 1));
+        }
+    }
+
     public HttpContext(HttpClient httpClient, URI baseUri, JSON json, String authHeader, String userAgent) {
         this(httpClient, baseUri, json, headers(authHeader, userAgent));
     }
@@ -39,5 +47,21 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[
             headers[7] = userAgent;
         }
         return headers;
+    }
+
+    URI queryUrl(String databaseName) {
+        return URI.create("%s/db/%s/query/v2".formatted(baseUri, databaseName)).normalize();
+    }
+
+    URI txUrl(String databaseName) {
+        return URI.create("%s/tx".formatted(queryUrl(databaseName)));
+    }
+
+    URI txUrl(TransactionInfo tx) {
+        return URI.create("%s/%s".formatted(txUrl(tx.databaseName()), tx.id()));
+    }
+
+    URI commitUrl(TransactionInfo tx) {
+        return URI.create("%s/commit".formatted(txUrl(tx)));
     }
 }
