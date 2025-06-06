@@ -21,6 +21,7 @@ import static org.neo4j.bolt.connection.query_api.impl.FutureUtil.completionExce
 import com.fasterxml.jackson.jr.ob.JSON;
 import com.fasterxml.jackson.jr.ob.JacksonJrExtension;
 import com.fasterxml.jackson.jr.ob.api.ExtensionContext;
+import java.io.Serial;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Clock;
@@ -54,11 +55,16 @@ import org.neo4j.bolt.connection.message.CommitMessage;
 import org.neo4j.bolt.connection.message.DiscardMessage;
 import org.neo4j.bolt.connection.message.Message;
 import org.neo4j.bolt.connection.message.PullMessage;
+import org.neo4j.bolt.connection.message.ResetMessage;
 import org.neo4j.bolt.connection.message.RollbackMessage;
 import org.neo4j.bolt.connection.message.RunMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class QueryApiBoltConnection implements BoltConnection {
+    private static final CompletionStage<Void> MESSAGE_HANDLING_WITH_IGNORING_STAGE =
+            CompletableFuture.failedStage(new IllegalStateException("ignore messages"));
+    private static final CompletionStage<Void> MESSAGE_HANDLING_ABORTING_STAGE =
+            CompletableFuture.failedStage(new MessageHandlingAbortingException());
     private final JSON json;
     private final LoggingProvider logging;
     private final System.Logger log;
@@ -116,6 +122,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     public CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages) {
         try {
             synchronized (this) {
+                assertValidStateForWrite();
                 List<Message> messagesToWrite = new ArrayList<>(this.messages);
                 this.messages.clear();
                 messagesToWrite.addAll(messages);
@@ -134,6 +141,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     public CompletionStage<Void> write(List<Message> messages) {
         try {
             synchronized (this) {
+                assertValidStateForWrite();
                 this.messages.addAll(messages);
             }
             return CompletableFuture.completedFuture(null);
@@ -159,10 +167,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
     }
 
     @Override
-    public BoltConnectionState state() {
-        synchronized (this) {
-            return state;
-        }
+    public synchronized BoltConnectionState state() {
+        return state;
     }
 
     @Override
@@ -200,15 +206,19 @@ public final class QueryApiBoltConnection implements BoltConnection {
         return Optional.empty();
     }
 
-    private synchronized void setTransactionInfo(TransactionInfo transactionInfo) {
+    synchronized void setTransactionInfo(TransactionInfo transactionInfo) {
         this.transactionInfo = transactionInfo;
     }
 
-    private synchronized TransactionInfo getTransactionInfo() {
+    synchronized TransactionInfo getTransactionInfo() {
         return transactionInfo;
     }
 
-    private synchronized Query findById(long id) {
+    synchronized void addQuery(long id, Query query) {
+        qidToQuery.put(id, query);
+    }
+
+    synchronized Query findById(long id) {
         return qidToQuery.get(id);
     }
 
@@ -218,7 +228,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
 
     private synchronized List<MessageHandler<?>> initMessageHandlers(ResponseHandler handler, List<Message> messages) {
         var messageHandlers = new ArrayList<MessageHandler<?>>(messages.size());
-        for (var message : messages) {
+        for (var i = 0; i < messages.size(); i++) {
+            var message = messages.get(i);
             if (message instanceof BeginMessage beginMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new BeginMessageHandler(handler, httpContext, beginMessage, valueFactory, logging));
@@ -246,6 +257,12 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new RollbackMessageHandler(
                         handler, httpContext, this::getTransactionInfo, valueFactory, logging));
+            } else if (message instanceof ResetMessage) {
+                if (i > 0) {
+                    throw new BoltClientException(
+                            "Reset message is only supported at the beginning of message pipeline");
+                }
+                messageHandlers.add(new ResetMessageHandler(this::state, this::updateState, handler));
             } else {
                 throw new BoltException(
                         String.format("%s not supported", message.getClass().getCanonicalName()));
@@ -258,8 +275,23 @@ public final class QueryApiBoltConnection implements BoltConnection {
             ResponseHandler handler, List<MessageHandler<?>> messageHandlers, CompletionStage<Void> previousExecution) {
         var messageHandlingFuture = new CompletableFuture<Void>();
         var exchange = previousExecution.whenComplete((result, throwable) -> {});
-        for (var messageHandler : messageHandlers) {
-            CompletionStage<Void> handlerStage;
+        for (var i = 0; i < messageHandlers.size(); i++) {
+            var messageHandler = messageHandlers.get(i);
+            if (i == 0) {
+                // ensure the state is valid for message handling
+                exchange = appendMessageHandler(handler, exchange, () -> {
+                    CompletionStage<Void> result;
+                    synchronized (this) {
+                        result = switch (state()) {
+                            case OPEN -> CompletableFuture.completedStage(null);
+                            case ERROR, CLOSED -> MESSAGE_HANDLING_ABORTING_STAGE;
+                            case FAILURE -> messageHandler instanceof ResetMessageHandler
+                                    ? CompletableFuture.completedStage(null)
+                                    : MESSAGE_HANDLING_WITH_IGNORING_STAGE;};
+                    }
+                    return result;
+                });
+            }
             if (messageHandler instanceof BeginMessageHandler beginMessageHandler) {
                 exchange = appendMessageHandler(
                         handler, exchange, () -> beginMessageHandler.exchange().thenApply(transactionInfo -> {
@@ -270,8 +302,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 exchange = appendMessageHandler(
                         handler, exchange, () -> runMessageHandler.exchange().thenApply(query -> {
                             synchronized (this) {
-                                qidToQuery.put(query.id(), query);
-                                qidToQuery.put(-1L, query);
+                                addQuery(query.id(), query);
+                                addQuery(-1L, query);
                             }
                             return null;
                         }));
@@ -321,7 +353,11 @@ public final class QueryApiBoltConnection implements BoltConnection {
                             case OPEN, FAILURE, ERROR -> BoltConnectionState.ERROR;
                             case CLOSED -> BoltConnectionState.CLOSED;};
                     }
-                    state = newState;
+                    updateState(newState);
+                }
+                if (throwable instanceof MessageHandlingAbortingException) {
+                    handler.onError(new BoltServiceUnavailableException(
+                            "Failed to handle messages, the connection is no longer in a valid state"));
                 }
             }
             handler.onComplete();
@@ -342,12 +378,28 @@ public final class QueryApiBoltConnection implements BoltConnection {
         }
     }
 
+    private synchronized void assertValidStateForWrite() {
+        switch (state) {
+            case OPEN, FAILURE -> {}
+            case ERROR, CLOSED -> throw new BoltClientException(
+                    "Failed to write to connection in %s state".formatted(state));
+        }
+    }
+
+    synchronized void updateState(BoltConnectionState state) {
+        this.state = state;
+        transactionInfo = null;
+        qidToQuery.clear();
+    }
+
     private static CompletionStage<Void> appendMessageHandler(
             ResponseHandler handler, CompletionStage<Void> previous, Supplier<CompletionStage<Void>> messageSupplier) {
         return previous.handle((ignored, throwable) -> {
                     if (throwable != null) {
-                        handler.onIgnored();
                         throwable = completionExceptionCause(throwable);
+                        if (!(throwable instanceof MessageHandlingAbortingException)) {
+                            handler.onIgnored();
+                        }
                         return CompletableFuture.<Void>failedStage(throwable);
                     } else {
                         return messageSupplier.get().whenComplete((handlerResult, handlerError) -> {
@@ -359,5 +411,10 @@ public final class QueryApiBoltConnection implements BoltConnection {
                     }
                 })
                 .thenCompose(Function.identity());
+    }
+
+    private static class MessageHandlingAbortingException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 2360301147486954597L;
     }
 }
