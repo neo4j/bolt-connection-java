@@ -26,7 +26,6 @@ import java.util.Objects;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.message.BeginMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -55,9 +54,6 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
             throw new BoltClientException("Database name must be specified");
         }
 
-        if (message.transactionType() != TransactionType.DEFAULT) {
-            throw new BoltClientException("Only TransactionType.DEFAULT is supported");
-        }
         try {
             this.bodyPublisher = newHttpRequestBodyPublisher(httpContext, message, this.databaseName);
         } catch (IOException e) {
@@ -94,15 +90,23 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     private static HttpRequest.BodyPublisher newHttpRequestBodyPublisher(
             HttpContext httpContext, BeginMessage message, String databaseName) throws IOException {
 
-        String accessMode = message.accessMode() == AccessMode.READ ? "Read" : null;
-        String impersonatedUser = message.impersonatedUser().orElseGet(() -> null);
+        var accessMode = message.accessMode() == AccessMode.READ ? "Read" : null;
+        var impersonatedUser = message.impersonatedUser().orElse(null);
         List<String> bookmarks = null;
 
         if (!message.bookmarks().isEmpty()) {
             bookmarks = new ArrayList<>(message.bookmarks());
         }
 
-        var jsonBody = httpContext.json().asString(new BeginMessageWrapper(accessMode, impersonatedUser, bookmarks));
+        var txType = message.transactionType() != null
+                ? switch (message.transactionType()) {
+                    case UNCONSTRAINED -> "IMPLICIT";
+                    case DEFAULT -> null;
+                }
+                : null;
+
+        var jsonBody =
+                httpContext.json().asString(new BeginMessageWrapper(accessMode, impersonatedUser, bookmarks, txType));
         return HttpRequest.BodyPublishers.ofString(jsonBody);
     }
 
@@ -110,5 +114,5 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
     record Transaction(String id, String expires) {}
 
-    record BeginMessageWrapper(String accessMode, String impersonatedUser, List<String> bookmarks) {}
+    record BeginMessageWrapper(String accessMode, String impersonatedUser, List<String> bookmarks, String txType) {}
 }
