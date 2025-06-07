@@ -53,15 +53,15 @@ final class RoutingParametersBuilderImpl extends BoltConnectionParametersBuilder
     }
 
     @Override
-    public RoutedBoltConnectionParameters.Builder withDatabaseNameConsumer(
-            Consumer<DatabaseName> databaseNameConsumer) {
-        this.databaseNameConsumer = databaseNameConsumer;
+    public RoutedBoltConnectionParameters.Builder withDatabaseNameListener(
+            Consumer<DatabaseName> databaseNameListener) {
+        this.databaseNameConsumer = databaseNameListener;
         return this;
     }
 
     @Override
-    public RoutedBoltConnectionParameters.Builder withHomeDatabase(String homeDatabase) {
-        this.homeDatabase = homeDatabase;
+    public RoutedBoltConnectionParameters.Builder withHomeDatabaseHint(String homeDatabaseHint) {
+        this.homeDatabase = homeDatabaseHint;
         return this;
     }
 

@@ -35,7 +35,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.A;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.B;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.C;

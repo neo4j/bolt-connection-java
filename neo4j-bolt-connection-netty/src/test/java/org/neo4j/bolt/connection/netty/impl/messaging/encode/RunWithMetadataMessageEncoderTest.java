@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.neo4j.bolt.connection.AccessMode.READ;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardAllMessage.DISCARD_ALL;
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage.autoCommitTxRunMessage;
 

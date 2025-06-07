@@ -16,19 +16,16 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.Set;
-import java.util.function.Consumer;
+import java.util.Optional;
 
-record RoutedBoltConnectionParametersImpl(
-        AuthToken authToken,
-        BoltProtocolVersion minVersion,
-        AccessMode accessMode,
-        DatabaseName databaseName,
-        Consumer<DatabaseName> databaseNameListener,
-        String homeDatabaseHint,
-        Set<String> bookmarks,
-        String impersonatedUser)
-        implements RoutedBoltConnectionParameters {
-    static RoutedBoltConnectionParameters DEFAULT = new RoutedBoltConnectionParametersImpl(
-            null, null, AccessMode.WRITE, null, ignored -> {}, null, Set.of(), null);
+record DatabaseNameImpl(String name, String description) implements DatabaseName {
+    static final String DEFAULT_DATABASE_NAME = null;
+    static final String SYSTEM_DATABASE_NAME = "system";
+    static final DatabaseName DEFAULT_DATABASE = new DatabaseNameImpl(DEFAULT_DATABASE_NAME, "<default database>");
+    static final DatabaseName SYSTEM_DATABASE = new DatabaseNameImpl(SYSTEM_DATABASE_NAME, SYSTEM_DATABASE_NAME);
+
+    @Override
+    public Optional<String> databaseName() {
+        return Optional.ofNullable(name);
+    }
 }

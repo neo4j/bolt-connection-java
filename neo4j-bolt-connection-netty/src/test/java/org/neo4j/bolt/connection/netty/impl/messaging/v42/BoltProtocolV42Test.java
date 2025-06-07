@@ -30,8 +30,8 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.database;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.database;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage.autoCommitTxRunMessage;
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage.unmanagedTxRunMessage;
 

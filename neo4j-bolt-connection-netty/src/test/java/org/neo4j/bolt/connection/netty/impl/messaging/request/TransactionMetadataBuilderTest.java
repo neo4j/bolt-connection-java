@@ -24,8 +24,8 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.neo4j.bolt.connection.AccessMode.READ;
 import static org.neo4j.bolt.connection.AccessMode.WRITE;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.database;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.database;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.TransactionMetadataBuilder.buildMetadata;
 
 import java.time.Duration;

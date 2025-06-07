@@ -34,7 +34,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.bolt.connection.AccessMode;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
+import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.BeginMessage;
@@ -76,7 +76,7 @@ class BeginMessageEncoderTest {
                         txTimeout,
                         txMetadata,
                         mode,
-                        DatabaseNameUtil.defaultDatabase(),
+                        DatabaseName.defaultDatabase(),
                         impersonatedUser,
                         txType,
                         null,

@@ -29,7 +29,6 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.ClusterComposition;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.netty.impl.handlers.PullResponseHandlerImpl;
@@ -86,7 +85,7 @@ public class BoltProtocolV4 extends BoltProtocolV3 {
                 query.parameters(),
                 null,
                 Collections.emptyMap(),
-                DatabaseNameUtil.database("system"),
+                DatabaseName.systemDatabase(),
                 AccessMode.READ,
                 bookmarks,
                 null,
