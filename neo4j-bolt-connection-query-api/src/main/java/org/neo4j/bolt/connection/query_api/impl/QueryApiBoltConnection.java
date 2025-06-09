@@ -70,6 +70,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private final String userAgent;
     private final String serverAgent;
     private final BoltProtocolVersion boltProtocolVersion;
+    private final String defaultDatabase;
 
     // synchronized
     private final List<Message> messages = new ArrayList<>();
@@ -86,6 +87,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
             String userAgent,
             String serverAgent,
             BoltProtocolVersion boltProtocolVersion,
+            String defaultDatabase,
             LoggingProvider logging) {
         this.logging = logging;
         this.log = logging.getLog(getClass());
@@ -110,6 +112,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 })
                 .build();
         this.boltProtocolVersion = Objects.requireNonNull(boltProtocolVersion);
+        this.defaultDatabase = defaultDatabase;
     }
 
     @Override
@@ -221,11 +224,18 @@ public final class QueryApiBoltConnection implements BoltConnection {
         for (var message : messages) {
             if (message instanceof BeginMessage beginMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
-                messageHandlers.add(new BeginMessageHandler(handler, httpContext, beginMessage, valueFactory, logging));
+                messageHandlers.add(new BeginMessageHandler(
+                        handler, httpContext, beginMessage, defaultDatabase, valueFactory, logging));
             } else if (message instanceof RunMessage runMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
                 messageHandlers.add(new RunMessageHandler(
-                        handler, httpContext, valueFactory, runMessage, this::getTransactionInfo, logging));
+                        handler,
+                        httpContext,
+                        valueFactory,
+                        runMessage,
+                        defaultDatabase,
+                        this::getTransactionInfo,
+                        logging));
             } else if (message instanceof PullMessage pullMessage) {
                 if (pullMessage.qid() != -1 && !qidToQuery.containsKey(pullMessage.qid())) {
                     throw new BoltClientException("Pull query does not contain query id: " + pullMessage.qid());

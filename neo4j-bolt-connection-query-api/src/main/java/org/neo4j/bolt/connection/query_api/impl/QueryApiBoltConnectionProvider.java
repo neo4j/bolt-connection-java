@@ -42,18 +42,31 @@ import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
+    // experimental
+    private static final String DEFAULT_DATABASE_ENV_NAME = "NEO4J_BOLT_CONNECTION_QUERY_API_DEFAULT_DATABASE";
     private final LoggingProvider logging;
     private final System.Logger logger;
     private final ValueFactory valueFactory;
     // Higher versions of Bolt require GQL support that it not available in Query API.
     private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
     private final Executor httpExecutor;
+    private final String defaultDatabase;
 
     public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory) {
         this.logging = Objects.requireNonNull(logging);
         this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        var defaultDatabase = System.getenv(DEFAULT_DATABASE_ENV_NAME);
+        if (defaultDatabase != null && !defaultDatabase.isEmpty()) {
+            this.defaultDatabase = defaultDatabase;
+            this.logger.log(
+                    System.Logger.Level.WARNING,
+                    "A default database '%s' has been set using experimental '%s' environment variable"
+                            .formatted(this.defaultDatabase, DEFAULT_DATABASE_ENV_NAME));
+        } else {
+            this.defaultDatabase = null;
+        }
     }
 
     @SuppressWarnings("resource") // not AutoCloseable in Java 17
@@ -114,6 +127,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                                     userAgent,
                                     serverAgent,
                                     BOLT_PROTOCOL_VERSION,
+                                    defaultDatabase,
                                     logging);
                         } catch (IOException e) {
                             throw new BoltClientException(
