@@ -38,7 +38,7 @@ import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
+import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
@@ -229,7 +229,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     private CompletionStage<Void> writeMessage(ResponseHandler handler, BeginMessage beginMessage) {
         return protocol.beginTransaction(
                 this.connection,
-                DatabaseNameUtil.database(beginMessage.databaseName().orElse(null)),
+                DatabaseName.database(beginMessage.databaseName().orElse(null)),
                 beginMessage.accessMode(),
                 beginMessage.impersonatedUser().orElse(null),
                 beginMessage.bookmarks(),
@@ -274,7 +274,7 @@ public final class BoltConnectionImpl implements BoltConnection {
             var extra = runMessage.extra().get();
             return protocol.runAuto(
                     connection,
-                    DatabaseNameUtil.database(extra.databaseName().orElse(null)),
+                    DatabaseName.database(extra.databaseName().orElse(null)),
                     extra.accessMode(),
                     extra.impersonatedUser().orElse(null),
                     runMessage.query(),

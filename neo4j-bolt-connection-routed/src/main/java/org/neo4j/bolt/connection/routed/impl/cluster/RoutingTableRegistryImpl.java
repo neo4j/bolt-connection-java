@@ -38,7 +38,6 @@ import org.neo4j.bolt.connection.BoltConnectionParameters;
 import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.routed.Rediscovery;
@@ -98,8 +97,8 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
     public CompletionStage<RoutingTableHandler> ensureRoutingTable(
             CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters) {
         if (!databaseNameFuture.isDone()) {
-            if (parameters.homeDatabase() != null) {
-                var handler = routingTableHandlers.get(DatabaseNameUtil.database(parameters.homeDatabase()));
+            if (parameters.homeDatabaseHint() != null) {
+                var handler = routingTableHandlers.get(DatabaseName.database(parameters.homeDatabaseHint()));
                 if (handler != null && !handler.isStaleFor(parameters.accessMode())) {
                     return CompletableFuture.completedFuture(handler);
                 }
@@ -136,11 +135,11 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
                         principalToDatabaseNameStage.put(principal, databaseNameFuture);
                         databaseNameStage = databaseNameFuture;
 
-                        var routingTable = new ClusterRoutingTable(DatabaseNameUtil.defaultDatabase(), clock);
+                        var routingTable = new ClusterRoutingTable(DatabaseName.defaultDatabase(), clock);
                         rediscovery
                                 .lookupClusterComposition(routingTable, connectionSourceGetter, parameters)
                                 .thenCompose(compositionLookupResult -> {
-                                    var databaseName = DatabaseNameUtil.database(compositionLookupResult
+                                    var databaseName = DatabaseName.database(compositionLookupResult
                                             .getClusterComposition()
                                             .databaseName());
                                     var handler = getOrCreate(databaseName);

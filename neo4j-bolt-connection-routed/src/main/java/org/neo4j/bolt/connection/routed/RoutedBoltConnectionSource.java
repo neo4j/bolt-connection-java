@@ -40,7 +40,6 @@ import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
@@ -120,14 +119,17 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
 
         var handlerRef = new AtomicReference<RoutingTableHandler>();
         var databaseName = parameters.databaseName();
-        var databaseNameFuture = databaseName == null
-                ? new CompletableFuture<DatabaseName>()
-                : CompletableFuture.completedFuture(databaseName);
-        databaseNameFuture.whenComplete((name, throwable) -> {
-            if (name != null) {
-                parameters.databaseNameConsumer().accept(name);
-            }
-        });
+        CompletableFuture<DatabaseName> databaseNameFuture;
+        if (databaseName == null) {
+            databaseNameFuture = new CompletableFuture<>();
+            databaseNameFuture.whenComplete((name, throwable) -> {
+                if (name != null) {
+                    parameters.databaseNameListener().accept(name);
+                }
+            });
+        } else {
+            databaseNameFuture = CompletableFuture.completedFuture(databaseName);
+        }
         return registry.ensureRoutingTable(databaseNameFuture, parameters)
                 .thenApply(routingTableHandler -> {
                     handlerRef.set(routingTableHandler);
@@ -144,6 +146,28 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                     } else {
                         throw new CompletionException(throwable);
                     }
+                })
+                .thenCompose(boltConnection -> {
+                    if (parameters.homeDatabaseHint() != null
+                            && !boltConnection.serverSideRoutingEnabled()
+                            && !databaseNameFuture.isDone()) {
+                        // home database was requested with hint, but the returned connection does not have SSR enabled
+                        var parametersWithoutHomeDatabaseHint = RoutedBoltConnectionParameters.builder()
+                                .withAuthToken(parameters.authToken())
+                                .withMinVersion(parameters.minVersion())
+                                .withAccessMode(parameters.accessMode())
+                                .withDatabaseName(parameters.databaseName())
+                                .withDatabaseNameListener(parameters.databaseNameListener())
+                                .withHomeDatabaseHint(null)
+                                .withBookmarks(parameters.bookmarks())
+                                .withImpersonatedUser(parameters.impersonatedUser())
+                                .build();
+                        return boltConnection
+                                .close()
+                                .thenCompose(ignored -> getConnection(parametersWithoutHomeDatabaseHint));
+                    } else {
+                        return CompletableFuture.completedStage(boltConnection);
+                    }
                 });
     }
 
@@ -156,8 +180,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         return supportsMultiDb()
                 .thenCompose(supports -> registry.ensureRoutingTable(
                         supports
-                                ? CompletableFuture.completedFuture(DatabaseNameUtil.database("system"))
-                                : CompletableFuture.completedFuture(DatabaseNameUtil.defaultDatabase()),
+                                ? CompletableFuture.completedFuture(DatabaseName.systemDatabase())
+                                : CompletableFuture.completedFuture(DatabaseName.defaultDatabase()),
                         RoutedBoltConnectionParameters.builder()
                                 .withAccessMode(AccessMode.READ)
                                 .build()))

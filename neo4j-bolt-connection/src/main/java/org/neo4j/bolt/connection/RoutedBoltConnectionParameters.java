@@ -32,12 +32,13 @@ public interface RoutedBoltConnectionParameters extends BoltConnectionParameters
     AccessMode accessMode();
 
     /**
-     * A database that the connection must lead to.
+     * A database name that the connection should be established for.
      * <p>
-     * Not every cluster member may host the desired database, so the {@link BoltConnectionSource} must know which
-     * database the given connection must lead to.
+     * In a clustered Neo4j DBMS not every cluster member may host the desired database, so the
+     * {@link BoltConnectionSource} must know which database the given connection must be established for.
      * <p>
-     * When no database is provided, the {@link BoltConnectionSource} must resolve the user home database and use it.
+     * When it is set to {@code null}, the user's home database must be used on Bolt 4.1 and above. For previous Bolt
+     * versions, the default database determined by the server is used instead.
      * @return the database name
      */
     DatabaseName databaseName();
@@ -45,16 +46,40 @@ public interface RoutedBoltConnectionParameters extends BoltConnectionParameters
     /**
      * A database name consumer that will be notified with the database name used for the given connection.
      * <p>
-     * It is intended for getting user home database when it gets resolved.
+     * This option is only used when the {@link #databaseName()} is set to {@code null}. It is intended for getting
+     * user's home database when it gets resolved.
+     *
+     * @since 4.0.0
      * @return the database name consumer
      */
-    Consumer<DatabaseName> databaseNameConsumer();
+    Consumer<DatabaseName> databaseNameListener();
 
     /**
      * A home database name hint.
+     * <p>
+     * This option is only used when the {@link #databaseName()} is set to {@code null}.
+     * <p>
+     * The objective is to minimise the need for an explicit home database resolution that requires an extra network
+     * exchange.
+     * <p>
+     * The home database hint should be used to check if a server-side routing (SSR) enabled connection may be
+     * returned without having to explicitly resolve home database. If such connection is returned, the following
+     * applies:
+     * <ul>
+     *     <li>The {@link #databaseNameListener()} is not notified as no home database resolution takes place.</li>
+     *     <li>This value MUST NOT be considered to be the user's home database as it may have changed. The home
+     *     database can be determined later by sending {@code BEGIN} or autocommit {@code RUN} message without database
+     *     name set. In that case, the server includes the home database in the response summary. This behaviour
+     *     only applies from Bolt 5.8 and higher.</li>
+     *     <li>The server-side routing is required to make sure the messages can be forwarded to a relevant server if
+     *     this value has actually changed and is no longer true. However, such forwarding may inccur extra network
+     *     exchanges within the cluster.</li>
+     * </ul>
+     *
+     * @since 4.0.0
      * @return the database name hint
      */
-    String homeDatabase();
+    String homeDatabaseHint();
 
     /**
      * Bookmarks used for routing.
@@ -132,19 +157,19 @@ public interface RoutedBoltConnectionParameters extends BoltConnectionParameters
          * Sets a database name consumer that will be notified with the database name used for the given connection.
          * <p>
          * The default is a noop consumer.
-         * @param databaseNameConsumer the database name consumer
+         * @param databaseNameListener the database name consumer
          * @return this builder
          */
-        Builder withDatabaseNameConsumer(Consumer<DatabaseName> databaseNameConsumer);
+        Builder withDatabaseNameListener(Consumer<DatabaseName> databaseNameListener);
 
         /**
          * Sets a home database name hint.
          * <p>
          * The default is {@code null}.
-         * @param homeDatabase the home database hint or {@code null}
+         * @param homeDatabaseHint the home database hint or {@code null}
          * @return this builder
          */
-        Builder withHomeDatabase(String homeDatabase);
+        Builder withHomeDatabaseHint(String homeDatabaseHint);
 
         /**
          * Sets routing bookmarks.

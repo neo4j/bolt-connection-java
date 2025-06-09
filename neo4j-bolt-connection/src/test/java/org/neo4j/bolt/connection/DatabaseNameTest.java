@@ -17,15 +17,15 @@
 package org.neo4j.bolt.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.DEFAULT_DATABASE_NAME;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.SYSTEM_DATABASE_NAME;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.database;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.systemDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.database;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.systemDatabase;
+import static org.neo4j.bolt.connection.DatabaseNameImpl.DEFAULT_DATABASE_NAME;
+import static org.neo4j.bolt.connection.DatabaseNameImpl.SYSTEM_DATABASE_NAME;
 
 import org.junit.jupiter.api.Test;
 
-class DatabaseNameUtilTest {
+class DatabaseNameTest {
     @Test
     @SuppressWarnings("EqualsWithItself")
     void shouldDatabaseNameBeEqual() {

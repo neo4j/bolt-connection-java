@@ -59,7 +59,6 @@ import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
@@ -109,7 +108,7 @@ class PooledBoltConnectionSourceTest {
     final int timeout = 1000;
 
     final SecurityPlan securityPlan = null;
-    final DatabaseName databaseName = DatabaseNameUtil.defaultDatabase();
+    final DatabaseName databaseName = DatabaseName.defaultDatabase();
     final AccessMode mode = AccessMode.WRITE;
     final Set<String> bookmarks = Set.of("bookmark1", "bookmark2");
     final BoltProtocolVersion minVersion = new BoltProtocolVersion(5, 6);

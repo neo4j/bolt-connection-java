@@ -26,9 +26,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.SYSTEM_DATABASE_NAME;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.database;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.database;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.A;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.B;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.C;
@@ -94,7 +93,7 @@ class RoutingTableRegistryImplTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {SYSTEM_DATABASE_NAME, "", "database", " molly "})
+    @ValueSource(strings = {"system", "", "database", " molly "})
     void shouldCreateRoutingTableHandlerIfAbsentWhenFreshRoutingTable(String databaseName) {
         // Given
         ConcurrentMap<DatabaseName, RoutingTableHandler> map = new ConcurrentHashMap<>();
@@ -111,7 +110,7 @@ class RoutingTableRegistryImplTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {SYSTEM_DATABASE_NAME, "", "database", " molly "})
+    @ValueSource(strings = {"system", "", "database", " molly "})
     void shouldReturnExistingRoutingTableHandlerWhenFreshRoutingTable(String databaseName) {
         // Given
         ConcurrentMap<DatabaseName, RoutingTableHandler> map = new ConcurrentHashMap<>();

@@ -34,7 +34,7 @@ import static org.mockito.Mockito.when;
 import static org.neo4j.bolt.connection.AccessMode.READ;
 import static org.neo4j.bolt.connection.AccessMode.WRITE;
 import static org.neo4j.bolt.connection.BoltServerAddress.LOCAL_DEFAULT;
-import static org.neo4j.bolt.connection.DatabaseNameUtil.defaultDatabase;
+import static org.neo4j.bolt.connection.DatabaseName.defaultDatabase;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.A;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.B;
 import static org.neo4j.bolt.connection.routed.impl.util.ClusterCompositionUtil.C;

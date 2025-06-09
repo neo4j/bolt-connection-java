@@ -36,7 +36,6 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.ClusterComposition;
 import org.neo4j.bolt.connection.DatabaseName;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.exception.BoltException;
@@ -152,7 +151,7 @@ public class BoltProtocolV3 implements BoltProtocol {
                 query.parameters(),
                 null,
                 Collections.emptyMap(),
-                DatabaseNameUtil.defaultDatabase(),
+                DatabaseName.defaultDatabase(),
                 AccessMode.WRITE,
                 Collections.emptySet(),
                 null,
