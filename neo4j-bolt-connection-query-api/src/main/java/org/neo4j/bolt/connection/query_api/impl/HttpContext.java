@@ -18,20 +18,45 @@ package org.neo4j.bolt.connection.query_api.impl;
 
 import com.fasterxml.jackson.jr.ob.JSON;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.util.Objects;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 
-public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[] headers) {
+public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[] headers, String defaultDatabase) {
+    // experimental
+    private static final String DEFAULT_DATABASE_KEY_NAME = "defaultDatabase";
 
     public HttpContext {
         var path = baseUri.getPath();
         if (path.endsWith("/")) {
-            baseUri = baseUri.resolve(path.substring(0, path.length() - 1));
+            path = path.substring(0, path.length() - 1);
+        }
+        var query = baseUri.getQuery();
+        if (query != null) {
+            for (var pair : query.split("&")) {
+                var keyAndValue = pair.split("=");
+                if (keyAndValue.length == 2) {
+                    var key = keyAndValue[0];
+                    if (DEFAULT_DATABASE_KEY_NAME.equals(key)) {
+                        var value = keyAndValue[1].trim();
+                        if (!value.isEmpty()) {
+                            defaultDatabase = value;
+                        }
+                    }
+                }
+            }
+        }
+        try {
+            baseUri = new URI(
+                    baseUri.getScheme(), baseUri.getUserInfo(), baseUri.getHost(), baseUri.getPort(), path, null, null);
+        } catch (URISyntaxException e) {
+            throw new BoltClientException("Invalid URI", e);
         }
     }
 
     public HttpContext(HttpClient httpClient, URI baseUri, JSON json, String authHeader, String userAgent) {
-        this(httpClient, baseUri, json, headers(authHeader, userAgent));
+        this(httpClient, baseUri, json, headers(authHeader, userAgent), null);
     }
 
     private static String[] headers(String authHeader, String userAgent) {
