@@ -59,6 +59,17 @@ public interface BoltConnection {
 
     boolean telemetrySupported();
 
+    /**
+     * Returns whether server-side routing is enabled for this connection.
+     * <p>
+     * Since this may only be detected reliably from Bolt 5.8 and higher, it may return {@code false} for previous Bolt
+     * versions even if server-side routing is enabled.
+     * <p>
+     * In addition, this MUST return {@code false} when no routing context is sent to the server. The absense of routing
+     * context prohibits server-side routing from routing even if it is enabled on the server.
+     *
+     * @return {@code true} if enabled, {@code false} otherwise
+     */
     boolean serverSideRoutingEnabled();
 
     Optional<Duration> defaultReadTimeout();

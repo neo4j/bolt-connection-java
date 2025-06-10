@@ -192,7 +192,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
 
     @Override
     public boolean serverSideRoutingEnabled() {
-        return false;
+        return true;
     }
 
     @Override
