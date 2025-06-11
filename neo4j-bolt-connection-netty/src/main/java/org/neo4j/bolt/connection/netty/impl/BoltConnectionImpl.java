@@ -113,7 +113,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         this.serverAddress = Objects.requireNonNull(connection.serverAddress());
         this.protocolVersion = Objects.requireNonNull(connection.protocol().version());
         this.telemetrySupported = connection.isTelemetryEnabled();
-        this.serverSideRouting = connection.isSsrEnabled();
+        this.serverSideRouting = routingContext.isServerRoutingEnabled() && connection.isSsrEnabled();
         this.authDataRef = new AtomicReference<>(
                 CompletableFuture.completedFuture(new AuthInfoImpl(authToken, latestAuthMillisFuture.join())));
         this.valueFactory = Objects.requireNonNull(valueFactory);
