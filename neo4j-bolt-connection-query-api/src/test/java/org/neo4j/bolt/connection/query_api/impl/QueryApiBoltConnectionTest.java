@@ -31,6 +31,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpResponse;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,6 +95,7 @@ final class QueryApiBoltConnectionTest {
                 "userAgent",
                 "serverAgent",
                 new BoltProtocolVersion(5, 6),
+                Clock.systemUTC(),
                 loggingProvider);
     }
 

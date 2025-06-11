@@ -43,6 +43,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     private final System.Logger log;
     private final ResponseHandler handler;
     private final HttpContext httpContext;
+    private final Supplier<String> authHeaderSupplier;
     private final HttpRequest.BodyPublisher bodyPublisher;
     private final ValueFactory valueFactory;
     private final RunMessage message;
@@ -53,6 +54,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     RunMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
+            Supplier<String> authHeaderSupplier,
             ValueFactory valueFactory,
             RunMessage message,
             Supplier<TransactionInfo> transactionInfoSupplier,
@@ -61,6 +63,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
+        this.authHeaderSupplier = Objects.requireNonNull(authHeaderSupplier);
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.message = Objects.requireNonNull(message);
         this.transactionInfoSupplier = Objects.requireNonNull(transactionInfoSupplier);
@@ -80,7 +83,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         var transactionInfo = transactionInfoSupplier.get();
         String databaseName;
         URI uri;
-        var headers = httpContext.headers();
+        var headers = httpContext.headers(authHeaderSupplier.get());
         if (transactionInfo != null) {
             databaseName = transactionInfo.databaseName();
             uri = httpContext.txUrl(transactionInfo);

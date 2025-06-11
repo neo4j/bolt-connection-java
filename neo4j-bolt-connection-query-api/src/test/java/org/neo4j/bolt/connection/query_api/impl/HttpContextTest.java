@@ -40,15 +40,15 @@ class HttpContextTest {
             })
     void shouldNormalizeBase(URI uri) {
 
-        var httpContext = new HttpContext(HttpClient.newHttpClient(), uri, JSON.std, new String[] {}, null);
+        var httpContext = new HttpContext(HttpClient.newHttpClient(), uri, JSON.std, null);
         var expected = uri.toString() + (uri.toString().endsWith("/") ? "" : "/") + "db/foo/query/v2";
         Assertions.assertEquals(expected, httpContext.queryUrl("foo").toString());
     }
 
     @Test
     void txUrlShouldWork() {
-        var httpContext = new HttpContext(
-                HttpClient.newHttpClient(), URI.create("http://localhost:7474"), JSON.std, new String[] {}, null);
+        var httpContext =
+                new HttpContext(HttpClient.newHttpClient(), URI.create("http://localhost:7474"), JSON.std, null);
         Assertions.assertEquals(
                 "http://localhost:7474/db/ads/query/v2/tx",
                 httpContext.txUrl("ads").toString());
@@ -60,7 +60,6 @@ class HttpContextTest {
                 HttpClient.newHttpClient(),
                 URI.create("http://localhost:7474?defaultDatabase=neo4j&ignored=value"),
                 JSON.std,
-                new String[] {},
                 null);
 
         Assertions.assertEquals("neo4j", httpContext.defaultDatabase());

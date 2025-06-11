@@ -32,11 +32,13 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
     private final System.Logger log;
     private final ResponseHandler handler;
     private final HttpContext httpContext;
+    private final Supplier<String> authHeaderSupplier;
     private final Supplier<TransactionInfo> transactionInfoSupplier;
 
     CommitMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
+            Supplier<String> authHeaderSupplier,
             ValueFactory valueFactory,
             Supplier<TransactionInfo> transactionInfoSupplier,
             LoggingProvider logging) {
@@ -44,6 +46,7 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
+        this.authHeaderSupplier = Objects.requireNonNull(authHeaderSupplier);
         this.transactionInfoSupplier = Objects.requireNonNull(transactionInfoSupplier);
     }
 
@@ -53,7 +56,7 @@ final class CommitMessageHandler extends AbstractMessageHandler<Void> {
         if (transactionInfo == null) {
             throw new BoltClientException("No transaction found");
         }
-        var headers = httpContext.headers();
+        var headers = httpContext.headers(authHeaderSupplier.get());
         if (transactionInfo.affinity() != null) {
             headers = Arrays.copyOf(headers, headers.length + 2);
             headers[headers.length - 2] = "neo4j-cluster-affinity";

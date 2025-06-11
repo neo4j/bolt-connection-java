@@ -31,11 +31,13 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
     private final System.Logger log;
     private final ResponseHandler handler;
     private final HttpContext httpContext;
+    private final Supplier<String> authHeaderSupplier;
     private final Supplier<TransactionInfo> transactionInfoSupplier;
 
     RollbackMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
+            Supplier<String> authHeaderSupplier,
             Supplier<TransactionInfo> transactionInfoSupplier,
             ValueFactory valueFactory,
             LoggingProvider logging) {
@@ -43,6 +45,7 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
+        this.authHeaderSupplier = Objects.requireNonNull(authHeaderSupplier);
         this.transactionInfoSupplier = Objects.requireNonNull(transactionInfoSupplier);
     }
 
@@ -53,7 +56,7 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
             throw new BoltClientException("No transaction found");
         }
         var uri = httpContext.txUrl(transactionInfo);
-        var headers = httpContext.headers();
+        var headers = httpContext.headers(authHeaderSupplier.get());
         if (transactionInfo.affinity() != null) {
             headers = Arrays.copyOf(headers, headers.length + 2);
             headers[headers.length - 2] = "neo4j-cluster-affinity";
