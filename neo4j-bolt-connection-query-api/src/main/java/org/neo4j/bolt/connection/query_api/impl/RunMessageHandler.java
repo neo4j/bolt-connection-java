@@ -48,6 +48,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     private final RunMessage message;
     private final Supplier<TransactionInfo> transactionInfoSupplier;
     private final AtomicReference<String> databaseName = new AtomicReference<>();
+    private final String defaultDatabase;
 
     RunMessageHandler(
             ResponseHandler handler,
@@ -66,11 +67,12 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
 
         if (message.extra().isPresent()) {
             var extra = message.extra().get();
-            if (extra.databaseName().isEmpty()) {
+            if (extra.databaseName().isEmpty() && httpContext.defaultDatabase() == null) {
                 throw new BoltClientException("Database name must be specified");
             }
         }
         this.bodyPublisher = newHttpRequestBodyPublisher(httpContext.json(), message);
+        this.defaultDatabase = httpContext.defaultDatabase();
     }
 
     @Override
@@ -89,7 +91,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
             }
         } else {
             databaseName =
-                    message.extra().flatMap(extra -> extra.databaseName()).orElse(null);
+                    message.extra().flatMap(extra -> extra.databaseName()).orElse(defaultDatabase);
             if (databaseName == null) {
                 throw new BoltClientException("Database not specified");
             }

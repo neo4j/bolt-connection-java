@@ -50,6 +50,8 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
         if (message.databaseName().isPresent()) {
             this.databaseName = message.databaseName().get();
+        } else if (httpContext.defaultDatabase() != null) {
+            this.databaseName = httpContext.defaultDatabase();
         } else {
             throw new BoltClientException("Database name must be specified");
         }
