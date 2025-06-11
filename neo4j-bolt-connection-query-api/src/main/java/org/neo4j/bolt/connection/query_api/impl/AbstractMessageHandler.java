@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
@@ -31,6 +32,7 @@ import org.neo4j.bolt.connection.GqlStatusError;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
@@ -64,8 +66,9 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                                 System.Logger.Level.DEBUG,
                                 "An error occurred while sending request %s".formatted(throwable.getMessage()));
                         throwable = completionExceptionCause(throwable);
-                        if (throwable instanceof IOException) {
-                            // todo defunct
+                        if (throwable instanceof HttpTimeoutException) {
+                            throw new BoltConnectionReadTimeoutException("Read timedout has been exceeded", throwable);
+                        } else if (throwable instanceof IOException) {
                             throw new BoltServiceUnavailableException(
                                     "An error occurred while sending request", throwable);
                         } else {

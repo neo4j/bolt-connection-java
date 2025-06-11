@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.query_api.impl;
 
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -33,12 +34,14 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
     private final HttpContext httpContext;
     private final Supplier<String> authHeaderSupplier;
     private final Supplier<TransactionInfo> transactionInfoSupplier;
+    private final Duration readTimeout;
 
     RollbackMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
             Supplier<String> authHeaderSupplier,
             Supplier<TransactionInfo> transactionInfoSupplier,
+            Duration readTimeout,
             ValueFactory valueFactory,
             LoggingProvider logging) {
         super(httpContext, handler, valueFactory, logging);
@@ -47,6 +50,7 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
         this.httpContext = Objects.requireNonNull(httpContext);
         this.authHeaderSupplier = Objects.requireNonNull(authHeaderSupplier);
         this.transactionInfoSupplier = Objects.requireNonNull(transactionInfoSupplier);
+        this.readTimeout = readTimeout;
     }
 
     @Override
@@ -62,7 +66,11 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
             headers[headers.length - 2] = "neo4j-cluster-affinity";
             headers[headers.length - 1] = transactionInfo.affinity();
         }
-        return HttpRequest.newBuilder(uri).headers(headers).DELETE().build();
+        var builder = HttpRequest.newBuilder(uri).headers(headers).DELETE();
+        if (readTimeout != null) {
+            builder = builder.timeout(readTimeout);
+        }
+        return builder.build();
     }
 
     @Override

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,14 +51,16 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     private final Supplier<TransactionInfo> transactionInfoSupplier;
     private final AtomicReference<String> databaseName = new AtomicReference<>();
     private final String defaultDatabase;
+    private final Duration readTimeout;
 
     RunMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
             Supplier<String> authHeaderSupplier,
-            ValueFactory valueFactory,
             RunMessage message,
             Supplier<TransactionInfo> transactionInfoSupplier,
+            Duration readTimeout,
+            ValueFactory valueFactory,
             LoggingProvider logging) {
         super(httpContext, handler, valueFactory, logging);
         this.log = logging.getLog(getClass());
@@ -67,6 +70,7 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.message = Objects.requireNonNull(message);
         this.transactionInfoSupplier = Objects.requireNonNull(transactionInfoSupplier);
+        this.readTimeout = readTimeout;
 
         if (message.extra().isPresent()) {
             var extra = message.extra().get();
@@ -101,7 +105,11 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
             uri = httpContext.queryUrl(databaseName);
         }
         this.databaseName.set(databaseName);
-        return HttpRequest.newBuilder(uri).headers(headers).POST(bodyPublisher).build();
+        var builder = HttpRequest.newBuilder(uri).headers(headers).POST(bodyPublisher);
+        if (readTimeout != null) {
+            builder = builder.timeout(readTimeout);
+        }
+        return builder.build();
     }
 
     @Override

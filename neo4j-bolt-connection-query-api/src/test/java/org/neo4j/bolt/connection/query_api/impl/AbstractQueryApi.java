@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,6 +57,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.SecurityPlans;
 import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.summary.BeginSummary;
@@ -767,6 +769,43 @@ abstract class AbstractQueryApi {
         var error = boltFailureExceptionArgumentCaptor.getValue();
         assertEquals("Neo.ClientError.Security.Unauthorized", error.code());
         assertEquals(BoltConnectionState.FAILURE, connection.state());
+    }
+
+    @Test
+    void shouldTimeout() {
+        // given
+        var timeoutMillis = 100;
+        var responseFuture = new CompletableFuture<>();
+        willAnswer(invocation -> {
+                    responseFuture.complete(null);
+                    return null;
+                })
+                .given(responseHandler)
+                .onComplete();
+        var message = Messages.run(
+                database(),
+                AccessMode.WRITE,
+                null,
+                Set.of(),
+                "CALL apoc.util.sleep(%d)".formatted(timeoutMillis * 2),
+                Map.of(),
+                null,
+                Map.of(),
+                NotificationConfig.defaultConfig());
+        connection.setReadTimeout(Duration.ofMillis(timeoutMillis));
+
+        // when
+        connection
+                .writeAndFlush(responseHandler, message)
+                .thenCompose(ignored -> responseFuture)
+                .toCompletableFuture()
+                .join();
+
+        // then
+        var responseHandlerInOrder = inOrder(responseHandler);
+        responseHandlerInOrder.verify(responseHandler).onError(any(BoltConnectionReadTimeoutException.class));
+        responseHandlerInOrder.verify(responseHandler).onComplete();
+        then(responseHandler).shouldHaveNoMoreInteractions();
     }
 
     abstract URI uri();
