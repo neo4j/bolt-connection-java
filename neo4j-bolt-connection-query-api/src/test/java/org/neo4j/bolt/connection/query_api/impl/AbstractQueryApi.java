@@ -43,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
 import org.neo4j.bolt.connection.AccessMode;
@@ -54,6 +55,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.SecurityPlans;
 import org.neo4j.bolt.connection.TransactionType;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.CommitSummary;
@@ -671,6 +673,55 @@ abstract class AbstractQueryApi {
         assertNotNull(exception);
 
         assertEquals(BoltConnectionState.FAILURE, connection.state());
+    }
+
+    @Test
+    void shouldResetAfterFailure() {
+        // given
+        var responseFuture = new CompletableFuture<>();
+        willAnswer(invocation -> {
+                    responseFuture.complete(null);
+                    return null;
+                })
+                .given(responseHandler)
+                .onComplete();
+        var message = Messages.run(
+                database(),
+                AccessMode.WRITE,
+                null,
+                Set.of(),
+                "not query",
+                Map.of(),
+                null,
+                Map.of(),
+                NotificationConfig.defaultConfig());
+        connection
+                .writeAndFlush(responseHandler, message)
+                .thenCompose(ignored -> responseFuture)
+                .toCompletableFuture()
+                .join();
+        then(responseHandler).should().onError(any(BoltFailureException.class));
+        then(responseHandler).should().onComplete();
+        assertEquals(BoltConnectionState.FAILURE, connection.state());
+        Mockito.reset(responseHandler);
+        var resetResponseFuture = new CompletableFuture<>();
+        willAnswer(invocation -> {
+                    resetResponseFuture.complete(null);
+                    return null;
+                })
+                .given(responseHandler)
+                .onComplete();
+
+        // when
+        connection
+                .writeAndFlush(responseHandler, Messages.reset())
+                .thenCompose(ignored -> resetResponseFuture)
+                .toCompletableFuture()
+                .join();
+
+        // then
+        then(responseHandler).should().onComplete();
+        assertEquals(BoltConnectionState.OPEN, connection.state());
     }
 
     abstract URI uri();
