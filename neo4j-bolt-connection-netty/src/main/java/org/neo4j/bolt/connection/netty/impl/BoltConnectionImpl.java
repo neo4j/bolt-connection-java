@@ -38,10 +38,9 @@ import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.DatabaseNameUtil;
+import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
@@ -114,7 +113,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         this.serverAddress = Objects.requireNonNull(connection.serverAddress());
         this.protocolVersion = Objects.requireNonNull(connection.protocol().version());
         this.telemetrySupported = connection.isTelemetryEnabled();
-        this.serverSideRouting = connection.isSsrEnabled();
+        this.serverSideRouting = routingContext.isServerRoutingEnabled() && connection.isSsrEnabled();
         this.authDataRef = new AtomicReference<>(
                 CompletableFuture.completedFuture(new AuthInfoImpl(authToken, latestAuthMillisFuture.join())));
         this.valueFactory = Objects.requireNonNull(valueFactory);
@@ -230,7 +229,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     private CompletionStage<Void> writeMessage(ResponseHandler handler, BeginMessage beginMessage) {
         return protocol.beginTransaction(
                 this.connection,
-                DatabaseNameUtil.database(beginMessage.databaseName().orElse(null)),
+                DatabaseName.database(beginMessage.databaseName().orElse(null)),
                 beginMessage.accessMode(),
                 beginMessage.impersonatedUser().orElse(null),
                 beginMessage.bookmarks(),
@@ -275,7 +274,7 @@ public final class BoltConnectionImpl implements BoltConnection {
             var extra = runMessage.extra().get();
             return protocol.runAuto(
                     connection,
-                    DatabaseNameUtil.database(extra.databaseName().orElse(null)),
+                    DatabaseName.database(extra.databaseName().orElse(null)),
                     extra.accessMode(),
                     extra.impersonatedUser().orElse(null),
                     runMessage.query(),

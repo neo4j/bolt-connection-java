@@ -16,10 +16,52 @@
  */
 package org.neo4j.bolt.connection;
 
+import static org.neo4j.bolt.connection.DatabaseNameImpl.DEFAULT_DATABASE;
+import static org.neo4j.bolt.connection.DatabaseNameImpl.DEFAULT_DATABASE_NAME;
+import static org.neo4j.bolt.connection.DatabaseNameImpl.SYSTEM_DATABASE;
+import static org.neo4j.bolt.connection.DatabaseNameImpl.SYSTEM_DATABASE_NAME;
+
+import java.util.Objects;
 import java.util.Optional;
 
-public interface DatabaseName {
+public sealed interface DatabaseName permits DatabaseNameImpl {
     Optional<String> databaseName();
 
     String description();
+
+    /**
+     * Returns a default database as deternimed by the server.
+     *
+     * @since 4.0.0
+     * @return the default database
+     */
+    static DatabaseName defaultDatabase() {
+        return DEFAULT_DATABASE;
+    }
+
+    /**
+     * Returns the system database.
+     *
+     * @since 4.0.0
+     * @return the system database
+     */
+    static DatabaseName systemDatabase() {
+        return SYSTEM_DATABASE;
+    }
+
+    /**
+     * Returns a {@link DatabaseName} instance for the supplied name.
+     *
+     * @since 4.0.0
+     * @param name the database name
+     * @return the {@link DatabaseName} instance
+     */
+    static DatabaseName database(String name) {
+        if (Objects.equals(name, DEFAULT_DATABASE_NAME)) {
+            return defaultDatabase();
+        } else if (Objects.equals(name, SYSTEM_DATABASE_NAME)) {
+            return systemDatabase();
+        }
+        return new DatabaseNameImpl(name, name);
+    }
 }

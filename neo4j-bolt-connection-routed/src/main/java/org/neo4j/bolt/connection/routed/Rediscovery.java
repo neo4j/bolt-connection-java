@@ -18,28 +18,21 @@ package org.neo4j.bolt.connection.routed;
 
 import java.net.UnknownHostException;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
-import java.util.function.Supplier;
-import org.neo4j.bolt.connection.AuthToken;
-import org.neo4j.bolt.connection.BoltConnectionProvider;
-import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.BoltConnectionParameters;
+import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltServerAddress;
-import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 
 /**
  * Provides cluster composition lookup capabilities and initial router address resolution.
  */
 public interface Rediscovery {
     CompletionStage<ClusterCompositionLookupResult> lookupClusterComposition(
-            SecurityPlan securityPlan,
             RoutingTable routingTable,
-            Function<BoltServerAddress, BoltConnectionProvider> connectionProviderGetter,
-            Set<String> bookmarks,
-            String impersonatedUser,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            BoltProtocolVersion minVersion);
+            Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionSourceGetter,
+            RoutedBoltConnectionParameters parameters);
 
     List<BoltServerAddress> resolve() throws UnknownHostException;
 }

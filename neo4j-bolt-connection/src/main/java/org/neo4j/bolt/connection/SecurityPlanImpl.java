@@ -16,14 +16,15 @@
  */
 package org.neo4j.bolt.connection;
 
+import java.util.Objects;
 import javax.net.ssl.SSLContext;
 
 /**
  * A SecurityPlan consists of encryption and trust details.
  */
-record SecurityPlanImpl(
-        boolean requiresEncryption,
-        boolean requiresClientAuth,
-        SSLContext sslContext,
-        boolean requiresHostnameVerification)
-        implements SecurityPlan {}
+record SecurityPlanImpl(SSLContext sslContext, boolean verifyHostname, String expectedHostname)
+        implements SecurityPlan {
+    SecurityPlanImpl {
+        Objects.requireNonNull(sslContext);
+    }
+}

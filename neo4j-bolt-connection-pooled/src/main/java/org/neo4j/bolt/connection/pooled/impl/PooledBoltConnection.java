@@ -32,7 +32,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.Message;
 import org.neo4j.bolt.connection.message.Messages;
-import org.neo4j.bolt.connection.pooled.PooledBoltConnectionProvider;
+import org.neo4j.bolt.connection.pooled.PooledBoltConnectionSource;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.CommitSummary;
 import org.neo4j.bolt.connection.summary.DiscardSummary;
@@ -48,25 +48,25 @@ import org.neo4j.bolt.connection.values.Value;
 
 public class PooledBoltConnection implements BoltConnection {
     private final BoltConnection delegate;
-    private final PooledBoltConnectionProvider provider;
+    private final PooledBoltConnectionSource source;
     private final Runnable releaseRunnable;
     private final Runnable purgeRunnable;
     private CompletableFuture<Void> closeFuture;
 
     public PooledBoltConnection(
             BoltConnection delegate,
-            PooledBoltConnectionProvider provider,
+            PooledBoltConnectionSource source,
             Runnable releaseRunnable,
             Runnable purgeRunnable) {
         this.delegate = Objects.requireNonNull(delegate);
-        this.provider = Objects.requireNonNull(provider);
+        this.source = Objects.requireNonNull(source);
         this.releaseRunnable = Objects.requireNonNull(releaseRunnable);
         this.purgeRunnable = Objects.requireNonNull(purgeRunnable);
     }
 
     @Override
     public CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages) {
-        return delegate.writeAndFlush(new PooledResponseHandler(provider, handler), messages)
+        return delegate.writeAndFlush(new PooledResponseHandler(source, handler), messages)
                 .whenComplete((ignored, throwable) -> {
                     if (throwable != null) {
                         if (delegate.state() == BoltConnectionState.CLOSED) {
@@ -176,7 +176,7 @@ public class PooledBoltConnection implements BoltConnection {
         return delegate;
     }
 
-    private record PooledResponseHandler(PooledBoltConnectionProvider provider, ResponseHandler handler)
+    private record PooledResponseHandler(PooledBoltConnectionSource provider, ResponseHandler handler)
             implements ResponseHandler {
 
         @Override

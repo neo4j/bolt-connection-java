@@ -16,56 +16,50 @@
  */
 package org.neo4j.bolt.connection;
 
-import java.util.Map;
-import java.util.Set;
+import java.net.URI;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
+/**
+ * A Neo4j <a href="https://neo4j.com/docs/bolt/current/bolt">Bolt Protocol</a> connection provider.
+ * <p>
+ * Its main objective is to establish Bolt connections.
+ * <p>
+ * Its intances are expected to be created using {@link BoltConnectionProviderFactory} that may be discovered using the
+ * {@link java.util.ServiceLoader}.
+ * @since 1.0.0
+ */
 public interface BoltConnectionProvider {
+    /**
+     * Connects to the given {@link URI} using the provided parameters and returns {@link BoltConnection} instance.
+     *
+     * @param uri                   the connection {@link URI}
+     * @param routingContextAddress the address to be used in the 'address' field of routing context. This applies to
+     *                              URI schemes that support routing context only. When set to {@code null}, the default
+     *                              behaviour of getting the address from the URI applies. This parameter should be used
+     *                              when an explicit address that differs from the one in the URI should be used.
+     * @param boltAgent             the {@link BoltAgent}
+     * @param userAgent             the User Agent
+     * @param connectTimeoutMillis  the connection timeout
+     * @param securityPlan          the {@link SecurityPlan}
+     * @param authToken             the {@link AuthToken}
+     * @param minVersion            the minimum {@link BoltProtocolVersion}
+     * @param notificationConfig    the {@link NotificationConfig}, this usually used in the Bolt {@code HELLO} message
+     * @return the {@link BoltConnection} instance
+     */
     CompletionStage<BoltConnection> connect(
-            BoltServerAddress address,
-            RoutingContext routingContext,
+            URI uri,
+            String routingContextAddress,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
             SecurityPlan securityPlan,
-            DatabaseName databaseName,
-            Supplier<CompletionStage<AuthToken>> authTokenStageSupplier,
-            AccessMode mode,
-            Set<String> bookmarks,
-            String impersonatedUser,
+            AuthToken authToken,
             BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig,
-            Consumer<DatabaseName> databaseNameConsumer,
-            Map<String, Object> additionalParameters);
+            NotificationConfig notificationConfig);
 
-    CompletionStage<Void> verifyConnectivity(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken);
-
-    CompletionStage<Boolean> supportsMultiDb(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken);
-
-    CompletionStage<Boolean> supportsSessionAuth(
-            BoltServerAddress address,
-            RoutingContext routingContext,
-            BoltAgent boltAgent,
-            String userAgent,
-            int connectTimeoutMillis,
-            SecurityPlan securityPlan,
-            AuthToken authToken);
-
+    /**
+     * Closes the {@link BoltConnectionProvider} instance.
+     * @return the close {@link CompletionStage}
+     */
     CompletionStage<Void> close();
 }

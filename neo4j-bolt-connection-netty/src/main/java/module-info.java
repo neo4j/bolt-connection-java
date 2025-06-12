@@ -17,16 +17,18 @@
 /**
  * The Neo4j Bolt Connection Netty implementation module.
  */
-@SuppressWarnings({"requires-automatic", "requires-transitive-automatic"})
+@SuppressWarnings("requires-automatic")
 module org.neo4j.bolt.connection.netty {
+    provides org.neo4j.bolt.connection.BoltConnectionProviderFactory with
+            org.neo4j.bolt.connection.netty.NettyBoltConnectionProviderFactory;
+
     exports org.neo4j.bolt.connection.netty;
 
-    requires transitive org.neo4j.bolt.connection;
+    requires org.neo4j.bolt.connection;
     requires io.netty.common;
     requires io.netty.handler;
-    requires transitive io.netty.transport;
+    requires io.netty.transport;
     requires io.netty.buffer;
     requires io.netty.codec;
     requires io.netty.resolver;
-    requires transitive java.logging;
 }

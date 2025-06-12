@@ -19,12 +19,10 @@ package org.neo4j.bolt.connection.netty.impl;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.RoutingContext;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
 import org.neo4j.bolt.connection.values.Value;
@@ -35,13 +33,10 @@ public interface ConnectionProvider {
             BoltServerAddress address,
             SecurityPlan securityPlan,
             RoutingContext routingContext,
-            String databaseName,
             Map<String, Value> authMap,
             BoltAgent boltAgent,
             String userAgent,
-            AccessMode mode,
             int connectTimeoutMillis,
-            String impersonatedUser,
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             MetricsListener metricsListener);

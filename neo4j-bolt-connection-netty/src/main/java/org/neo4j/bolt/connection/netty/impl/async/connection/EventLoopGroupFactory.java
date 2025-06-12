@@ -23,9 +23,10 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.FastThreadLocalThread;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
-import org.neo4j.bolt.connection.netty.EventLoopThread;
+import org.neo4j.bolt.connection.netty.impl.EventLoopThread;
 
 /**
  * Manages creation of Netty {@link EventLoopGroup}s, which are basically {@link Executor}s that perform IO operations.
@@ -35,7 +36,11 @@ public final class EventLoopGroupFactory {
     private static final int THREAD_PRIORITY = Thread.MAX_PRIORITY;
     private static final boolean THREAD_IS_DAEMON = true;
 
-    private EventLoopGroupFactory() {}
+    private final String threadNamePrefix;
+
+    public EventLoopGroupFactory(String threadNamePrefix) {
+        this.threadNamePrefix = Objects.requireNonNullElse(threadNamePrefix, THREAD_NAME_PREFIX);
+    }
 
     /**
      * Get class of {@link Channel} for {@link Bootstrap#channel(Class)} method.
@@ -43,7 +48,7 @@ public final class EventLoopGroupFactory {
      * @return class of the channel, which should be consistent with {@link EventLoopGroup}s returned by
      * {@link #newEventLoopGroup(int)}.
      */
-    public static Class<? extends Channel> channelClass() {
+    public Class<? extends Channel> channelClass() {
         return NioSocketChannel.class;
     }
 
@@ -54,7 +59,7 @@ public final class EventLoopGroupFactory {
      * @param threadCount amount of IO threads for the new group.
      * @return new group consistent with channel class returned by {@link #channelClass()}.
      */
-    public static EventLoopGroup newEventLoopGroup(int threadCount) {
+    public EventLoopGroup newEventLoopGroup(int threadCount) {
         return new DriverEventLoopGroup(threadCount);
     }
 
@@ -89,14 +94,14 @@ public final class EventLoopGroupFactory {
      */
     // use NioEventLoopGroup for now to be compatible with Netty 4.1
     @SuppressWarnings("deprecation")
-    private static class DriverEventLoopGroup extends NioEventLoopGroup {
+    private class DriverEventLoopGroup extends NioEventLoopGroup {
         DriverEventLoopGroup(int nThreads) {
             super(nThreads);
         }
 
         @Override
         protected ThreadFactory newDefaultThreadFactory() {
-            return new DriverThreadFactory();
+            return new DriverThreadFactory(threadNamePrefix);
         }
     }
 
@@ -107,8 +112,8 @@ public final class EventLoopGroupFactory {
     // use NioEventLoopGroup for now to be compatible with Netty 4.1
     @SuppressWarnings("deprecation")
     private static class DriverThreadFactory extends DefaultThreadFactory {
-        DriverThreadFactory() {
-            super(THREAD_NAME_PREFIX, THREAD_IS_DAEMON, THREAD_PRIORITY);
+        DriverThreadFactory(String threadNamePrefix) {
+            super(threadNamePrefix, THREAD_IS_DAEMON, THREAD_PRIORITY);
         }
 
         @SuppressWarnings("InstantiatingAThreadWithDefaultRunMethod")
