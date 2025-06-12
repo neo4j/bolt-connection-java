@@ -85,6 +85,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private BoltConnectionState state = BoltConnectionState.OPEN;
     private String authHeader;
     private CompletableFuture<AuthInfo> authInfoFuture;
+    private Duration readTimeout;
 
     public QueryApiBoltConnection(
             ValueFactory valueFactory,
@@ -159,8 +160,11 @@ public final class QueryApiBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<Void> setReadTimeout(Duration duration) {
-        // todo update this
+    public synchronized CompletionStage<Void> setReadTimeout(Duration duration) {
+        if (duration != null && (duration.isNegative() || Duration.ZERO.equals(duration))) {
+            return CompletableFuture.failedStage(new IllegalArgumentException("Invalid duration: " + duration));
+        }
+        this.readTimeout = duration;
         return CompletableFuture.completedStage(null);
     }
 
@@ -231,16 +235,17 @@ public final class QueryApiBoltConnection implements BoltConnection {
             if (message instanceof BeginMessage beginMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new BeginMessageHandler(
-                        handler, httpContext, this::authHeader, beginMessage, valueFactory, logging));
+                        handler, httpContext, this::authHeader, beginMessage, readTimeout, valueFactory, logging));
             } else if (message instanceof RunMessage runMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new RunMessageHandler(
                         handler,
                         httpContext,
                         this::authHeader,
-                        valueFactory,
                         runMessage,
                         this::getTransactionInfo,
+                        readTimeout,
+                        valueFactory,
                         logging));
             } else if (message instanceof PullMessage pullMessage) {
                 if (pullMessage.qid() != -1 && !qidToQuery.containsKey(pullMessage.qid())) {
@@ -257,11 +262,23 @@ public final class QueryApiBoltConnection implements BoltConnection {
             } else if (message instanceof CommitMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new CommitMessageHandler(
-                        handler, httpContext, this::authHeader, valueFactory, this::getTransactionInfo, logging));
+                        handler,
+                        httpContext,
+                        this::authHeader,
+                        this::getTransactionInfo,
+                        readTimeout,
+                        valueFactory,
+                        logging));
             } else if (message instanceof RollbackMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new RollbackMessageHandler(
-                        handler, httpContext, this::authHeader, this::getTransactionInfo, valueFactory, logging));
+                        handler,
+                        httpContext,
+                        this::authHeader,
+                        this::getTransactionInfo,
+                        readTimeout,
+                        valueFactory,
+                        logging));
             } else if (message instanceof ResetMessage) {
                 if (i > 0) {
                     throw new BoltClientException(

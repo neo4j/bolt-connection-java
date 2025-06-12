@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.query_api.impl;
 import java.io.IOException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,12 +39,14 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     private final Supplier<String> authHeaderSupplier;
     private final HttpRequest.BodyPublisher bodyPublisher;
     private final String databaseName;
+    private final Duration readTimeout;
 
     BeginMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
             Supplier<String> authHeaderSupplier,
             BeginMessage message,
+            Duration readTimeout,
             ValueFactory valueFactory,
             LoggingProvider logging) {
         super(httpContext, handler, valueFactory, logging);
@@ -51,6 +54,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
         this.authHeaderSupplier = Objects.requireNonNull(authHeaderSupplier);
+        this.readTimeout = readTimeout;
 
         if (message.databaseName().isPresent()) {
             this.databaseName = message.databaseName().get();
@@ -69,10 +73,13 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
 
     @Override
     protected HttpRequest newHttpRequest() {
-        return HttpRequest.newBuilder(httpContext.txUrl(databaseName))
+        var builder = HttpRequest.newBuilder(httpContext.txUrl(databaseName))
                 .headers(httpContext.headers(authHeaderSupplier.get()))
-                .POST(bodyPublisher)
-                .build();
+                .POST(bodyPublisher);
+        if (readTimeout != null) {
+            builder = builder.timeout(readTimeout);
+        }
+        return builder.build();
     }
 
     @Override

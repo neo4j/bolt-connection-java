@@ -31,7 +31,8 @@ class QueryApiIT extends AbstractQueryApi {
                     DockerImageName.parse("neo4j:%s-enterprise"
                             .formatted(Optional.ofNullable(System.getenv("NEO4J_VERSION"))
                                     .orElse("2025.04.0"))))
-            .withEnv("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes");
+            .withEnv("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
+            .withEnv("NEO4JLABS_PLUGINS", "[\"apoc\"]");
 
     @Override
     URI uri() {
