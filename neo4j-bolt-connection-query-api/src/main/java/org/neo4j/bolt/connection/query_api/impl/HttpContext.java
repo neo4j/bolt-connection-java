@@ -23,7 +23,7 @@ import java.net.http.HttpClient;
 import java.util.Objects;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 
-public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[] headers, String defaultDatabase) {
+public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String defaultDatabase, String userAgent) {
     // experimental
     private static final String DEFAULT_DATABASE_KEY_NAME = "defaultDatabase";
 
@@ -55,8 +55,12 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String[
         }
     }
 
-    public HttpContext(HttpClient httpClient, URI baseUri, JSON json, String authHeader, String userAgent) {
-        this(httpClient, baseUri, json, headers(authHeader, userAgent), null);
+    public HttpContext(HttpClient httpClient, URI baseUri, JSON json, String userAgent) {
+        this(httpClient, baseUri, json, null, userAgent);
+    }
+
+    public String[] headers(String authHeader) {
+        return headers(authHeader, userAgent);
     }
 
     private static String[] headers(String authHeader, String userAgent) {

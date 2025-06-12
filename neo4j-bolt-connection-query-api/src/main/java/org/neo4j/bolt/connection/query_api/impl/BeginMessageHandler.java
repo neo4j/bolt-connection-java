@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
@@ -34,12 +35,14 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     private final System.Logger log;
     private final ResponseHandler handler;
     private final HttpContext httpContext;
+    private final Supplier<String> authHeaderSupplier;
     private final HttpRequest.BodyPublisher bodyPublisher;
     private final String databaseName;
 
     BeginMessageHandler(
             ResponseHandler handler,
             HttpContext httpContext,
+            Supplier<String> authHeaderSupplier,
             BeginMessage message,
             ValueFactory valueFactory,
             LoggingProvider logging) {
@@ -47,6 +50,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
+        this.authHeaderSupplier = Objects.requireNonNull(authHeaderSupplier);
 
         if (message.databaseName().isPresent()) {
             this.databaseName = message.databaseName().get();
@@ -66,7 +70,7 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     @Override
     protected HttpRequest newHttpRequest() {
         return HttpRequest.newBuilder(httpContext.txUrl(databaseName))
-                .headers(httpContext.headers())
+                .headers(httpContext.headers(authHeaderSupplier.get()))
                 .POST(bodyPublisher)
                 .build();
     }

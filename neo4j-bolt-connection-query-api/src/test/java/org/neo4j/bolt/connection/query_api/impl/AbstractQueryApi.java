@@ -34,6 +34,7 @@ import static org.mockito.Mockito.times;
 import java.io.IOException;
 import java.net.URI;
 import java.security.GeneralSecurityException;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,7 +83,7 @@ abstract class AbstractQueryApi {
         var valueFactory = TestValueFactory.INSTANCE;
         given(logging.getLog(any(Class.class))).willAnswer((Answer<System.Logger>) invocation ->
                 System.getLogger(invocation.getArgument(0).getClass().getCanonicalName()));
-        var provider = new QueryApiBoltConnectionProvider(logging, valueFactory);
+        var provider = new QueryApiBoltConnectionProvider(logging, valueFactory, Clock.systemUTC());
         connection = (QueryApiBoltConnection) provider.connect(
                         uri(),
                         null,
@@ -722,6 +723,50 @@ abstract class AbstractQueryApi {
         // then
         then(responseHandler).should().onComplete();
         assertEquals(BoltConnectionState.OPEN, connection.state());
+    }
+
+    @Test
+    void shouldUpdateAuthToken() {
+        // given
+        var responseFuture = new CompletableFuture<>();
+        willAnswer(invocation -> {
+                    responseFuture.complete(null);
+                    return null;
+                })
+                .given(responseHandler)
+                .onComplete();
+        var messages = List.of(
+                Messages.logoff(),
+                Messages.logon(AuthTokens.basic(username(), password() + "typo", "basic", TestValueFactory.INSTANCE)),
+                Messages.run(
+                        database(),
+                        AccessMode.WRITE,
+                        null,
+                        Set.of(),
+                        "RETURN 1",
+                        Map.of(),
+                        null,
+                        Map.of(),
+                        NotificationConfig.defaultConfig()));
+
+        // when
+        connection
+                .writeAndFlush(responseHandler, messages)
+                .thenCompose(ignored -> responseFuture)
+                .toCompletableFuture()
+                .join();
+
+        // then
+        var boltFailureExceptionArgumentCaptor = ArgumentCaptor.forClass(BoltFailureException.class);
+        var responseHandlerInOrder = inOrder(responseHandler);
+        responseHandlerInOrder.verify(responseHandler).onLogoffSummary(any());
+        responseHandlerInOrder.verify(responseHandler).onLogonSummary(any());
+        responseHandlerInOrder.verify(responseHandler).onError(boltFailureExceptionArgumentCaptor.capture());
+        responseHandlerInOrder.verify(responseHandler).onComplete();
+        then(responseHandler).shouldHaveNoMoreInteractions();
+        var error = boltFailureExceptionArgumentCaptor.getValue();
+        assertEquals("Neo.ClientError.Security.Unauthorized", error.code());
+        assertEquals(BoltConnectionState.FAILURE, connection.state());
     }
 
     abstract URI uri();

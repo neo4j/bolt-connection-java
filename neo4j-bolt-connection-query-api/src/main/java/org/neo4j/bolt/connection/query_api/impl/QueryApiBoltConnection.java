@@ -47,12 +47,13 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
-import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.message.BeginMessage;
 import org.neo4j.bolt.connection.message.CommitMessage;
 import org.neo4j.bolt.connection.message.DiscardMessage;
+import org.neo4j.bolt.connection.message.LogoffMessage;
+import org.neo4j.bolt.connection.message.LogonMessage;
 import org.neo4j.bolt.connection.message.Message;
 import org.neo4j.bolt.connection.message.PullMessage;
 import org.neo4j.bolt.connection.message.ResetMessage;
@@ -71,11 +72,10 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private final ValueFactory valueFactory;
     private final HttpClient httpClient;
     private final URI baseUri;
-    private final String authHeader;
-    private final AuthInfo authInfo;
     private final String userAgent;
     private final String serverAgent;
     private final BoltProtocolVersion boltProtocolVersion;
+    private final Clock clock;
 
     // synchronized
     private final List<Message> messages = new ArrayList<>();
@@ -83,6 +83,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private TransactionInfo transactionInfo;
     private CompletionStage<Void> execTail = CompletableFuture.completedFuture(null);
     private BoltConnectionState state = BoltConnectionState.OPEN;
+    private String authHeader;
+    private CompletableFuture<AuthInfo> authInfoFuture;
 
     public QueryApiBoltConnection(
             ValueFactory valueFactory,
@@ -92,20 +94,14 @@ public final class QueryApiBoltConnection implements BoltConnection {
             String userAgent,
             String serverAgent,
             BoltProtocolVersion boltProtocolVersion,
+            Clock clock,
             LoggingProvider logging) {
         this.logging = logging;
         this.log = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.httpClient = Objects.requireNonNull(httpClient);
         this.baseUri = Objects.requireNonNull(baseUri);
-        this.authInfo = new AuthInfoImpl(authToken, Clock.systemUTC().millis());
         this.userAgent = userAgent;
-        var authMap = authToken.asMap();
-        var username = authMap.get("principal").asString();
-        var password = authMap.get("credentials").asString();
-        this.authHeader = "Basic "
-                + Base64.getEncoder()
-                        .encodeToString("%s:%s".formatted(username, password).getBytes());
         this.serverAgent = Objects.requireNonNull(serverAgent);
         json = JSON.builder()
                 .register(new JacksonJrExtension() {
@@ -116,6 +112,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 })
                 .build();
         this.boltProtocolVersion = Objects.requireNonNull(boltProtocolVersion);
+        this.clock = Objects.requireNonNull(clock);
+        updateAuthHeader(authToken);
     }
 
     @Override
@@ -172,8 +170,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<AuthInfo> authInfo() {
-        return CompletableFuture.completedStage(authInfo);
+    public synchronized CompletionStage<AuthInfo> authInfo() {
+        return authInfoFuture;
     }
 
     @Override
@@ -231,12 +229,19 @@ public final class QueryApiBoltConnection implements BoltConnection {
         for (var i = 0; i < messages.size(); i++) {
             var message = messages.get(i);
             if (message instanceof BeginMessage beginMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
-                messageHandlers.add(new BeginMessageHandler(handler, httpContext, beginMessage, valueFactory, logging));
+                var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
+                messageHandlers.add(new BeginMessageHandler(
+                        handler, httpContext, this::authHeader, beginMessage, valueFactory, logging));
             } else if (message instanceof RunMessage runMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
+                var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new RunMessageHandler(
-                        handler, httpContext, valueFactory, runMessage, this::getTransactionInfo, logging));
+                        handler,
+                        httpContext,
+                        this::authHeader,
+                        valueFactory,
+                        runMessage,
+                        this::getTransactionInfo,
+                        logging));
             } else if (message instanceof PullMessage pullMessage) {
                 if (pullMessage.qid() != -1 && !qidToQuery.containsKey(pullMessage.qid())) {
                     throw new BoltClientException("Pull query does not contain query id: " + pullMessage.qid());
@@ -250,21 +255,33 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 messageHandlers.add(
                         new DiscardMessageHandler(handler, discardMessage, this::findById, this::deleteById, logging));
             } else if (message instanceof CommitMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
+                var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new CommitMessageHandler(
-                        handler, httpContext, valueFactory, this::getTransactionInfo, logging));
+                        handler, httpContext, this::authHeader, valueFactory, this::getTransactionInfo, logging));
             } else if (message instanceof RollbackMessage) {
-                var httpContext = new HttpContext(httpClient, baseUri, json, authHeader, userAgent);
+                var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new RollbackMessageHandler(
-                        handler, httpContext, this::getTransactionInfo, valueFactory, logging));
+                        handler, httpContext, this::authHeader, this::getTransactionInfo, valueFactory, logging));
             } else if (message instanceof ResetMessage) {
                 if (i > 0) {
                     throw new BoltClientException(
                             "Reset message is only supported at the beginning of message pipeline");
                 }
                 messageHandlers.add(new ResetMessageHandler(this::state, this::updateState, handler));
+            } else if (message instanceof LogoffMessage) {
+                var nextMessage = messages.get(i + 1);
+                if (nextMessage instanceof LogonMessage logonMessage) {
+                    messageHandlers.add(new LogoffMessageHandler(handler));
+                    messageHandlers.add(new LogonMessageHandler(handler, logonMessage, this::updateAuthHeader));
+                    i++;
+                } else {
+                    throw new BoltClientException(
+                            "Logoff message is only supported when Logon message is sent immediately after it");
+                }
+            } else if (message instanceof LogonMessage logonMessage) {
+                throw new BoltClientException("Logon message is only supported immediately after Logoff message");
             } else {
-                throw new BoltException(
+                throw new BoltClientException(
                         String.format("%s not supported", message.getClass().getCanonicalName()));
             }
         }
@@ -411,6 +428,20 @@ public final class QueryApiBoltConnection implements BoltConnection {
                     }
                 })
                 .thenCompose(Function.identity());
+    }
+
+    private synchronized String authHeader() {
+        return authHeader;
+    }
+
+    private synchronized void updateAuthHeader(AuthToken authToken) {
+        var authMap = authToken.asMap();
+        var username = authMap.get("principal").asString();
+        var password = authMap.get("credentials").asString();
+        this.authHeader = "Basic "
+                + Base64.getEncoder()
+                        .encodeToString("%s:%s".formatted(username, password).getBytes());
+        this.authInfoFuture = CompletableFuture.completedFuture(new AuthInfoImpl(authToken, clock.millis()));
     }
 
     private static class MessageHandlingAbortingException extends RuntimeException {

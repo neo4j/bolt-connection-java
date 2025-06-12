@@ -22,6 +22,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -48,12 +49,14 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     // Higher versions of Bolt require GQL support that it not available in Query API.
     private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
     private final Executor httpExecutor;
+    private final Clock clock;
 
-    public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory) {
+    public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory, Clock clock) {
         this.logging = Objects.requireNonNull(logging);
         this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        this.clock = Objects.requireNonNull(clock);
     }
 
     @SuppressWarnings("resource") // not AutoCloseable in Java 17
@@ -114,6 +117,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                                     userAgent,
                                     serverAgent,
                                     BOLT_PROTOCOL_VERSION,
+                                    clock,
                                     logging);
                         } catch (IOException e) {
                             throw new BoltClientException(

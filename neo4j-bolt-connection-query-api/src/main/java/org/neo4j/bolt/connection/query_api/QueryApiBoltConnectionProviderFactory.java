@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.query_api;
 
+import java.time.Clock;
 import java.util.Map;
 import java.util.Set;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
@@ -52,6 +53,15 @@ public final class QueryApiBoltConnectionProviderFactory implements BoltConnecti
             ValueFactory valueFactory,
             MetricsListener metricsListener,
             Map<String, ?> additionalConfig) {
-        return new QueryApiBoltConnectionProvider(loggingProvider, valueFactory);
+        return new QueryApiBoltConnectionProvider(loggingProvider, valueFactory, getClock(additionalConfig));
+    }
+
+    private Clock getClock(Map<String, ?> additionalConfig) {
+        var value = additionalConfig.get("clock");
+        if (value instanceof Clock clock) {
+            return clock;
+        } else {
+            return Clock.systemUTC();
+        }
     }
 }
