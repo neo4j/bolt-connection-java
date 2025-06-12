@@ -59,6 +59,7 @@ import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
 /**
  * A routed {@link BoltConnectionSource} implementation that implements Neo4j client-side routing that is typically
  * expected from the {@code neo4j} URI schemes.
+ *
  * @since 4.0.0
  */
 public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBoltConnectionParameters> {
@@ -175,6 +176,9 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     public CompletionStage<Void> verifyConnectivity() {
         RoutingTableRegistry registry;
         synchronized (this) {
+            if (closeFuture != null) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
+            }
             registry = this.registry;
         }
         return supportsMultiDb()
@@ -229,6 +233,9 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             String baseErrorMessagePrefix, Function<BoltConnection, Boolean> featureDetectionFunction) {
         Rediscovery rediscovery;
         synchronized (this) {
+            if (closeFuture != null) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
+            }
             rediscovery = this.rediscovery;
         }
 
