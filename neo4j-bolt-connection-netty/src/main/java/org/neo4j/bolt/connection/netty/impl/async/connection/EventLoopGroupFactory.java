@@ -106,11 +106,9 @@ public final class EventLoopGroupFactory {
     }
 
     /**
-     * Same as {@link DefaultThreadFactory} created by {@link NioEventLoopGroup} by default, except produces threads of
+     * Same as {@link DefaultThreadFactory} created by default, except produces threads of
      * {@link DriverThread} class. Such threads can be recognized by {@link #assertNotInEventLoopThread()}.
      */
-    // use NioEventLoopGroup for now to be compatible with Netty 4.1
-    @SuppressWarnings("deprecation")
     private static class DriverThreadFactory extends DefaultThreadFactory {
         DriverThreadFactory(String threadNamePrefix) {
             super(threadNamePrefix, THREAD_IS_DAEMON, THREAD_PRIORITY);
