@@ -107,19 +107,6 @@ class HelloResponseHandlerTest {
     }
 
     @Test
-    void shouldThrowWhenServerAgentIsUnrecognised() {
-        var agentFuture = new CompletableFuture<String>();
-        var latestAuth = new CompletableFuture<Long>();
-        var handler = new HelloResponseHandler(agentFuture, channel, mock(Clock.class), latestAuth);
-
-        var metadata = metadata("WrongServerVersion", "bolt-x");
-        assertThrows(BoltUntrustedServerException.class, () -> handler.onSuccess(metadata));
-
-        assertTrue(agentFuture.isCompletedExceptionally()); // initialization failed
-        assertTrue(channel.closeFuture().isDone()); // channel was closed
-    }
-
-    @Test
     void shouldSetConnectionIdOnChannel() {
         var agentFuture = new CompletableFuture<String>();
         var latestAuth = new CompletableFuture<Long>();

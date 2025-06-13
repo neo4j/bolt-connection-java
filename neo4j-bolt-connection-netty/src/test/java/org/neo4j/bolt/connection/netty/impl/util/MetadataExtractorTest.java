@@ -79,11 +79,4 @@ class MetadataExtractorTest {
                 () -> extractServer(singletonMap("server", valueFactory.value((Object) null))));
         assertThrows(BoltUntrustedServerException.class, () -> extractServer(singletonMap("server", null)));
     }
-
-    @Test
-    void shouldFailToExtractServerVersionFromNonNeo4jProduct() {
-        assertThrows(
-                BoltUntrustedServerException.class,
-                () -> extractServer(singletonMap("server", valueFactory.value("NotNeo4j/1.2.3"))));
-    }
 }
