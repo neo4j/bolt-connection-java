@@ -20,4 +20,4 @@ import java.util.List;
 import java.util.Map;
 import org.neo4j.bolt.connection.values.Value;
 
-record Query(long id, List<String> fields, List<Value[]> values, Map<String, Value> metadata) {}
+record Query(long id, List<String> fields, List<List<Value>> values, Map<String, Value> metadata) {}

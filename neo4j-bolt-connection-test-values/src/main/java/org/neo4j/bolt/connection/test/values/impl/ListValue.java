@@ -16,15 +16,14 @@
  */
 package org.neo4j.bolt.connection.test.values.impl;
 
-import java.util.Arrays;
-import java.util.Iterator;
+import java.util.List;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 
 public class ListValue extends ValueAdapter {
-    private final Value[] values;
+    private final List<? extends Value> values;
 
-    public ListValue(Value... values) {
+    public ListValue(List<? extends Value> values) {
         if (values == null) {
             throw new IllegalArgumentException("Cannot construct ListValue from null");
         }
@@ -33,42 +32,28 @@ public class ListValue extends ValueAdapter {
 
     @Override
     public boolean isEmpty() {
-        return values.length == 0;
+        return values.isEmpty();
     }
 
     @Override
     public int size() {
-        return values.length;
+        return values.size();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Iterable<Value> boltValues() {
+        return (Iterable<Value>) values;
     }
 
     @Override
-    public Iterable<Value> values() {
-        return () -> new Iterator<>() {
-            private int cursor = 0;
-
-            @Override
-            public boolean hasNext() {
-                return cursor < values.length;
-            }
-
-            @Override
-            public Value next() {
-                return values[cursor++];
-            }
-
-            @Override
-            public void remove() {}
-        };
-    }
-
-    @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.LIST;
     }
 
     @Override
     public String toString() {
-        return Arrays.toString(values);
+        return values.toString();
     }
 
     @Override
@@ -81,11 +66,11 @@ public class ListValue extends ValueAdapter {
         }
 
         var otherValues = (ListValue) o;
-        return Arrays.equals(values, otherValues.values);
+        return values.equals(otherValues.values);
     }
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(values);
+        return values.hashCode();
     }
 }

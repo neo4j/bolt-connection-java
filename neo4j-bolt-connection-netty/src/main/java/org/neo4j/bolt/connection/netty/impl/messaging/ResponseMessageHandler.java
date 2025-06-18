@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging;
 
+import java.util.List;
 import java.util.Map;
 import org.neo4j.bolt.connection.GqlError;
 import org.neo4j.bolt.connection.values.Value;
@@ -23,7 +24,7 @@ import org.neo4j.bolt.connection.values.Value;
 public interface ResponseMessageHandler {
     void handleSuccessMessage(Map<String, Value> meta);
 
-    void handleRecordMessage(Value[] fields);
+    void handleRecordMessage(List<Value> fields);
 
     void handleFailureMessage(GqlError gqlError);
 

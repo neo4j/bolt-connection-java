@@ -168,7 +168,7 @@ public class RoutedBoltConnection implements BoltConnection {
         }
 
         @Override
-        public void onRecord(Value[] fields) {
+        public void onRecord(List<Value> fields) {
             handler.onRecord(fields);
         }
 

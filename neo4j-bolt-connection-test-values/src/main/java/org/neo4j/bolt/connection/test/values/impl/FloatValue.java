@@ -26,7 +26,7 @@ public class FloatValue extends NumberValueAdapter<Double> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.FLOAT;
     }
 
@@ -39,7 +39,7 @@ public class FloatValue extends NumberValueAdapter<Double> {
     public long asLong() {
         var longVal = (long) val;
         if ((double) longVal != val) {
-            throw new LossyCoercion(type().name(), "Java long");
+            throw new LossyCoercion(boltValueType().name(), "Java long");
         }
 
         return longVal;

@@ -30,6 +30,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.DecoderException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,7 +107,7 @@ class InboundMessageHandlerTest {
         var responseHandler = mock(ResponseHandler.class);
         messageDispatcher.enqueue(responseHandler);
 
-        var fields = new Value[] {valueFactory.value(1), valueFactory.value(2), valueFactory.value(3)};
+        var fields = List.of(valueFactory.value(1), valueFactory.value(2), valueFactory.value(3));
         channel.writeInbound(writer.asByteBuf(new RecordMessage(fields)));
 
         verify(responseHandler).onRecord(fields);
