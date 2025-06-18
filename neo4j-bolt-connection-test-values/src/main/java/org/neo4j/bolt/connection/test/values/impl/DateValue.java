@@ -30,7 +30,7 @@ public class DateValue extends ObjectValueAdapter<LocalDate> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.DATE;
     }
 }

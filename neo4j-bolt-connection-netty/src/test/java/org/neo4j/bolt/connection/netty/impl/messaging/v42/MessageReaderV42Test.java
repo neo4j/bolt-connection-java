@@ -100,6 +100,6 @@ public class MessageReaderV42Test extends AbstractMessageReaderTestBase {
     }
 
     private Message record(Value value) {
-        return new RecordMessage(new Value[] {value});
+        return new RecordMessage(List.of(value));
     }
 }

@@ -25,6 +25,7 @@ import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttri
 import static org.neo4j.bolt.connection.netty.impl.util.MetadataExtractor.extractServer;
 
 import io.netty.channel.Channel;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -72,7 +73,7 @@ public class HelloV51ResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         throw new UnsupportedOperationException();
     }
 
@@ -80,18 +81,18 @@ public class HelloV51ResponseHandler implements ResponseHandler {
         var configurationHints = metadata.get(CONFIGURATION_HINTS_KEY);
         if (configurationHints != null) {
             getFromSupplierOrEmptyOnException(() -> configurationHints
-                            .get(CONNECTION_RECEIVE_TIMEOUT_SECONDS_KEY)
+                            .getBoltValue(CONNECTION_RECEIVE_TIMEOUT_SECONDS_KEY)
                             .asLong())
                     .ifPresent(timeout -> setConnectionReadTimeout(channel, timeout));
 
             getFromSupplierOrEmptyOnException(() -> {
-                        var value = configurationHints.get(TELEMETRY_ENABLED_KEY);
+                        var value = configurationHints.getBoltValue(TELEMETRY_ENABLED_KEY);
                         return !value.isNull() && value.asBoolean();
                     })
                     .ifPresent(telemetryEnabled -> setTelemetryEnabled(channel, telemetryEnabled));
 
             getFromSupplierOrEmptyOnException(() -> {
-                        var value = configurationHints.get(SSR_ENABLED_KEY);
+                        var value = configurationHints.getBoltValue(SSR_ENABLED_KEY);
                         return !value.isNull() && value.asBoolean();
                     })
                     .ifPresent(telemetryEnabled -> setSsrEnabled(channel, telemetryEnabled));

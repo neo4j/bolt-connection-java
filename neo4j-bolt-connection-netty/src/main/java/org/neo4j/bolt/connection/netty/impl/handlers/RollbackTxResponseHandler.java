@@ -18,7 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.handlers;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.bolt.connection.netty.impl.spi.ResponseHandler;
@@ -42,8 +42,7 @@ public class RollbackTxResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
-        throw new UnsupportedOperationException(
-                "Transaction rollback is not expected to receive records: " + Arrays.toString(fields));
+    public void onRecord(List<Value> fields) {
+        throw new UnsupportedOperationException("Transaction rollback is not expected to receive records: " + fields);
     }
 }

@@ -21,6 +21,7 @@ import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttri
 
 import io.netty.channel.Channel;
 import java.time.Clock;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
@@ -58,7 +59,7 @@ public class LogonResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         future.completeExceptionally(new BoltProtocolException("Records are not supported on LOGON"));
     }
 }

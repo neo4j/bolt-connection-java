@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.handlers;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
@@ -42,7 +43,7 @@ public class LogoffResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         this.future.completeExceptionally(new BoltProtocolException("Records are not supported on LOGON"));
     }
 }

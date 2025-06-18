@@ -183,25 +183,24 @@ public final class BoltProtocolV4Test {
                 })
                 .willAnswer((Answer<CompletionStage<Void>>) invocation -> {
                     var handler = (PullResponseHandlerImpl) invocation.getArgument(1);
-                    handler.onRecord(new Value[] {
-                        value(1000),
-                        value(List.of(
-                                value(Map.of(
-                                        "role",
-                                        value("ROUTE"),
-                                        "addresses",
-                                        value(List.of(value("192.168.0.1:7867"))))),
-                                value(Map.of(
-                                        "role",
-                                        value("WRITE"),
-                                        "addresses",
-                                        value(List.of(value("192.168.0.1:7867"))))),
-                                value(Map.of(
-                                        "role",
-                                        value("READ"),
-                                        "addresses",
-                                        value(List.of(value("192.168.0.1:7867")))))))
-                    });
+                    handler.onRecord(List.of(
+                            value(1000),
+                            value(List.of(
+                                    value(Map.of(
+                                            "role",
+                                            value("ROUTE"),
+                                            "addresses",
+                                            value(List.of(value("192.168.0.1:7867"))))),
+                                    value(Map.of(
+                                            "role",
+                                            value("WRITE"),
+                                            "addresses",
+                                            value(List.of(value("192.168.0.1:7867"))))),
+                                    value(Map.of(
+                                            "role",
+                                            value("READ"),
+                                            "addresses",
+                                            value(List.of(value("192.168.0.1:7867")))))))));
                     handler.onSuccess(emptyMap());
                     return CompletableFuture.completedStage(null);
                 });

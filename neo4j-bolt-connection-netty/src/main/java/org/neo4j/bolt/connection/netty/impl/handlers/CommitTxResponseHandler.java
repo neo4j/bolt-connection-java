@@ -18,7 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.handlers;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.neo4j.bolt.connection.netty.impl.spi.ResponseHandler;
@@ -36,7 +36,7 @@ public class CommitTxResponseHandler implements ResponseHandler {
     public void onSuccess(Map<String, Value> metadata) {
         var bookmarkValue = metadata.get("bookmark");
         String bookmark = null;
-        if (bookmarkValue != null && !bookmarkValue.isNull() && Type.STRING.equals(bookmarkValue.type())) {
+        if (bookmarkValue != null && !bookmarkValue.isNull() && Type.STRING.equals(bookmarkValue.boltValueType())) {
             bookmark = bookmarkValue.asString();
             if (bookmark.isEmpty()) {
                 bookmark = null;
@@ -51,8 +51,7 @@ public class CommitTxResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
-        throw new UnsupportedOperationException(
-                "Transaction commit is not expected to receive records: " + Arrays.toString(fields));
+    public void onRecord(List<Value> fields) {
+        throw new UnsupportedOperationException("Transaction commit is not expected to receive records: " + fields);
     }
 }

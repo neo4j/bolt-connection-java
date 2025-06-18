@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,6 @@ import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.util.MetadataExtractor;
 import org.neo4j.bolt.connection.summary.RunSummary;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
-import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class RunResponseHandlerTest {
@@ -67,7 +67,7 @@ class RunResponseHandlerTest {
         assertThrows(
                 UnsupportedOperationException.class,
                 () -> handler.onRecord(
-                        new Value[] {valueFactory.value("a"), valueFactory.value("b"), valueFactory.value("c")}));
+                        List.of(valueFactory.value("a"), valueFactory.value("b"), valueFactory.value("c"))));
     }
 
     private static RunResponseHandler newHandler() {

@@ -56,7 +56,7 @@ public interface ValueFactory {
         return value((Object) stringToValue);
     }
 
-    default Value value(Value[] values) {
+    default Value value(List<Value> values) {
         return value((Object) values);
     }
 

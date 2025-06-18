@@ -31,7 +31,7 @@ public abstract class BooleanValue extends ValueAdapter {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.BOOLEAN;
     }
 

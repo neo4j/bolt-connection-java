@@ -30,7 +30,7 @@ public class PathValue extends ObjectValueAdapter<TestPath> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.PATH;
     }
 

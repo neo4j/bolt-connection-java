@@ -28,6 +28,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -58,7 +59,7 @@ class MessageFormatTest {
     void shouldUnpackAllResponses() {
         assertSerializes(new FailureMessage("Hello", "World!"));
         assertSerializes(IgnoredMessage.IGNORED);
-        assertSerializes(new RecordMessage(new Value[] {valueFactory.value(1337L)}));
+        assertSerializes(new RecordMessage(List.of(valueFactory.value(1337L))));
         assertSerializes(new SuccessMessage(new HashMap<>()));
     }
 
@@ -114,7 +115,7 @@ class MessageFormatTest {
             }
 
             @Override
-            public void onRecord(Value[] fields) {
+            public void onRecord(List<Value> fields) {
                 // ignored
             }
         });
@@ -130,7 +131,7 @@ class MessageFormatTest {
     }
 
     private void assertSerializesValue(Value value) {
-        assertSerializes(new RecordMessage(new Value[] {value}));
+        assertSerializes(new RecordMessage(List.of(value)));
     }
 
     private void assertSerializes(Message message) {
@@ -175,7 +176,7 @@ class MessageFormatTest {
     }
 
     private void assertOnlyDeserializesValue(Value value) {
-        var message = new RecordMessage(new Value[] {value});
+        var message = new RecordMessage(List.of(value));
         var packed = knowledgeablePack(message);
 
         var channel = newEmbeddedChannel();

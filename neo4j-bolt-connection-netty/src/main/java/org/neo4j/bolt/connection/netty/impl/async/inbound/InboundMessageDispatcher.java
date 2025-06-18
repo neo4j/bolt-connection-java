@@ -20,8 +20,8 @@ import static java.util.Objects.requireNonNull;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.isClosing;
 
 import io.netty.channel.Channel;
-import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import org.neo4j.bolt.connection.GqlError;
@@ -85,14 +85,13 @@ public class InboundMessageDispatcher implements ResponseMessageHandler {
     }
 
     @Override
-    public void handleRecordMessage(Value[] fields) {
+    public void handleRecordMessage(List<Value> fields) {
         if (log.isLoggable(System.Logger.Level.DEBUG)) {
-            log.log(System.Logger.Level.DEBUG, "S: RECORD %s", Arrays.toString(fields));
+            log.log(System.Logger.Level.DEBUG, "S: RECORD %s", fields.toString());
         }
         var handler = handlers.peek();
         if (handler == null) {
-            throw new IllegalStateException(
-                    "No handler exists to handle RECORD message with fields: " + Arrays.toString(fields));
+            throw new IllegalStateException("No handler exists to handle RECORD message with fields: " + fields);
         }
         handler.onRecord(fields);
     }

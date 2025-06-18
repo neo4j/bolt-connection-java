@@ -30,8 +30,8 @@ public abstract class EntityValueAdapter<V extends Entity> extends ObjectValueAd
     }
 
     @Override
-    public <T> Map<String, T> asMap(Function<Value, T> mapFunction) {
-        return asEntity().asMap(mapFunction);
+    public Map<String, Value> asBoltMap() {
+        return asEntity().asMap(Function.identity());
     }
 
     @Override
@@ -45,7 +45,7 @@ public abstract class EntityValueAdapter<V extends Entity> extends ObjectValueAd
     }
 
     @Override
-    public Value get(String key) {
+    public Value getBoltValue(String key) {
         return asEntity().get(key);
     }
 }

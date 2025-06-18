@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.handlers;
 
+import java.util.List;
 import java.util.Map;
 import org.neo4j.bolt.connection.netty.impl.spi.ResponseHandler;
 import org.neo4j.bolt.connection.values.Value;
@@ -30,5 +31,5 @@ public class NoOpResponseHandler implements ResponseHandler {
     public void onFailure(Throwable error) {}
 
     @Override
-    public void onRecord(Value[] fields) {}
+    public void onRecord(List<Value> fields) {}
 }
