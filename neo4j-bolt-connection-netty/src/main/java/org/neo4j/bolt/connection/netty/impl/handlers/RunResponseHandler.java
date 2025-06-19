@@ -51,7 +51,7 @@ public class RunResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         throw new UnsupportedOperationException();
     }
 

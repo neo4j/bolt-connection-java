@@ -18,7 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.handlers;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -46,9 +46,8 @@ public class BeginTxResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
-        throw new UnsupportedOperationException(
-                "Transaction begin is not expected to receive records: " + Arrays.toString(fields));
+    public void onRecord(List<Value> fields) {
+        throw new UnsupportedOperationException("Transaction begin is not expected to receive records: " + fields);
     }
 
     private record BeginSummaryImpl(String database) implements BeginSummary {

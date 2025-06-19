@@ -19,5 +19,5 @@ package org.neo4j.bolt.connection.test.values.impl;
 import org.neo4j.bolt.connection.values.Value;
 
 public abstract class InternalMapAccessorWithDefaultValue implements Value {
-    public abstract Value get(String key);
+    public abstract Value getBoltValue(String key);
 }

@@ -37,8 +37,8 @@ public class MapValue extends ValueAdapter {
     }
 
     @Override
-    public <T> Map<String, T> asMap(Function<Value, T> mapFunction) {
-        return Extract.map(val, mapFunction);
+    public Map<String, Value> asBoltMap() {
+        return Extract.map(val, Function.identity());
     }
 
     @Override
@@ -57,12 +57,12 @@ public class MapValue extends ValueAdapter {
     }
 
     @Override
-    public Iterable<Value> values() {
+    public Iterable<Value> boltValues() {
         return val.values();
     }
 
     @Override
-    public Value get(String key) {
+    public Value getBoltValue(String key) {
         var value = val.get(key);
         return value == null ? NullValue.NULL : value;
     }
@@ -73,7 +73,7 @@ public class MapValue extends ValueAdapter {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.MAP;
     }
 

@@ -25,12 +25,12 @@ public class DurationValue extends ObjectValueAdapter<IsoDuration> {
     }
 
     @Override
-    public IsoDuration asIsoDuration() {
+    public IsoDuration asBoltIsoDuration() {
         return asObject();
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.DURATION;
     }
 }

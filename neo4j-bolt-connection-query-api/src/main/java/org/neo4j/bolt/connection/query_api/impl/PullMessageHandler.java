@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.query_api.impl;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -52,7 +53,7 @@ final class PullMessageHandler implements MessageHandler<Void> {
     public CompletionStage<Void> exchange() {
         return CompletableFuture.<Void>completedStage(null).thenApply(ignored -> {
             var query = queryFinder.apply(message.qid());
-            var records = new ArrayList<Value[]>();
+            var records = new ArrayList<List<Value>>();
             var deleted = false;
 
             var request = message.request() > 0 ? message.request() : Long.MAX_VALUE;

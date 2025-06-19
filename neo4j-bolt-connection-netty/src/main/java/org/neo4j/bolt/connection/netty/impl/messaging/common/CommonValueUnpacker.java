@@ -120,13 +120,13 @@ public class CommonValueUnpacker implements ValueUnpacker {
     }
 
     @Override
-    public Value[] unpackArray() throws IOException {
+    public List<Value> unpackList() throws IOException {
         var size = (int) unpacker.unpackListHeader();
         var values = new Value[size];
         for (var i = 0; i < size; i++) {
             values[i] = unpack();
         }
-        return values;
+        return Arrays.asList(values);
     }
 
     protected Value unpack() throws IOException {
@@ -159,7 +159,7 @@ public class CommonValueUnpacker implements ValueUnpacker {
                 for (var j = 0; j < size; j++) {
                     vals[j] = unpack();
                 }
-                return valueFactory.value(vals);
+                return valueFactory.value(Arrays.asList(vals));
             }
             case STRUCT -> {
                 var size = unpacker.unpackStructHeader();

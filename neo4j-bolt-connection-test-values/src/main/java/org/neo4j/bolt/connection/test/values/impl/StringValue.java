@@ -50,7 +50,7 @@ public class StringValue extends ValueAdapter {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.STRING;
     }
 

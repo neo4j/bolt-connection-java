@@ -30,7 +30,7 @@ public class NodeValue extends EntityValueAdapter<TestNode> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.NODE;
     }
 }

@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -176,9 +177,9 @@ public class BoltProtocolV3 implements BoltProtocol {
                     Set<BoltServerAddress> writers = new LinkedHashSet<>();
                     Set<BoltServerAddress> routers = new LinkedHashSet<>();
 
-                    for (var serversMap : map.get("servers").values()) {
-                        var role = serversMap.get("role").asString();
-                        for (var server : serversMap.get("addresses").values()) {
+                    for (var serversMap : map.get("servers").boltValues()) {
+                        var role = serversMap.getBoltValue("role").asString();
+                        for (var server : serversMap.getBoltValue("addresses").boltValues()) {
                             var address = new BoltServerAddress(server.asString());
                             switch (role) {
                                 case "WRITE" -> writers.add(address);
@@ -212,12 +213,12 @@ public class BoltProtocolV3 implements BoltProtocol {
                         private Map<String, Value> routingTable;
 
                         @Override
-                        public void onRecord(Value[] fields) {
+                        public void onRecord(List<Value> fields) {
                             if (routingTable == null) {
                                 var keys = runFuture.join().keys();
                                 routingTable = new HashMap<>(keys.size());
                                 for (var i = 0; i < keys.size(); i++) {
-                                    routingTable.put(keys.get(i), fields[i]);
+                                    routingTable.put(keys.get(i), fields.get(i));
                                 }
                                 routingTable = Collections.unmodifiableMap(routingTable);
                             }

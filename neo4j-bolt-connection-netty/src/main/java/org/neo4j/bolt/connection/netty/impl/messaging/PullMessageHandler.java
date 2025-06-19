@@ -16,9 +16,10 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging;
 
+import java.util.List;
 import org.neo4j.bolt.connection.summary.PullSummary;
 import org.neo4j.bolt.connection.values.Value;
 
 public interface PullMessageHandler extends MessageHandler<PullSummary> {
-    void onRecord(Value[] fields);
+    void onRecord(List<Value> fields);
 }

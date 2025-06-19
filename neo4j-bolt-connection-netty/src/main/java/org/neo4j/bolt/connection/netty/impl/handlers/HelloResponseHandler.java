@@ -28,6 +28,7 @@ import static org.neo4j.bolt.connection.netty.impl.util.MetadataExtractor.extrac
 
 import io.netty.channel.Channel;
 import java.time.Clock;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -94,7 +95,7 @@ public class HelloResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         throw new UnsupportedOperationException();
     }
 
@@ -111,7 +112,7 @@ public class HelloResponseHandler implements ResponseHandler {
         var configurationHints = metadata.get(CONFIGURATION_HINTS_KEY);
         if (configurationHints != null) {
             getFromSupplierOrEmptyOnException(() -> configurationHints
-                            .get(CONNECTION_RECEIVE_TIMEOUT_SECONDS_KEY)
+                            .getBoltValue(CONNECTION_RECEIVE_TIMEOUT_SECONDS_KEY)
                             .asLong())
                     .ifPresent(timeout -> setConnectionReadTimeout(channel, timeout));
         }

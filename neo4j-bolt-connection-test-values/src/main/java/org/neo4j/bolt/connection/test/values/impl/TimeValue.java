@@ -30,7 +30,7 @@ public class TimeValue extends ObjectValueAdapter<OffsetTime> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.TIME;
     }
 }

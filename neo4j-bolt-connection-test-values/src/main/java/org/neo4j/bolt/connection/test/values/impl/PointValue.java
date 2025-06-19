@@ -25,12 +25,12 @@ public class PointValue extends ObjectValueAdapter<Point> {
     }
 
     @Override
-    public Point asPoint() {
+    public Point asBoltPoint() {
         return asObject();
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.POINT;
     }
 }

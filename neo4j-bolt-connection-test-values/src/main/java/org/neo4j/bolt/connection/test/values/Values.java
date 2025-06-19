@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.neo4j.bolt.connection.test.values.impl.AsValue;
@@ -41,9 +42,9 @@ import org.neo4j.bolt.connection.test.values.impl.DateValue;
 import org.neo4j.bolt.connection.test.values.impl.DurationValue;
 import org.neo4j.bolt.connection.test.values.impl.FloatValue;
 import org.neo4j.bolt.connection.test.values.impl.IntegerValue;
-import org.neo4j.bolt.connection.test.values.impl.InternalIsoDuration;
-import org.neo4j.bolt.connection.test.values.impl.InternalPoint2D;
-import org.neo4j.bolt.connection.test.values.impl.InternalPoint3D;
+import org.neo4j.bolt.connection.test.values.impl.InternalBoltIsoDuration;
+import org.neo4j.bolt.connection.test.values.impl.InternalBoltPoint2D;
+import org.neo4j.bolt.connection.test.values.impl.InternalBoltPoint3D;
 import org.neo4j.bolt.connection.test.values.impl.ListValue;
 import org.neo4j.bolt.connection.test.values.impl.LocalDateTimeValue;
 import org.neo4j.bolt.connection.test.values.impl.LocalTimeValue;
@@ -210,7 +211,7 @@ final class Values {
         var size = input.length;
         var values = new Value[size];
         System.arraycopy(input, 0, values, 0, size);
-        return new ListValue(values);
+        return new ListValue(Arrays.asList(values));
     }
 
     /**
@@ -230,7 +231,9 @@ final class Values {
      * @return the value
      */
     public static Value value(String... input) {
-        var values = Arrays.stream(input).map(StringValue::new).toArray(StringValue[]::new);
+        var values = Arrays.stream(input)
+                .map(StringValue::new)
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -241,8 +244,9 @@ final class Values {
      * @return the value
      */
     public static Value value(boolean... input) {
-        var values =
-                IntStream.range(0, input.length).mapToObj(i -> value(input[i])).toArray(Value[]::new);
+        var values = IntStream.range(0, input.length)
+                .mapToObj(i -> value(input[i]))
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -253,8 +257,9 @@ final class Values {
      * @return the value
      */
     public static Value value(char... input) {
-        var values =
-                IntStream.range(0, input.length).mapToObj(i -> value(input[i])).toArray(Value[]::new);
+        var values = IntStream.range(0, input.length)
+                .mapToObj(i -> value(input[i]))
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -265,7 +270,9 @@ final class Values {
      * @return the value
      */
     public static Value value(long... input) {
-        var values = Arrays.stream(input).mapToObj(Values::value).toArray(Value[]::new);
+        var values = Arrays.stream(input)
+                .mapToObj(Values::value)
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -276,8 +283,9 @@ final class Values {
      * @return the value
      */
     public static Value value(short... input) {
-        var values =
-                IntStream.range(0, input.length).mapToObj(i -> value(input[i])).toArray(Value[]::new);
+        var values = IntStream.range(0, input.length)
+                .mapToObj(i -> value(input[i]))
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -288,7 +296,9 @@ final class Values {
      * @return the value
      */
     public static Value value(int... input) {
-        var values = Arrays.stream(input).mapToObj(Values::value).toArray(Value[]::new);
+        var values = Arrays.stream(input)
+                .mapToObj(Values::value)
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -299,7 +309,9 @@ final class Values {
      * @return the value
      */
     public static Value value(double... input) {
-        var values = Arrays.stream(input).mapToObj(Values::value).toArray(Value[]::new);
+        var values = Arrays.stream(input)
+                .mapToObj(Values::value)
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -310,8 +322,9 @@ final class Values {
      * @return the value
      */
     public static Value value(float... input) {
-        var values =
-                IntStream.range(0, input.length).mapToObj(i -> value(input[i])).toArray(Value[]::new);
+        var values = IntStream.range(0, input.length)
+                .mapToObj(i -> value(input[i]))
+                .collect(Collectors.toCollection(() -> new ArrayList<>(input.length)));
         return new ListValue(values);
     }
 
@@ -327,7 +340,7 @@ final class Values {
         for (var val : vals) {
             values[i++] = value(val);
         }
-        return new ListValue(values);
+        return new ListValue(Arrays.asList(values));
     }
 
     /**
@@ -351,7 +364,7 @@ final class Values {
         while (val.hasNext()) {
             values.add(value(val.next()));
         }
-        return new ListValue(values.toArray(new Value[0]));
+        return new ListValue(values);
     }
 
     /**
@@ -361,7 +374,7 @@ final class Values {
      * @return the value
      */
     public static Value value(Stream<Object> stream) {
-        var values = stream.map(Values::value).toArray(Value[]::new);
+        var values = stream.map(Values::value).toList();
         return new ListValue(values);
     }
 
@@ -506,7 +519,7 @@ final class Values {
      * @return the value
      */
     public static Value value(Period period) {
-        return value(new InternalIsoDuration(period));
+        return value(new InternalBoltIsoDuration(period));
     }
 
     /**
@@ -516,7 +529,7 @@ final class Values {
      * @return the value
      */
     public static Value value(Duration duration) {
-        return value(new InternalIsoDuration(duration));
+        return value(new InternalBoltIsoDuration(duration));
     }
 
     /**
@@ -529,7 +542,7 @@ final class Values {
      * @return the value
      */
     public static Value isoDuration(long months, long days, long seconds, int nanoseconds) {
-        return value(new InternalIsoDuration(months, days, seconds, nanoseconds));
+        return value(new InternalBoltIsoDuration(months, days, seconds, nanoseconds));
     }
 
     /**
@@ -551,7 +564,7 @@ final class Values {
      * @return the value
      */
     public static Value point(int srid, double x, double y) {
-        return value(new InternalPoint2D(srid, x, y));
+        return value(new InternalBoltPoint2D(srid, x, y));
     }
 
     /**
@@ -574,6 +587,6 @@ final class Values {
      * @return the value
      */
     public static Value point(int srid, double x, double y, double z) {
-        return value(new InternalPoint3D(srid, x, y, z));
+        return value(new InternalBoltPoint3D(srid, x, y, z));
     }
 }

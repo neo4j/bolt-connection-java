@@ -18,7 +18,7 @@ package org.neo4j.bolt.connection.test.values.impl;
 
 import org.neo4j.bolt.connection.values.Point;
 
-public record InternalPoint2D(int srid, double x, double y) implements Point {
+public record InternalBoltPoint2D(int srid, double x, double y) implements Point {
 
     @Override
     public double z() {
@@ -33,7 +33,7 @@ public record InternalPoint2D(int srid, double x, double y) implements Point {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var that = (InternalPoint2D) o;
+        var that = (InternalBoltPoint2D) o;
         return srid == that.srid && Double.compare(that.x, x) == 0 && Double.compare(that.y, y) == 0;
     }
 

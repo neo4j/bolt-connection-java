@@ -30,7 +30,7 @@ public class LocalTimeValue extends ObjectValueAdapter<LocalTime> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.LOCAL_TIME;
     }
 }

@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.handlers;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -48,7 +49,7 @@ public class ResetResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public final void onRecord(Value[] fields) {
+    public final void onRecord(List<Value> fields) {
         throw new UnsupportedOperationException();
     }
 

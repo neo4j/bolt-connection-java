@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Objects;
 import org.neo4j.bolt.connection.values.IsoDuration;
 
-public class InternalIsoDuration implements IsoDuration {
+public class InternalBoltIsoDuration implements IsoDuration {
     private static final long NANOS_PER_SECOND = 1_000_000_000;
     private static final List<TemporalUnit> SUPPORTED_UNITS = List.of(MONTHS, DAYS, SECONDS, NANOS);
 
@@ -37,19 +37,19 @@ public class InternalIsoDuration implements IsoDuration {
     private final long seconds;
     private final int nanoseconds;
 
-    public InternalIsoDuration(Period period) {
+    public InternalBoltIsoDuration(Period period) {
         this(period.toTotalMonths(), period.getDays(), Duration.ZERO);
     }
 
-    public InternalIsoDuration(Duration duration) {
+    public InternalBoltIsoDuration(Duration duration) {
         this(0, 0, duration);
     }
 
-    public InternalIsoDuration(long months, long days, long seconds, int nanoseconds) {
+    public InternalBoltIsoDuration(long months, long days, long seconds, int nanoseconds) {
         this(months, days, Duration.ofSeconds(seconds, nanoseconds));
     }
 
-    InternalIsoDuration(long months, long days, Duration duration) {
+    InternalBoltIsoDuration(long months, long days, Duration duration) {
         this.months = months;
         this.days = days;
         this.seconds = duration.getSeconds(); // normalized value of seconds
@@ -84,7 +84,7 @@ public class InternalIsoDuration implements IsoDuration {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var that = (InternalIsoDuration) o;
+        var that = (InternalBoltIsoDuration) o;
         return months == that.months && days == that.days && seconds == that.seconds && nanoseconds == that.nanoseconds;
     }
 

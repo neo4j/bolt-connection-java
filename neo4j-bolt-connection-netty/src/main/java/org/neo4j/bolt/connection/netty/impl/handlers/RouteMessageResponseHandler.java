@@ -18,7 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.handlers;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -32,18 +32,16 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  */
 public class RouteMessageResponseHandler implements ResponseHandler {
     private final CompletableFuture<Map<String, Value>> completableFuture;
-    private final ValueFactory valueFactory;
 
     public RouteMessageResponseHandler(
             final CompletableFuture<Map<String, Value>> completableFuture, ValueFactory valueFactory) {
         this.completableFuture = requireNonNull(completableFuture);
-        this.valueFactory = requireNonNull(valueFactory);
     }
 
     @Override
     public void onSuccess(Map<String, Value> metadata) {
         try {
-            completableFuture.complete(metadata.get("rt").asMap(valueFactory::value));
+            completableFuture.complete(metadata.get("rt").asBoltMap());
         } catch (Exception ex) {
             completableFuture.completeExceptionally(ex);
         }
@@ -55,9 +53,9 @@ public class RouteMessageResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
-        completableFuture.completeExceptionally(new UnsupportedOperationException(
-                "Route is not expected to receive records: " + Arrays.toString(fields)));
+    public void onRecord(List<Value> fields) {
+        completableFuture.completeExceptionally(
+                new UnsupportedOperationException("Route is not expected to receive records: " + fields));
     }
 
     @Override

@@ -307,7 +307,7 @@ public final class BoltConnectionImpl implements BoltConnection {
                 pullMessage.request(),
                 new PullMessageHandler() {
                     @Override
-                    public void onRecord(Value[] fields) {
+                    public void onRecord(List<Value> fields) {
                         handler.onRecord(fields);
                     }
 
@@ -626,7 +626,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         }
 
         @Override
-        public void onRecord(Value[] fields) {
+        public void onRecord(List<Value> fields) {
             if (!summariesFuture.isDone()) {
                 runIgnoringError(() -> delegate.onRecord(fields));
             }

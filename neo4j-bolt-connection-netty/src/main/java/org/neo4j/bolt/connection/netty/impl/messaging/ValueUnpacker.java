@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.netty.impl.messaging;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.neo4j.bolt.connection.values.Value;
 
@@ -28,5 +29,5 @@ public interface ValueUnpacker {
 
     Map<String, Value> unpackMap() throws IOException;
 
-    Value[] unpackArray() throws IOException;
+    List<Value> unpackList() throws IOException;
 }
