@@ -77,9 +77,9 @@ public class BoltProtocolV43 extends BoltProtocolV42 {
                     Set<BoltServerAddress> writers = new LinkedHashSet<>();
                     Set<BoltServerAddress> routers = new LinkedHashSet<>();
 
-                    for (var serversMap : map.get("servers").values()) {
-                        var role = serversMap.get("role").asString();
-                        for (var server : serversMap.get("addresses").values()) {
+                    for (var serversMap : map.get("servers").boltValues()) {
+                        var role = serversMap.getBoltValue("role").asString();
+                        for (var server : serversMap.getBoltValue("addresses").boltValues()) {
                             var address = new BoltServerAddress(server.asString());
                             switch (role) {
                                 case "WRITE" -> writers.add(address);

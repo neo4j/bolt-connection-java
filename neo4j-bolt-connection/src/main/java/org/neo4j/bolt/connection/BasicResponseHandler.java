@@ -37,7 +37,7 @@ import org.neo4j.bolt.connection.values.Value;
 
 public final class BasicResponseHandler implements ResponseHandler {
     private final CompletableFuture<Summaries> summariesFuture = new CompletableFuture<>();
-    private final List<Value[]> valuesList = new ArrayList<>();
+    private final List<List<Value>> valuesList = new ArrayList<>();
 
     private BeginSummary beginSummary;
     private RunSummary runSummary;
@@ -85,7 +85,7 @@ public final class BasicResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         valuesList.add(fields);
     }
 
@@ -164,7 +164,7 @@ public final class BasicResponseHandler implements ResponseHandler {
     public record Summaries(
             BeginSummary beginSummary,
             RunSummary runSummary,
-            List<Value[]> valuesList,
+            List<List<Value>> valuesList,
             PullSummary pullSummary,
             DiscardSummary discardSummary,
             CommitSummary commitSummary,

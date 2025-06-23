@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -78,7 +79,7 @@ class RouteMessageResponseHandlerTest {
         var completableFuture = new CompletableFuture<Map<String, Value>>();
         var responseHandler = new RouteMessageResponseHandler(completableFuture, valueFactory);
 
-        responseHandler.onRecord(new Value[0]);
+        responseHandler.onRecord(List.of());
 
         assertTrue(completableFuture.isCompletedExceptionally());
         completableFuture.handle((value, ex) -> {

@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.handlers;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.neo4j.bolt.connection.netty.impl.messaging.PullMessageHandler;
@@ -46,7 +47,7 @@ public class PullResponseHandlerImpl implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {
+    public void onRecord(List<Value> fields) {
         handler.onRecord(fields);
     }
 

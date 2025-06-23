@@ -85,7 +85,7 @@ public class CommonMessageReader implements MessageFormat.Reader {
     }
 
     private void unpackRecordMessage(ResponseMessageHandler output) throws IOException {
-        var fields = unpacker.unpackArray();
+        var fields = unpacker.unpackList();
         output.handleRecordMessage(fields);
     }
 }

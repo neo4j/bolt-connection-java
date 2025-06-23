@@ -82,7 +82,11 @@ public class CommonValuePacker implements ValuePacker {
 
     @Override
     public final void pack(Value value) throws IOException {
-        packInternalValue(value);
+        if (value != null) {
+            packInternalValue(value);
+        } else {
+            throw new IllegalArgumentException("Unable to pack: null");
+        }
     }
 
     @Override
@@ -99,7 +103,7 @@ public class CommonValuePacker implements ValuePacker {
     }
 
     protected void packInternalValue(Value value) throws IOException {
-        switch (value.type()) {
+        switch (value.boltValueType()) {
             case DATE -> packDate(value.asLocalDate());
             case TIME -> packTime(value.asOffsetTime());
             case LOCAL_TIME -> packLocalTime(value.asLocalTime());
@@ -111,8 +115,8 @@ public class CommonValuePacker implements ValuePacker {
                     packZonedDateTime(value.asZonedDateTime());
                 }
             }
-            case DURATION -> packDuration(value.asIsoDuration());
-            case POINT -> packPoint(value.asPoint());
+            case DURATION -> packDuration(value.asBoltIsoDuration());
+            case POINT -> packPoint(value.asBoltPoint());
             case NULL -> packer.packNull();
             case BYTES -> packer.pack(value.asByteArray());
             case STRING -> packer.pack(value.asString());
@@ -123,16 +127,17 @@ public class CommonValuePacker implements ValuePacker {
                 packer.packMapHeader(value.size());
                 for (var s : value.keys()) {
                     packer.pack(s);
-                    pack(value.get(s));
+                    pack(value.getBoltValue(s));
                 }
             }
             case LIST -> {
                 packer.packListHeader(value.size());
-                for (var item : value.values()) {
+                for (var item : value.boltValues()) {
                     pack(item);
                 }
             }
-            default -> throw new IOException("Unknown type: " + value.type().name());
+            default -> throw new IOException(
+                    "Unknown type: " + value.boltValueType().name());
         }
     }
 

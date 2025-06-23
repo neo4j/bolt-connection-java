@@ -39,7 +39,7 @@ public class MetadataExtractor {
         if (keysValue != null) {
             if (!keysValue.isEmpty()) {
                 List<String> keys = new ArrayList<>(keysValue.size());
-                for (var value : keysValue.values()) {
+                for (var value : keysValue.boltValues()) {
                     keys.add(value.asString());
                 }
 
@@ -81,7 +81,7 @@ public class MetadataExtractor {
     public static Set<String> extractBoltPatches(Map<String, Value> metadata) {
         var boltPatch = metadata.get("patch_bolt");
         if (boltPatch != null && !boltPatch.isNull()) {
-            return StreamSupport.stream(boltPatch.values().spliterator(), false)
+            return StreamSupport.stream(boltPatch.boltValues().spliterator(), false)
                     .map(Value::asString)
                     .collect(Collectors.toSet());
         } else {

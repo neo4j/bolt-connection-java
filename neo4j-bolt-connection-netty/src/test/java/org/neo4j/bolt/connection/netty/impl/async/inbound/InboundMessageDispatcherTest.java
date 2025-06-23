@@ -39,6 +39,7 @@ import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.Attribute;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import org.junit.jupiter.api.Test;
@@ -118,9 +119,9 @@ class InboundMessageDispatcherTest {
         dispatcher.enqueue(handler);
         assertEquals(1, dispatcher.queuedHandlersCount());
 
-        var fields1 = new Value[] {valueFactory.value(1)};
-        var fields2 = new Value[] {valueFactory.value(2)};
-        var fields3 = new Value[] {valueFactory.value(3)};
+        var fields1 = List.of(valueFactory.value(1));
+        var fields2 = List.of(valueFactory.value(2));
+        var fields3 = List.of(valueFactory.value(3));
 
         dispatcher.handleRecordMessage(fields1);
         dispatcher.handleRecordMessage(fields2);
@@ -182,7 +183,7 @@ class InboundMessageDispatcherTest {
 
         assertThrows(
                 IllegalStateException.class,
-                () -> dispatcher.handleRecordMessage(new Value[] {valueFactory.value(1), valueFactory.value(2)}));
+                () -> dispatcher.handleRecordMessage(List.of(valueFactory.value(1), valueFactory.value(2))));
     }
 
     @Test
@@ -294,7 +295,7 @@ class InboundMessageDispatcherTest {
                                 anyString());
             };
         } else if (RecordMessage.class.isAssignableFrom(message)) {
-            dispatcher.handleRecordMessage(new Value[0]);
+            dispatcher.handleRecordMessage(List.of());
             loggerVerification = () -> {
                 verify(logger).isLoggable(System.Logger.Level.DEBUG);
                 verify(logger).log(eq(System.Logger.Level.DEBUG), eq((ResourceBundle) null), anyString(), anyString());

@@ -35,7 +35,7 @@ public final class NullValue extends ValueAdapter {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.NULL;
     }
 

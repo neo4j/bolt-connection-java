@@ -30,7 +30,7 @@ public class DateTimeValue extends ObjectValueAdapter<ZonedDateTime> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.DATE_TIME;
     }
 }

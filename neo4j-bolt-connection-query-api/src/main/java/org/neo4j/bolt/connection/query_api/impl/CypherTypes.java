@@ -41,13 +41,13 @@ enum CypherTypes {
     List(
         Type.LIST,
         null, // manually handled in JSON converter
-        (v) -> v.values()
+        (v) -> v.boltValues()
     ),
 
     Map(
         Type.MAP,
         null, // manually handled in JSON converter
-        (v) -> v.asMap(Function.identity())
+        Value::asBoltMap
     ),
 
     Boolean(
@@ -124,7 +124,7 @@ enum CypherTypes {
     Duration(
         Type.DURATION,
         CypherTypes::parseDuration,
-        (v) -> v.asIsoDuration().toString()
+        (v) -> v.asBoltIsoDuration().toString()
     ),
 
     Point(
@@ -162,14 +162,14 @@ enum CypherTypes {
     }
 
     public static CypherTypes typeFromValue(Value value) {
-        var valueType = value.type();
+        var valueType = value.boltValueType();
         for (CypherTypes cypherType : values()) {
             if (cypherType.type == valueType) {
                 return cypherType;
             }
         }
 
-        throw new IllegalArgumentException("no Cypher type found representing " + value.type());
+        throw new IllegalArgumentException("no Cypher type found representing " + value.boltValueType());
     }
 
     /**
@@ -208,8 +208,8 @@ enum CypherTypes {
     }
 
     private static String writePoint(Value value) {
-        if (value.type() == Type.POINT) {
-            var point = value.asPoint();
+        if (value.boltValueType() == Type.POINT) {
+            var point = value.asBoltPoint();
             var srid = point.srid();
             String pointArguments;
             if (Double.isNaN(point.z())) {

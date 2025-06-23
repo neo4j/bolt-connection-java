@@ -16,7 +16,6 @@
  */
 package org.neo4j.bolt.connection.query_api.impl;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -209,6 +208,7 @@ abstract class AbstractQueryApi {
         assertEquals("Database name must be specified", boltException.getMessage());
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldRunAutocommitAndPullAll() {
         // given
@@ -241,7 +241,7 @@ abstract class AbstractQueryApi {
 
         // then
         var runSummaryCaptor = ArgumentCaptor.forClass(RunSummary.class);
-        var valuesCaptor = ArgumentCaptor.forClass(Value[].class);
+        var valuesCaptor = ArgumentCaptor.forClass(List.class);
         var pullSummaryCaptor = ArgumentCaptor.forClass(PullSummary.class);
         var responseHandlerInOrder = inOrder(responseHandler);
         responseHandlerInOrder.verify(responseHandler).onRunSummary(runSummaryCaptor.capture());
@@ -257,8 +257,8 @@ abstract class AbstractQueryApi {
         assertEquals(-1, runSummary.resultAvailableAfter());
         assertEquals(database(), runSummary.databaseName().orElse(null));
 
-        var values = valuesCaptor.getValue();
-        assertArrayEquals(new Value[] {TestValueFactory.INSTANCE.value(1L)}, values);
+        var values = (List<Value>) valuesCaptor.getValue();
+        assertEquals(List.of(TestValueFactory.INSTANCE.value(1L)), values);
 
         var pullSummary = pullSummaryCaptor.getValue();
         assertNotNull(pullSummary);
@@ -321,6 +321,7 @@ abstract class AbstractQueryApi {
         assertFalse(discardSummary.metadata().get("bookmark").isEmpty());
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldRunAutocommitAndPullAllLater() {
         // given
@@ -367,7 +368,7 @@ abstract class AbstractQueryApi {
                 .join();
 
         // then
-        var valuesCaptor = ArgumentCaptor.forClass(Value[].class);
+        var valuesCaptor = ArgumentCaptor.forClass(List.class);
         var pullSummaryCaptor = ArgumentCaptor.forClass(PullSummary.class);
         var responseHandlerInOrder = inOrder(responseHandler);
         responseHandlerInOrder.verify(responseHandler).onRecord(valuesCaptor.capture());
@@ -376,7 +377,7 @@ abstract class AbstractQueryApi {
         then(responseHandler).shouldHaveNoMoreInteractions();
 
         var values = valuesCaptor.getValue();
-        assertArrayEquals(new Value[] {TestValueFactory.INSTANCE.value(1L)}, values);
+        assertEquals(List.of(TestValueFactory.INSTANCE.value(1L)), values);
 
         var pullSummary = pullSummaryCaptor.getValue();
         assertNotNull(pullSummary);
@@ -425,6 +426,7 @@ abstract class AbstractQueryApi {
         assertEquals(database(), beginSummary.databaseName().orElse(null));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldBeginTransactionAndRunAndPull() {
         // given
@@ -458,7 +460,7 @@ abstract class AbstractQueryApi {
         // then
         var beginSummaryCaptor = ArgumentCaptor.forClass(BeginSummary.class);
         var runSummaryCaptor = ArgumentCaptor.forClass(RunSummary.class);
-        var valuesCaptor = ArgumentCaptor.forClass(Value[].class);
+        var valuesCaptor = ArgumentCaptor.forClass(List.class);
         var pullSummaryCaptor = ArgumentCaptor.forClass(PullSummary.class);
         var responseHandlerInOrder = inOrder(responseHandler);
         responseHandlerInOrder.verify(responseHandler).onBeginSummary(beginSummaryCaptor.capture());
@@ -480,7 +482,7 @@ abstract class AbstractQueryApi {
         assertEquals(database(), runSummary.databaseName().orElse(null));
 
         var values = valuesCaptor.getValue();
-        assertArrayEquals(new Value[] {TestValueFactory.INSTANCE.value(1L)}, values);
+        assertEquals(List.of(TestValueFactory.INSTANCE.value(1L)), values);
 
         var pullSummary = pullSummaryCaptor.getValue();
         assertNotNull(pullSummary);
@@ -489,6 +491,7 @@ abstract class AbstractQueryApi {
         assertFalse(pullSummary.metadata().containsKey("bookmark"));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldBeginTransactionAndRunAndPullAndCommit() {
         // given
@@ -523,7 +526,7 @@ abstract class AbstractQueryApi {
         // then
         var beginSummaryCaptor = ArgumentCaptor.forClass(BeginSummary.class);
         var runSummaryCaptor = ArgumentCaptor.forClass(RunSummary.class);
-        var valuesCaptor = ArgumentCaptor.forClass(Value[].class);
+        var valuesCaptor = ArgumentCaptor.forClass(List.class);
         var pullSummaryCaptor = ArgumentCaptor.forClass(PullSummary.class);
         var commitSummaryCaptor = ArgumentCaptor.forClass(CommitSummary.class);
         var responseHandlerInOrder = inOrder(responseHandler);
@@ -547,7 +550,7 @@ abstract class AbstractQueryApi {
         assertEquals(database(), runSummary.databaseName().orElse(null));
 
         var values = valuesCaptor.getValue();
-        assertArrayEquals(new Value[] {TestValueFactory.INSTANCE.value(1L)}, values);
+        assertEquals(List.of(TestValueFactory.INSTANCE.value(1L)), values);
 
         var pullSummary = pullSummaryCaptor.getValue();
         assertNotNull(pullSummary);
@@ -561,6 +564,7 @@ abstract class AbstractQueryApi {
         assertFalse(commitSummary.bookmark().get().isEmpty());
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void shouldBeginTransactionAndRunAndPullAndRollback() {
         // given
@@ -595,7 +599,7 @@ abstract class AbstractQueryApi {
         // then
         var beginSummaryCaptor = ArgumentCaptor.forClass(BeginSummary.class);
         var runSummaryCaptor = ArgumentCaptor.forClass(RunSummary.class);
-        var valuesCaptor = ArgumentCaptor.forClass(Value[].class);
+        var valuesCaptor = ArgumentCaptor.forClass(List.class);
         var pullSummaryCaptor = ArgumentCaptor.forClass(PullSummary.class);
         var rollbackSummaryCaptor = ArgumentCaptor.forClass(RollbackSummary.class);
         var responseHandlerInOrder = inOrder(responseHandler);
@@ -619,7 +623,7 @@ abstract class AbstractQueryApi {
         assertEquals(database(), runSummary.databaseName().orElse(null));
 
         var values = valuesCaptor.getValue();
-        assertArrayEquals(new Value[] {TestValueFactory.INSTANCE.value(1L)}, values);
+        assertEquals(List.of(TestValueFactory.INSTANCE.value(1L)), values);
 
         var pullSummary = pullSummaryCaptor.getValue();
         assertNotNull(pullSummary);

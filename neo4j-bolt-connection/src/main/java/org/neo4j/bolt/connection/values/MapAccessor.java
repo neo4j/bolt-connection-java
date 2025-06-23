@@ -16,19 +16,14 @@
  */
 package org.neo4j.bolt.connection.values;
 
-import java.util.Map;
-import java.util.function.Function;
-
 interface MapAccessor {
     Iterable<String> keys();
 
     int size();
 
-    Value get(String key);
+    Value getBoltValue(String key);
 
-    Iterable<Value> values();
+    Iterable<Value> boltValues();
 
     boolean containsKey(String key);
-
-    <T> Map<String, T> asMap(Function<Value, T> mapFunction);
 }

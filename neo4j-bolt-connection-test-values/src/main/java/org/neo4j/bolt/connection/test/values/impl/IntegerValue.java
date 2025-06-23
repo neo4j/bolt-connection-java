@@ -26,7 +26,7 @@ public class IntegerValue extends NumberValueAdapter<Long> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.INTEGER;
     }
 
@@ -44,7 +44,7 @@ public class IntegerValue extends NumberValueAdapter<Long> {
     public double asDouble() {
         var doubleVal = (double) val;
         if ((long) doubleVal != val) {
-            throw new LossyCoercion(type().name(), "Java double");
+            throw new LossyCoercion(boltValueType().name(), "Java double");
         }
 
         return (double) val;
