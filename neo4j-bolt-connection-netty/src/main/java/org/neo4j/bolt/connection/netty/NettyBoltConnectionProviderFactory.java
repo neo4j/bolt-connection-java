@@ -31,10 +31,10 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DefaultDomainNameResolver;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.netty.impl.BootstrapFactory;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 /**
@@ -77,7 +77,7 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
     public BoltConnectionProvider create(
             LoggingProvider loggingProvider,
             ValueFactory valueFactory,
-            MetricsListener metricsListener,
+            ObservationProvider observationProvider,
             Map<String, ?> additionalConfig) {
         var logger = loggingProvider.getLog(getClass());
 
@@ -107,8 +107,8 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 maxVersion,
                 loggingProvider,
                 valueFactory,
-                metricsListener,
-                shutdownEventLoopGroupOnClose);
+                shutdownEventLoopGroupOnClose,
+                observationProvider);
     }
 
     private EventLoopGroup createEventLoopGroup(System.Logger logger, Map<String, ?> additionalConfig) {

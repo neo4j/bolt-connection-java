@@ -16,4 +16,6 @@
  */
 package org.neo4j.bolt.connection.message;
 
-public sealed interface ResetMessage extends Message permits ResetMessageImpl {}
+public sealed interface ResetMessage extends Message permits ResetMessageImpl {
+    String NAME = "RESET";
+}

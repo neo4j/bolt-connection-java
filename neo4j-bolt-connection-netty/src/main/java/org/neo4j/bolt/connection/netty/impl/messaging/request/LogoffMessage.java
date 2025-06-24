@@ -16,10 +16,9 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
-public class LogoffMessage implements Message {
+public class LogoffMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x6B;
+    private static final String NAME = "LOGOFF";
 
     public static final LogoffMessage INSTANCE = new LogoffMessage();
 
@@ -31,7 +30,12 @@ public class LogoffMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "LOGOFF";
+        return NAME;
     }
 }

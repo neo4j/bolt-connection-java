@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v51;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.messageDispatcher;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.LogoffMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.LogonMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v5.BoltProtocolV5;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -57,7 +59,8 @@ public class BoltProtocolV51 extends BoltProtocolV5 {
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
         if (exception != null) {
             return CompletableFuture.failedStage(exception);
@@ -88,30 +91,50 @@ public class BoltProtocolV51 extends BoltProtocolV5 {
 
         var helloFuture = new CompletableFuture<String>();
         messageDispatcher(channel).enqueue(new HelloV51ResponseHandler(channel, helloFuture));
-        channel.write(message, channel.voidPromise());
+        channel.write(message).addListener((ChannelFutureListener) writeFuture -> {
+            if (writeFuture.isSuccess()) {
+                observation.onWrite(message.name());
+            }
+        });
 
         var logonFuture = new CompletableFuture<Void>();
         var logon = new LogonMessage(authMap, valueFactory);
         messageDispatcher(channel)
                 .enqueue(new LogonResponseHandler(logonFuture, channel, clock, latestAuthMillisFuture));
-        channel.writeAndFlush(logon, channel.voidPromise());
+        channel.writeAndFlush(logon).addListener((ChannelFutureListener) writeFuture -> {
+            if (writeFuture.isSuccess()) {
+                observation.onWrite(logon.name());
+            }
+        });
 
-        return helloFuture.thenCompose(ignored -> logonFuture).thenApply(ignored -> channel);
+        return helloFuture
+                .thenCompose(ignored -> {
+                    observation.onSummary(message.name());
+                    return logonFuture;
+                })
+                .thenApply(ignored -> {
+                    observation.onSummary(logon.name());
+                    return channel;
+                });
     }
 
     @Override
-    public CompletionStage<Void> logoff(Connection connection, MessageHandler<Void> handler) {
+    public CompletionStage<Void> logoff(
+            Connection connection, MessageHandler<Void> handler, BoltExchangeObservation observation) {
         var logoffMessage = LogoffMessage.INSTANCE;
         var logoffFuture = new CompletableFuture<Void>();
         logoffFuture.whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(logoffMessage.name());
                 handler.onSummary(null);
             }
         });
         var logoffHandler = new LogoffResponseHandler(logoffFuture);
-        return connection.write(logoffMessage, logoffHandler);
+        return connection
+                .write(logoffMessage, logoffHandler)
+                .thenAccept(message -> observation.onWrite(logoffMessage.name()));
     }
 
     @Override
@@ -120,18 +143,22 @@ public class BoltProtocolV51 extends BoltProtocolV5 {
             Map<String, Value> authMap,
             Clock clock,
             MessageHandler<Void> handler,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var logonMessage = new LogonMessage(authMap, valueFactory);
         var logonFuture = new CompletableFuture<Long>();
         logonFuture.whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(logonMessage.name());
                 handler.onSummary(null);
             }
         });
         var logonHandler = new LogonResponseHandler(logonFuture, null, clock, logonFuture);
-        return connection.write(logonMessage, logonHandler);
+        return connection
+                .write(logonMessage, logonHandler)
+                .thenAccept(message -> observation.onWrite(logonMessage.name()));
     }
 
     @Override

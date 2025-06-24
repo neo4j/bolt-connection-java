@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.ResponseHandler;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 final class LogoffMessageHandler implements MessageHandler<Void> {
     private final ResponseHandler handler;
@@ -29,7 +30,7 @@ final class LogoffMessageHandler implements MessageHandler<Void> {
     }
 
     @Override
-    public CompletionStage<Void> exchange() {
+    public CompletionStage<Void> exchange(ImmutableObservation parentObservation) {
         return CompletableFuture.<Void>completedStage(null).thenApply(ignored -> {
             handler.onLogoffSummary(LogoffSummaryImpl.INSTANCE);
             return null;

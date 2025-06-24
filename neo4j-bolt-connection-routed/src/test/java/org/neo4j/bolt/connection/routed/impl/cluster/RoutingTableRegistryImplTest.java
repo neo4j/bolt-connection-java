@@ -57,6 +57,7 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
+import org.neo4j.bolt.connection.observation.Observation;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
 import org.neo4j.bolt.connection.routed.impl.NoopLoggingProvider;
@@ -102,7 +103,8 @@ class RoutingTableRegistryImplTest {
 
         // When
         var database = database(databaseName);
-        routingTables.ensureRoutingTable(CompletableFuture.completedFuture(database), parameters);
+        routingTables.ensureRoutingTable(
+                CompletableFuture.completedFuture(database), parameters, mock(Observation.class));
 
         // Then
         assertTrue(map.containsKey(database));
@@ -125,12 +127,12 @@ class RoutingTableRegistryImplTest {
 
         // When
         var actual = routingTables
-                .ensureRoutingTable(CompletableFuture.completedFuture(database), parameters)
+                .ensureRoutingTable(CompletableFuture.completedFuture(database), parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join();
 
         // Then it is the one we put in map that is picked up.
-        verify(handler).ensureRoutingTable(parameters);
+        verify(handler).ensureRoutingTable(eq(parameters), any());
         // Then it is the one we put in map that is picked up.
         assertEquals(handler, actual);
     }
@@ -149,12 +151,13 @@ class RoutingTableRegistryImplTest {
 
         // When
         routingTables
-                .ensureRoutingTable(CompletableFuture.completedFuture(defaultDatabase()), parameters)
+                .ensureRoutingTable(
+                        CompletableFuture.completedFuture(defaultDatabase()), parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join();
 
         // Then
-        verify(handler).ensureRoutingTable(parameters);
+        verify(handler).ensureRoutingTable(eq(parameters), any());
     }
 
     @Test
@@ -248,7 +251,7 @@ class RoutingTableRegistryImplTest {
 
     private RoutingTableHandler mockedRoutingTableHandler() {
         var handler = Mockito.mock(RoutingTableHandler.class);
-        when(handler.ensureRoutingTable(any())).thenReturn(completedFuture(Mockito.mock(RoutingTable.class)));
+        when(handler.ensureRoutingTable(any(), any())).thenReturn(completedFuture(Mockito.mock(RoutingTable.class)));
         return handler;
     }
 }

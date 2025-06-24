@@ -66,6 +66,10 @@ import org.neo4j.bolt.connection.netty.impl.messaging.MessageHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.PullMessageHandler;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.Observation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.CommitSummary;
 import org.neo4j.bolt.connection.summary.DiscardSummary;
@@ -97,6 +101,7 @@ public final class BoltConnectionImpl implements BoltConnection {
     private final Queue<Message> messages;
     private final Clock clock;
     private final ValueFactory valueFactory;
+    private final ObservationProvider observationProvider;
 
     public BoltConnectionImpl(
             BoltProtocol protocol,
@@ -107,7 +112,8 @@ public final class BoltConnectionImpl implements BoltConnection {
             RoutingContext routingContext,
             Clock clock,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            ObservationProvider observationProvider) {
         this.protocol = Objects.requireNonNull(protocol);
         this.connection = Objects.requireNonNull(connection);
         this.eventLoop = Objects.requireNonNull(eventLoop);
@@ -126,14 +132,16 @@ public final class BoltConnectionImpl implements BoltConnection {
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
         this.log = this.logging.getLog(getClass());
+        this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
     @Override
-    public CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages) {
+    public CompletionStage<Void> writeAndFlush(
+            ResponseHandler handler, List<Message> messages, ImmutableObservation parentObservation) {
         var flushFuture = new CompletableFuture<Void>();
         return executeInEventLoop(() -> {
                     this.messages.addAll(messages);
-                    flush(handler, flushFuture);
+                    flush(handler, flushFuture, parentObservation);
                 })
                 .thenCompose(ignored -> flushFuture)
                 .handle((ignored, throwable) -> {
@@ -158,13 +166,20 @@ public final class BoltConnectionImpl implements BoltConnection {
         return executeInEventLoop(() -> this.messages.addAll(messages)).thenApply(ignored -> null);
     }
 
-    private void flush(ResponseHandler handler, CompletableFuture<Void> flushFuture) {
+    private void flush(
+            ResponseHandler handler, CompletableFuture<Void> flushFuture, ImmutableObservation parentObservation) {
         if (connection.isOpen()) {
             var flushStage = CompletableFuture.<Void>completedStage(null);
-            var responseHandler = new ResponseHandleImpl(handler, messages.size());
+            var observation = observationProvider.boltExchange(
+                    parentObservation,
+                    serverAddress.connectionHost(),
+                    serverAddress.port(),
+                    protocolVersion,
+                    (key, value) -> {});
+            var responseHandler = new ResponseHandleImpl(handler, messages.size(), observation);
 
             for (var message : messages) {
-                flushStage = flushStage.thenCompose(ignored -> writeMessage(responseHandler, message));
+                flushStage = flushStage.thenCompose(ignored -> writeMessage(responseHandler, message, observation));
             }
             messages.clear();
 
@@ -179,6 +194,8 @@ public final class BoltConnectionImpl implements BoltConnection {
                     } else {
                         flushFuture.completeExceptionally(throwable);
                     }
+                    observation.error(throwable);
+                    observation.stop();
                 } else {
                     flushFuture.complete(null);
                     log.log(System.Logger.Level.DEBUG, "flushed");
@@ -189,37 +206,39 @@ public final class BoltConnectionImpl implements BoltConnection {
         }
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, Message message) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, Message message, BoltExchangeObservation observation) {
         CompletionStage<Void> result;
         if (message instanceof RouteMessage routeMessage) {
-            result = writeMessage(handler, routeMessage);
+            result = writeMessage(handler, routeMessage, observation);
         } else if (message instanceof BeginMessage beginMessage) {
-            result = writeMessage(handler, beginMessage);
+            result = writeMessage(handler, beginMessage, observation);
         } else if (message instanceof RunMessage runMessage) {
-            result = writeMessage(handler, runMessage);
+            result = writeMessage(handler, runMessage, observation);
         } else if (message instanceof PullMessage pullMessage) {
-            result = writeMessage(handler, pullMessage);
+            result = writeMessage(handler, pullMessage, observation);
         } else if (message instanceof DiscardMessage discardMessage) {
-            result = writeMessage(handler, discardMessage);
+            result = writeMessage(handler, discardMessage, observation);
         } else if (message instanceof CommitMessage commitMessage) {
-            result = writeMessage(handler, commitMessage);
+            result = writeMessage(handler, commitMessage, observation);
         } else if (message instanceof RollbackMessage rollbackMessage) {
-            result = writeMessage(handler, rollbackMessage);
+            result = writeMessage(handler, rollbackMessage, observation);
         } else if (message instanceof ResetMessage resetMessage) {
-            result = writeMessage(handler, resetMessage);
+            result = writeMessage(handler, resetMessage, observation);
         } else if (message instanceof LogoffMessage logoffMessage) {
-            result = writeMessage(handler, logoffMessage);
+            result = writeMessage(handler, logoffMessage, observation);
         } else if (message instanceof LogonMessage logonMessage) {
-            result = writeMessage(handler, logonMessage);
+            result = writeMessage(handler, logonMessage, observation);
         } else if (message instanceof TelemetryMessage telemetryMessage) {
-            result = writeMessage(handler, telemetryMessage);
+            result = writeMessage(handler, telemetryMessage, observation);
         } else {
             result = CompletableFuture.failedStage(new BoltException("Unknown message type: " + message.getClass()));
         }
         return result;
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, RouteMessage routeMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, RouteMessage routeMessage, BoltExchangeObservation observation) {
         return protocol.route(
                 this.connection,
                 this.routingContext,
@@ -240,10 +259,12 @@ public final class BoltConnectionImpl implements BoltConnection {
                 },
                 clock,
                 logging,
-                valueFactory);
+                valueFactory,
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, BeginMessage beginMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, BeginMessage beginMessage, BoltExchangeObservation observation) {
         return protocol.beginTransaction(
                 this.connection,
                 DatabaseName.database(beginMessage.databaseName().orElse(null)),
@@ -270,23 +291,30 @@ public final class BoltConnectionImpl implements BoltConnection {
                     }
                 },
                 logging,
-                valueFactory);
+                valueFactory,
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, RunMessage runMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, RunMessage runMessage, BoltExchangeObservation observation) {
         if (runMessage.extra().isEmpty()) {
-            return protocol.run(connection, runMessage.query(), runMessage.parameters(), new MessageHandler<>() {
-                @Override
-                public void onError(Throwable throwable) {
-                    updateState(throwable);
-                    handler.onError(throwable);
-                }
+            return protocol.run(
+                    connection,
+                    runMessage.query(),
+                    runMessage.parameters(),
+                    new MessageHandler<>() {
+                        @Override
+                        public void onError(Throwable throwable) {
+                            updateState(throwable);
+                            handler.onError(throwable);
+                        }
 
-                @Override
-                public void onSummary(RunSummary summary) {
-                    handler.onRunSummary(summary);
-                }
-            });
+                        @Override
+                        public void onSummary(RunSummary summary) {
+                            handler.onRunSummary(summary);
+                        }
+                    },
+                    observation);
         } else {
             var extra = runMessage.extra().get();
             return protocol.runAuto(
@@ -313,11 +341,13 @@ public final class BoltConnectionImpl implements BoltConnection {
                         }
                     },
                     logging,
-                    valueFactory);
+                    valueFactory,
+                    observation);
         }
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, PullMessage pullMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, PullMessage pullMessage, BoltExchangeObservation observation) {
         return protocol.pull(
                 connection,
                 pullMessage.qid(),
@@ -339,10 +369,12 @@ public final class BoltConnectionImpl implements BoltConnection {
                         handler.onPullSummary(success);
                     }
                 },
-                valueFactory);
+                valueFactory,
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, DiscardMessage discardMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, DiscardMessage discardMessage, BoltExchangeObservation observation) {
         return protocol.discard(
                 this.connection,
                 discardMessage.qid(),
@@ -359,72 +391,90 @@ public final class BoltConnectionImpl implements BoltConnection {
                         handler.onDiscardSummary(summary);
                     }
                 },
-                valueFactory);
+                valueFactory,
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, CommitMessage commitMessage) {
-        return protocol.commitTransaction(connection, new MessageHandler<>() {
-            @Override
-            public void onError(Throwable throwable) {
-                updateState(throwable);
-                handler.onError(throwable);
-            }
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, CommitMessage commitMessage, BoltExchangeObservation observation) {
+        return protocol.commitTransaction(
+                connection,
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
 
-            @Override
-            public void onSummary(String bookmark) {
-                handler.onCommitSummary(() -> Optional.ofNullable(bookmark));
-            }
-        });
+                    @Override
+                    public void onSummary(String bookmark) {
+                        handler.onCommitSummary(() -> Optional.ofNullable(bookmark));
+                    }
+                },
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, RollbackMessage rollbackMessage) {
-        return protocol.rollbackTransaction(connection, new MessageHandler<>() {
-            @Override
-            public void onError(Throwable throwable) {
-                updateState(throwable);
-                handler.onError(throwable);
-            }
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, RollbackMessage rollbackMessage, BoltExchangeObservation observation) {
+        return protocol.rollbackTransaction(
+                connection,
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
 
-            @Override
-            public void onSummary(Void summary) {
-                handler.onRollbackSummary(RollbackSummaryImpl.INSTANCE);
-            }
-        });
+                    @Override
+                    public void onSummary(Void summary) {
+                        handler.onRollbackSummary(RollbackSummaryImpl.INSTANCE);
+                    }
+                },
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, ResetMessage resetMessage) {
-        return protocol.reset(connection, new MessageHandler<>() {
-            @Override
-            public void onError(Throwable throwable) {
-                updateState(throwable);
-                handler.onError(throwable);
-            }
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, ResetMessage resetMessage, BoltExchangeObservation observation) {
+        return protocol.reset(
+                connection,
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
 
-            @Override
-            public void onSummary(Void summary) {
-                stateRef.set(BoltConnectionState.OPEN);
-                handler.onResetSummary(null);
-            }
-        });
+                    @Override
+                    public void onSummary(Void summary) {
+                        stateRef.set(BoltConnectionState.OPEN);
+                        handler.onResetSummary(null);
+                    }
+                },
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, LogoffMessage logoffMessage) {
-        return protocol.logoff(connection, new MessageHandler<>() {
-            @Override
-            public void onError(Throwable throwable) {
-                updateState(throwable);
-                handler.onError(throwable);
-            }
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, LogoffMessage logoffMessage, BoltExchangeObservation observation) {
+        return protocol.logoff(
+                connection,
+                new MessageHandler<>() {
+                    @Override
+                    public void onError(Throwable throwable) {
+                        updateState(throwable);
+                        handler.onError(throwable);
+                    }
 
-            @Override
-            public void onSummary(Void summary) {
-                authDataRef.set(new CompletableFuture<>());
-                handler.onLogoffSummary(null);
-            }
-        });
+                    @Override
+                    public void onSummary(Void summary) {
+                        authDataRef.set(new CompletableFuture<>());
+                        handler.onLogoffSummary(null);
+                    }
+                },
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, LogonMessage logonMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, LogonMessage logonMessage, BoltExchangeObservation observation) {
         return protocol.logon(
                 connection,
                 logonMessage.authToken().asMap(),
@@ -442,25 +492,31 @@ public final class BoltConnectionImpl implements BoltConnection {
                         handler.onLogonSummary(null);
                     }
                 },
-                valueFactory);
+                valueFactory,
+                observation);
     }
 
-    private CompletionStage<Void> writeMessage(ResponseHandler handler, TelemetryMessage telemetryMessage) {
+    private CompletionStage<Void> writeMessage(
+            ResponseHandler handler, TelemetryMessage telemetryMessage, BoltExchangeObservation observation) {
         if (!telemetrySupported()) {
             return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("telemetry not supported"));
         } else {
-            return protocol.telemetry(connection, telemetryMessage.api().getValue(), new MessageHandler<>() {
-                @Override
-                public void onError(Throwable throwable) {
-                    updateState(throwable);
-                    handler.onError(throwable);
-                }
+            return protocol.telemetry(
+                    connection,
+                    telemetryMessage.api().getValue(),
+                    new MessageHandler<>() {
+                        @Override
+                        public void onError(Throwable throwable) {
+                            updateState(throwable);
+                            handler.onError(throwable);
+                        }
 
-                @Override
-                public void onSummary(Void summary) {
-                    handler.onTelemetrySummary(TelemetrySummaryImpl.INSTANCE);
-                }
-            });
+                        @Override
+                        public void onSummary(Void summary) {
+                            handler.onTelemetrySummary(TelemetrySummaryImpl.INSTANCE);
+                        }
+                    },
+                    observation);
         }
     }
 
@@ -602,10 +658,12 @@ public final class BoltConnectionImpl implements BoltConnection {
         private final ResponseHandler delegate;
         private final CompletableFuture<Void> summariesFuture = new CompletableFuture<>();
         private int expectedSummaries;
+        private final Observation observation;
 
-        private ResponseHandleImpl(ResponseHandler delegate, int expectedSummaries) {
+        private ResponseHandleImpl(ResponseHandler delegate, int expectedSummaries, Observation observation) {
             this.delegate = Objects.requireNonNull(delegate);
             this.expectedSummaries = expectedSummaries;
+            this.observation = Objects.requireNonNull(observation);
 
             summariesFuture.whenComplete((ignored1, ignored2) -> onComplete());
         }
@@ -614,6 +672,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         public void onError(Throwable throwable) {
             if (!(throwable instanceof MessageIgnoredException)) {
                 if (!summariesFuture.isDone()) {
+                    observation.error(throwable);
                     runIgnoringError(() -> delegate.onError(throwable));
                     if (!(throwable instanceof BoltException)
                             || throwable instanceof BoltServiceUnavailableException
@@ -733,6 +792,7 @@ public final class BoltConnectionImpl implements BoltConnection {
 
         @Override
         public void onComplete() {
+            observation.stop();
             runIgnoringError(delegate::onComplete);
         }
 

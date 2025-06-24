@@ -33,6 +33,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.MessageHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v42.BoltProtocolV42;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.summary.RouteSummary;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -62,7 +63,8 @@ public class BoltProtocolV43 extends BoltProtocolV42 {
             MessageHandler<RouteSummary> handler,
             Clock clock,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var routeMessage = new RouteMessage(routingContext, bookmarks, databaseName, impersonatedUser);
         var routeFuture = new CompletableFuture<Map<String, Value>>();
         routeFuture
@@ -102,11 +104,16 @@ public class BoltProtocolV43 extends BoltProtocolV42 {
                     if (throwable != null) {
                         handler.onError(throwable);
                     } else {
+                        observation.onSummary(routeMessage.name());
                         handler.onSummary(summary);
                     }
                 });
         var routeHandler = new RouteMessageResponseHandler(routeFuture, valueFactory);
-        return connection.write(routeMessage, routeHandler);
+        return connection.write(routeMessage, routeHandler).whenComplete((summary, throwable) -> {
+            if (throwable == null) {
+                observation.onWrite(routeMessage.name());
+            }
+        });
     }
 
     @Override

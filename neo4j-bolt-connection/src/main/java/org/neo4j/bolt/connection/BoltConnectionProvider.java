@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection;
 
 import java.net.URI;
 import java.util.concurrent.CompletionStage;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 /**
  * A Neo4j <a href="https://neo4j.com/docs/bolt/current/bolt">Bolt Protocol</a> connection provider.
@@ -26,6 +27,7 @@ import java.util.concurrent.CompletionStage;
  * <p>
  * Its intances are expected to be created using {@link BoltConnectionProviderFactory} that may be discovered using the
  * {@link java.util.ServiceLoader}.
+ *
  * @since 1.0.0
  */
 public interface BoltConnectionProvider {
@@ -44,6 +46,7 @@ public interface BoltConnectionProvider {
      * @param authToken             the {@link AuthToken}
      * @param minVersion            the minimum {@link BoltProtocolVersion}
      * @param notificationConfig    the {@link NotificationConfig}, this usually used in the Bolt {@code HELLO} message
+     * @param parentObservation     the parent {@link ImmutableObservation} that should be used as a parent for nested observations
      * @return the {@link BoltConnection} instance
      */
     CompletionStage<BoltConnection> connect(
@@ -55,10 +58,12 @@ public interface BoltConnectionProvider {
             SecurityPlan securityPlan,
             AuthToken authToken,
             BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig);
+            NotificationConfig notificationConfig,
+            ImmutableObservation parentObservation);
 
     /**
      * Closes the {@link BoltConnectionProvider} instance.
+     *
      * @return the close {@link CompletionStage}
      */
     CompletionStage<Void> close();

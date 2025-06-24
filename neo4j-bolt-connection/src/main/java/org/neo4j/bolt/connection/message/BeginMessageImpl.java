@@ -35,6 +35,7 @@ record BeginMessageImpl(
         Map<String, Value> txMetadata,
         NotificationConfig notificationConfig)
         implements BeginMessage {
+
     @Override
     public Optional<String> databaseName() {
         return Optional.ofNullable(rawDatabaseName);
@@ -48,5 +49,10 @@ record BeginMessageImpl(
     @Override
     public Optional<Duration> txTimeout() {
         return Optional.ofNullable(rawTxTimeout);
+    }
+
+    @Override
+    public String name() {
+        return NAME;
     }
 }

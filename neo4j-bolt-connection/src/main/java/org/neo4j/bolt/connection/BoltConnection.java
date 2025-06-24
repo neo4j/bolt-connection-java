@@ -21,13 +21,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.message.Message;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 public interface BoltConnection {
-    default CompletionStage<Void> writeAndFlush(ResponseHandler handler, Message messages) {
-        return writeAndFlush(handler, List.of(messages));
+    default CompletionStage<Void> writeAndFlush(
+            ResponseHandler handler, Message messages, ImmutableObservation parentObservation) {
+        return writeAndFlush(handler, List.of(messages), parentObservation);
     }
 
-    CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages);
+    CompletionStage<Void> writeAndFlush(
+            ResponseHandler handler, List<Message> messages, ImmutableObservation parentObservation);
 
     default CompletionStage<Void> write(Message messages) {
         return write(List.of(messages));

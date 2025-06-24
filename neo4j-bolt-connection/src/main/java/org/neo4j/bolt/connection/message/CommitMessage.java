@@ -16,4 +16,6 @@
  */
 package org.neo4j.bolt.connection.message;
 
-public sealed interface CommitMessage extends Message permits CommitMessageImpl {}
+public sealed interface CommitMessage extends Message permits CommitMessageImpl {
+    String NAME = "COMMIT";
+}

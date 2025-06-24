@@ -16,12 +16,11 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
-public class RollbackMessage implements Message {
+public class RollbackMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x13;
+    private static final String NAME = "ROLLBACK";
 
-    public static final Message ROLLBACK = new RollbackMessage();
+    public static final RollbackMessage ROLLBACK = new RollbackMessage();
 
     private RollbackMessage() {}
 
@@ -31,7 +30,12 @@ public class RollbackMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "ROLLBACK";
+        return NAME;
     }
 }

@@ -31,7 +31,7 @@ public class PullMessage extends AbstractStreamingMessage {
     }
 
     @Override
-    protected String name() {
+    public String name() {
         return "PULL";
     }
 

@@ -22,6 +22,7 @@ import java.time.Clock;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class ConnectionProviders {
@@ -32,8 +33,9 @@ public class ConnectionProviders {
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            ObservationProvider observationProvider) {
         return new NettyConnectionProvider(
-                group, clock, domainNameResolver, localAddress, maxVersion, logging, valueFactory);
+                group, clock, domainNameResolver, localAddress, maxVersion, logging, valueFactory, observationProvider);
     }
 }

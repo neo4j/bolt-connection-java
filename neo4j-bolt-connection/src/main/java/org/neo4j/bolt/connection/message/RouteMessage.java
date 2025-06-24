@@ -20,6 +20,8 @@ import java.util.Optional;
 import java.util.Set;
 
 public sealed interface RouteMessage extends Message permits RouteMessageImpl {
+    String NAME = "ROUTE";
+
     Optional<String> databaseName();
 
     Optional<String> impersonatedUser();

@@ -21,6 +21,8 @@ import java.util.Optional;
 import org.neo4j.bolt.connection.values.Value;
 
 public sealed interface RunMessage extends Message permits RunMessageImpl {
+    String NAME = "RUN";
+
     String query();
 
     Map<String, Value> parameters();

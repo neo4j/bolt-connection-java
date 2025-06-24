@@ -40,6 +40,7 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
 
@@ -95,7 +96,9 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
 
     @Override
     public CompletionStage<RoutingTableHandler> ensureRoutingTable(
-            CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters) {
+            CompletableFuture<DatabaseName> databaseNameFuture,
+            RoutedBoltConnectionParameters parameters,
+            ImmutableObservation parentObservation) {
         if (!databaseNameFuture.isDone()) {
             if (parameters.homeDatabaseHint() != null) {
                 var handler = routingTableHandlers.get(DatabaseName.database(parameters.homeDatabaseHint()));
@@ -104,17 +107,21 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
                 }
             }
         }
-        return ensureDatabaseNameIsCompleted(databaseNameFuture, parameters).thenCompose(ctxAndHandler -> {
-            var handler = ctxAndHandler.handler() != null
-                    ? ctxAndHandler.handler()
-                    : getOrCreate(FutureUtil.joinNowOrElseThrow(
-                            ctxAndHandler.databaseNameFuture(), PENDING_DATABASE_NAME_EXCEPTION_SUPPLIER));
-            return handler.ensureRoutingTable(parameters).thenApply(ignored -> handler);
-        });
+        return ensureDatabaseNameIsCompleted(databaseNameFuture, parameters, parentObservation)
+                .thenCompose(ctxAndHandler -> {
+                    var handler = ctxAndHandler.handler() != null
+                            ? ctxAndHandler.handler()
+                            : getOrCreate(FutureUtil.joinNowOrElseThrow(
+                                    ctxAndHandler.databaseNameFuture(), PENDING_DATABASE_NAME_EXCEPTION_SUPPLIER));
+                    return handler.ensureRoutingTable(parameters, parentObservation)
+                            .thenApply(ignored -> handler);
+                });
     }
 
     private CompletionStage<ConnectionContextAndHandler> ensureDatabaseNameIsCompleted(
-            CompletableFuture<DatabaseName> databaseNameFutureS, RoutedBoltConnectionParameters parameters) {
+            CompletableFuture<DatabaseName> databaseNameFutureS,
+            RoutedBoltConnectionParameters parameters,
+            ImmutableObservation parentObservation) {
         CompletionStage<ConnectionContextAndHandler> contextAndHandlerStage;
 
         if (databaseNameFutureS.isDone()) {
@@ -137,7 +144,8 @@ public class RoutingTableRegistryImpl implements RoutingTableRegistry {
 
                         var routingTable = new ClusterRoutingTable(DatabaseName.defaultDatabase(), clock);
                         rediscovery
-                                .lookupClusterComposition(routingTable, connectionSourceGetter, parameters)
+                                .lookupClusterComposition(
+                                        routingTable, connectionSourceGetter, parameters, parentObservation)
                                 .thenCompose(compositionLookupResult -> {
                                     var databaseName = DatabaseName.database(compositionLookupResult
                                             .getClusterComposition()

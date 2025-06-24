@@ -21,6 +21,7 @@ import static org.neo4j.bolt.connection.netty.impl.messaging.request.CommitMessa
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage.ROLLBACK;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Collections;
@@ -63,6 +64,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.ResetMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
 import org.neo4j.bolt.connection.netty.impl.util.MetadataExtractor;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.DiscardSummary;
 import org.neo4j.bolt.connection.summary.PullSummary;
@@ -97,7 +99,8 @@ public class BoltProtocolV3 implements BoltProtocol {
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
         if (exception != null) {
             return CompletableFuture.failedStage(exception);
@@ -129,8 +132,15 @@ public class BoltProtocolV3 implements BoltProtocol {
         var future = new CompletableFuture<String>();
         var handler = new HelloResponseHandler(future, channel, clock, latestAuthMillisFuture);
         messageDispatcher(channel).enqueue(handler);
-        channel.writeAndFlush(message, channel.voidPromise());
-        return future.thenApply(ignored -> channel);
+        channel.writeAndFlush(message).addListener((ChannelFutureListener) writeFuture -> {
+            if (writeFuture.isSuccess()) {
+                observation.onWrite(message.name());
+            }
+        });
+        return future.thenApply(ignored -> {
+            observation.onSummary(message.name());
+            return channel;
+        });
     }
 
     @SuppressWarnings("DuplicatedCode")
@@ -144,7 +154,8 @@ public class BoltProtocolV3 implements BoltProtocol {
             MessageHandler<RouteSummary> handler,
             Clock clock,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var query = new Query(GET_ROUTING_TABLE, Map.of(ROUTING_CONTEXT, valueFactory.value(routingContext)));
 
         var runMessage = RunWithMetadataMessage.autoCommitTxRunMessage(
@@ -165,7 +176,10 @@ public class BoltProtocolV3 implements BoltProtocol {
         var pullFuture = new CompletableFuture<Map<String, Value>>();
 
         runFuture
-                .thenCompose(ignored -> pullFuture)
+                .thenCompose(ignored -> {
+                    observation.onSummary(runMessage.name());
+                    return pullFuture;
+                })
                 .thenApply(map -> {
                     var ttl = map.get("ttl").asLong();
                     var expirationTimestamp = clock.millis() + ttl * 1000;
@@ -207,6 +221,7 @@ public class BoltProtocolV3 implements BoltProtocol {
                 });
 
         return connection.write(runMessage, runHandler).thenCompose(ignored -> {
+            observation.onWrite(runMessage.name());
             var pullMessage = PullAllMessage.PULL_ALL;
             var pullHandler = new PullResponseHandlerImpl(
                     new PullMessageHandler() {
@@ -214,6 +229,7 @@ public class BoltProtocolV3 implements BoltProtocol {
 
                         @Override
                         public void onRecord(List<Value> fields) {
+                            observation.onRecord();
                             if (routingTable == null) {
                                 var keys = runFuture.join().keys();
                                 routingTable = new HashMap<>(keys.size());
@@ -231,11 +247,14 @@ public class BoltProtocolV3 implements BoltProtocol {
 
                         @Override
                         public void onSummary(PullSummary success) {
+                            observation.onSummary(pullMessage.name());
                             pullFuture.complete(routingTable);
                         }
                     },
                     valueFactory);
-            return connection.write(pullMessage, pullHandler);
+            return connection
+                    .write(pullMessage, pullHandler)
+                    .thenAccept(message -> observation.onWrite(pullMessage.name()));
         });
     }
 
@@ -252,7 +271,8 @@ public class BoltProtocolV3 implements BoltProtocol {
             NotificationConfig notificationConfig,
             MessageHandler<BeginSummary> handler,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
         if (exception != null) {
             return CompletableFuture.failedStage(exception);
@@ -280,54 +300,70 @@ public class BoltProtocolV3 implements BoltProtocol {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(beginMessage.name());
                 handler.onSummary(summary);
             }
         });
-        return connection.write(beginMessage, new BeginTxResponseHandler(beginTxFuture));
+        return connection
+                .write(beginMessage, new BeginTxResponseHandler(beginTxFuture))
+                .thenAccept(message -> observation.onWrite(beginMessage.name()));
     }
 
     @Override
-    public CompletionStage<Void> commitTransaction(Connection connection, MessageHandler<String> handler) {
+    public CompletionStage<Void> commitTransaction(
+            Connection connection, MessageHandler<String> handler, BoltExchangeObservation observation) {
         var commitFuture = new CompletableFuture<String>();
         commitFuture.whenComplete((bookmark, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(COMMIT.name());
                 handler.onSummary(bookmark);
             }
         });
-        return connection.write(COMMIT, new CommitTxResponseHandler(commitFuture));
+        return connection
+                .write(COMMIT, new CommitTxResponseHandler(commitFuture))
+                .thenAccept(message -> observation.onWrite(COMMIT.name()));
     }
 
     @Override
-    public CompletionStage<Void> rollbackTransaction(Connection connection, MessageHandler<Void> handler) {
+    public CompletionStage<Void> rollbackTransaction(
+            Connection connection, MessageHandler<Void> handler, BoltExchangeObservation observation) {
         var rollbackFuture = new CompletableFuture<Void>();
         rollbackFuture.whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(ROLLBACK.name());
                 handler.onSummary(null);
             }
         });
-        return connection.write(ROLLBACK, new RollbackTxResponseHandler(rollbackFuture));
+        return connection
+                .write(ROLLBACK, new RollbackTxResponseHandler(rollbackFuture))
+                .thenAccept(message -> observation.onWrite(ROLLBACK.name()));
     }
 
     @Override
-    public CompletionStage<Void> reset(Connection connection, MessageHandler<Void> handler) {
+    public CompletionStage<Void> reset(
+            Connection connection, MessageHandler<Void> handler, BoltExchangeObservation observation) {
         var resetFuture = new CompletableFuture<Void>();
         resetFuture.whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(ResetMessage.RESET.name());
                 handler.onSummary(null);
             }
         });
         var resetHandler = new ResetResponseHandler(resetFuture);
-        return connection.write(ResetMessage.RESET, resetHandler);
+        return connection
+                .write(ResetMessage.RESET, resetHandler)
+                .thenAccept(message -> observation.onWrite(ResetMessage.RESET.name()));
     }
 
     @Override
-    public CompletionStage<Void> telemetry(Connection connection, Integer api, MessageHandler<Void> handler) {
+    public CompletionStage<Void> telemetry(
+            Connection connection, Integer api, MessageHandler<Void> handler, BoltExchangeObservation observation) {
         return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("telemetry not supported"));
     }
 
@@ -346,7 +382,8 @@ public class BoltProtocolV3 implements BoltProtocol {
             NotificationConfig notificationConfig,
             MessageHandler<RunSummary> handler,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         try {
             verifyDatabaseNameBeforeTransaction(databaseName);
         } catch (Exception error) {
@@ -371,36 +408,68 @@ public class BoltProtocolV3 implements BoltProtocol {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(runMessage.name());
                 handler.onSummary(summary);
             }
         });
         var runHandler = new RunResponseHandler(runFuture, METADATA_EXTRACTOR);
-        return connection.write(runMessage, runHandler);
+        return connection.write(runMessage, runHandler).thenAccept(message -> observation.onWrite(runMessage.name()));
     }
 
     @SuppressWarnings("DuplicatedCode")
     @Override
     public CompletionStage<Void> run(
-            Connection connection, String query, Map<String, Value> parameters, MessageHandler<RunSummary> handler) {
+            Connection connection,
+            String query,
+            Map<String, Value> parameters,
+            MessageHandler<RunSummary> handler,
+            BoltExchangeObservation observation) {
         var runMessage = RunWithMetadataMessage.unmanagedTxRunMessage(query, parameters);
         var runFuture = new CompletableFuture<RunSummary>();
         runFuture.whenComplete((summary, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(runMessage.name());
                 handler.onSummary(summary);
             }
         });
         var runHandler = new RunResponseHandler(runFuture, METADATA_EXTRACTOR);
-        return connection.write(runMessage, runHandler);
+        return connection.write(runMessage, runHandler).thenAccept(message -> observation.onWrite(runMessage.name()));
     }
 
     @Override
     public CompletionStage<Void> pull(
-            Connection connection, long qid, long request, PullMessageHandler handler, ValueFactory valueFactory) {
+            Connection connection,
+            long qid,
+            long request,
+            PullMessageHandler handler,
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var pullMessage = PullAllMessage.PULL_ALL;
-        var pullHandler = new PullResponseHandlerImpl(handler, valueFactory);
-        return connection.write(pullMessage, pullHandler);
+        var pullHandler = new PullResponseHandlerImpl(
+                new PullMessageHandler() {
+                    @Override
+                    public void onRecord(List<Value> fields) {
+                        observation.onRecord();
+                        handler.onRecord(fields);
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(PullSummary summary) {
+                        observation.onSummary(pullMessage.name());
+                        handler.onSummary(summary);
+                    }
+                },
+                valueFactory);
+        return connection
+                .write(pullMessage, pullHandler)
+                .thenAccept(message -> observation.onWrite(pullMessage.name()));
     }
 
     @Override
@@ -409,18 +478,22 @@ public class BoltProtocolV3 implements BoltProtocol {
             long qid,
             long number,
             MessageHandler<DiscardSummary> handler,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var discardMessage = new DiscardMessage(number, qid, valueFactory);
         var discardFuture = new CompletableFuture<DiscardSummary>();
         discardFuture.whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(discardMessage.name());
                 handler.onSummary(ignored);
             }
         });
         var discardHandler = new DiscardResponseHandler(discardFuture);
-        return connection.write(discardMessage, discardHandler);
+        return connection
+                .write(discardMessage, discardHandler)
+                .thenAccept(message -> observation.onWrite(discardMessage.name()));
     }
 
     protected void verifyDatabaseNameBeforeTransaction(DatabaseName databaseName) {

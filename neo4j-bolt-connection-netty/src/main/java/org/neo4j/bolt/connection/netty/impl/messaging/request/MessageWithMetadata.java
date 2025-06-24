@@ -19,11 +19,10 @@ package org.neo4j.bolt.connection.netty.impl.messaging.request;
 import java.util.Map;
 import org.neo4j.bolt.connection.NotificationClassification;
 import org.neo4j.bolt.connection.NotificationConfig;
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-abstract class MessageWithMetadata implements Message {
+abstract class MessageWithMetadata implements RequestMessage {
     static final String NOTIFICATIONS_MINIMUM_SEVERITY = "notifications_minimum_severity";
     static final String NOTIFICATIONS_DISABLED_CATEGORIES = "notifications_disabled_categories";
     static final String NOTIFICATIONS_DISABLED_CLASSIFICATIONS = "notifications_disabled_classifications";

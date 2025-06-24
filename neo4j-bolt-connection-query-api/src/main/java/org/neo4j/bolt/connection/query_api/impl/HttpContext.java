@@ -26,6 +26,17 @@ import org.neo4j.bolt.connection.exception.BoltClientException;
 public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String defaultDatabase, String userAgent) {
     // experimental
     private static final String DEFAULT_DATABASE_KEY_NAME = "defaultDatabase";
+    private static final String QUERY_URL_FORMAT = "%s/db/%s/query/v2";
+    public static final String QUERY_URL_TEMPLATE = QUERY_URL_FORMAT.formatted("", "{databaseName}");
+    private static final String TRANSACTION_BASE_URL_FORMAT = "%s/tx".formatted(QUERY_URL_FORMAT);
+    public static final String TRANSACTION_BASE_URL_TEMPLATE =
+            TRANSACTION_BASE_URL_FORMAT.formatted("", "{databaseName}");
+    private static final String TRANSACTION_QUERY_URL_FORMAT = "%s/%s".formatted(TRANSACTION_BASE_URL_FORMAT, "%s");
+    public static final String TRANSACTION_QUERY_URL_TEMPLATE =
+            TRANSACTION_QUERY_URL_FORMAT.formatted("", "{databaseName}", "{transactionId}");
+    private static final String TRANSACTION_COMMIT_URL_FORMAT = "%s/commit".formatted(TRANSACTION_QUERY_URL_FORMAT);
+    public static final String TRANSACTION_COMMIT_URL_TEMPLATE =
+            TRANSACTION_QUERY_URL_FORMAT.formatted("", "{databaseName}", "{transactionId}");
 
     public HttpContext {
         var path = baseUri.getPath();
@@ -79,18 +90,21 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String 
     }
 
     URI queryUrl(String databaseName) {
-        return URI.create("%s/db/%s/query/v2".formatted(baseUri, databaseName)).normalize();
+        return URI.create(QUERY_URL_FORMAT.formatted(baseUri, databaseName)).normalize();
     }
 
     URI txUrl(String databaseName) {
-        return URI.create("%s/tx".formatted(queryUrl(databaseName)));
+        return URI.create(TRANSACTION_BASE_URL_FORMAT.formatted(baseUri, databaseName))
+                .normalize();
     }
 
     URI txUrl(TransactionInfo tx) {
-        return URI.create("%s/%s".formatted(txUrl(tx.databaseName()), tx.id()));
+        return URI.create(TRANSACTION_QUERY_URL_FORMAT.formatted(baseUri, tx.databaseName(), tx.id()))
+                .normalize();
     }
 
     URI commitUrl(TransactionInfo tx) {
-        return URI.create("%s/commit".formatted(txUrl(tx)));
+        return URI.create(TRANSACTION_COMMIT_URL_FORMAT.formatted(baseUri, tx.databaseName(), tx.id()))
+                .normalize();
     }
 }

@@ -31,6 +31,11 @@ record RunMessageImpl(String query, Map<String, Value> parameters, RunMessage.Ex
         return Optional.ofNullable(rawExtra);
     }
 
+    @Override
+    public String name() {
+        return NAME;
+    }
+
     record Extra(
             String rawDatabaseName,
             AccessMode accessMode,

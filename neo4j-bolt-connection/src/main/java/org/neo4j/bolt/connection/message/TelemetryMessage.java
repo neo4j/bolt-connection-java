@@ -19,5 +19,7 @@ package org.neo4j.bolt.connection.message;
 import org.neo4j.bolt.connection.TelemetryApi;
 
 public sealed interface TelemetryMessage extends Message permits TelemetryMessageImpl {
+    String NAME = "TELEMETRY";
+
     TelemetryApi api();
 }

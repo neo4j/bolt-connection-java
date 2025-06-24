@@ -18,4 +18,9 @@ package org.neo4j.bolt.connection.message;
 
 import org.neo4j.bolt.connection.TelemetryApi;
 
-record TelemetryMessageImpl(TelemetryApi api) implements TelemetryMessage {}
+record TelemetryMessageImpl(TelemetryApi api) implements TelemetryMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

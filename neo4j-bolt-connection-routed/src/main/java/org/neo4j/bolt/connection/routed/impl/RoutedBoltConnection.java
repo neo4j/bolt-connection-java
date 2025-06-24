@@ -33,6 +33,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.message.Message;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.routed.RoutedBoltConnectionSource;
 import org.neo4j.bolt.connection.routed.impl.cluster.RoutingTableHandler;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
@@ -67,9 +68,12 @@ public class RoutedBoltConnection implements BoltConnection {
     }
 
     @Override
-    public CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages) {
+    public CompletionStage<Void> writeAndFlush(
+            ResponseHandler handler, List<Message> messages, ImmutableObservation parentObservation) {
         return delegate.writeAndFlush(
-                new RoutedResponseHandler(routingTableHandler, handler, accessMode, serverAddress()), messages);
+                new RoutedResponseHandler(routingTableHandler, handler, accessMode, serverAddress()),
+                messages,
+                parentObservation);
     }
 
     @Override

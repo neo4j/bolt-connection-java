@@ -16,4 +16,9 @@
  */
 package org.neo4j.bolt.connection.message;
 
-record ResetMessageImpl() implements ResetMessage {}
+record ResetMessageImpl() implements ResetMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

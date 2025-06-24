@@ -78,6 +78,7 @@ import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.message.RouteMessage;
+import org.neo4j.bolt.connection.observation.Observation;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
 import org.neo4j.bolt.connection.routed.impl.NoopLoggingProvider;
@@ -102,7 +103,7 @@ class RediscoveryTest {
         var table = routingTableMock(B);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -127,7 +128,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -157,7 +158,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable error = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         error = error.getCause();
@@ -188,7 +189,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -223,7 +224,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualError = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         actualError = actualError.getCause();
@@ -245,7 +246,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualError = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         actualError = actualError.getCause();
@@ -271,7 +272,7 @@ class RediscoveryTest {
         var table = routingTableMock(B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -300,7 +301,7 @@ class RediscoveryTest {
         var table = routingTableMock(B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -331,7 +332,7 @@ class RediscoveryTest {
         var table = routingTableMock(B, C);
 
         var actualComposition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -358,7 +359,7 @@ class RediscoveryTest {
         var table = routingTableMock();
 
         Throwable error = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         error = error.getCause();
@@ -383,7 +384,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         e = e.getCause();
@@ -412,7 +413,7 @@ class RediscoveryTest {
         table.update(noWritersComposition);
 
         var composition2 = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -433,7 +434,7 @@ class RediscoveryTest {
         var table = routingTableMock(true, B, C, D);
 
         var composition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -457,7 +458,7 @@ class RediscoveryTest {
         var table = routingTableMock(true, D, E);
 
         var composition = rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join()
                 .getClusterComposition();
@@ -480,7 +481,7 @@ class RediscoveryTest {
         var table = routingTableMock(A);
 
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         e = e.getCause();
@@ -524,7 +525,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         actualException = actualException.getCause();
@@ -551,7 +552,7 @@ class RediscoveryTest {
         var table = routingTableMock(A, B, C);
 
         Throwable actualException = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         actualException = actualException.getCause();
@@ -584,7 +585,7 @@ class RediscoveryTest {
 
         // WHEN & THEN
         Throwable e = assertThrows(CompletionException.class, () -> rediscovery
-                .lookupClusterComposition(table, connectionSourceGetter, parameters)
+                .lookupClusterComposition(table, connectionSourceGetter, parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         e = e.getCause();
@@ -627,7 +628,7 @@ class RediscoveryTest {
 
     private BoltConnection setupConnection(Object answer) {
         var boltConnection = mock(BoltConnection.class);
-        given(boltConnection.writeAndFlush(any(), any(RouteMessage.class)))
+        given(boltConnection.writeAndFlush(any(), any(RouteMessage.class), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArguments()[0];
 

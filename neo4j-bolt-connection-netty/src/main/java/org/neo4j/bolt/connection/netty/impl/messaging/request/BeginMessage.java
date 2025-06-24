@@ -31,6 +31,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class BeginMessage extends MessageWithMetadata {
     public static final byte SIGNATURE = 0x11;
+    private static final String NAME = "BEGIN";
 
     public BeginMessage(
             Set<String> bookmarks,
@@ -90,6 +91,11 @@ public class BeginMessage extends MessageWithMetadata {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -108,6 +114,6 @@ public class BeginMessage extends MessageWithMetadata {
 
     @Override
     public String toString() {
-        return "BEGIN " + metadata();
+        return NAME + " " + metadata();
     }
 }

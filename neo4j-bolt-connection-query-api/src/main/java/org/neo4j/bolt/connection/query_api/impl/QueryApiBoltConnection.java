@@ -59,6 +59,8 @@ import org.neo4j.bolt.connection.message.PullMessage;
 import org.neo4j.bolt.connection.message.ResetMessage;
 import org.neo4j.bolt.connection.message.RollbackMessage;
 import org.neo4j.bolt.connection.message.RunMessage;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class QueryApiBoltConnection implements BoltConnection {
@@ -76,6 +78,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private final String serverAgent;
     private final BoltProtocolVersion boltProtocolVersion;
     private final Clock clock;
+    private final ObservationProvider observationProvider;
 
     // synchronized
     private final List<Message> messages = new ArrayList<>();
@@ -96,7 +99,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
             String serverAgent,
             BoltProtocolVersion boltProtocolVersion,
             Clock clock,
-            LoggingProvider logging) {
+            LoggingProvider logging,
+            ObservationProvider observationProvider) {
         this.logging = logging;
         this.log = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
@@ -114,11 +118,13 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 .build();
         this.boltProtocolVersion = Objects.requireNonNull(boltProtocolVersion);
         this.clock = Objects.requireNonNull(clock);
+        this.observationProvider = Objects.requireNonNull(observationProvider);
         updateAuthHeader(authToken);
     }
 
     @Override
-    public CompletionStage<Void> writeAndFlush(ResponseHandler handler, List<Message> messages) {
+    public CompletionStage<Void> writeAndFlush(
+            ResponseHandler handler, List<Message> messages, ImmutableObservation parentObservation) {
         try {
             synchronized (this) {
                 assertValidStateForWrite();
@@ -127,7 +133,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 messagesToWrite.addAll(messages);
 
                 var messageHandlers = initMessageHandlers(handler, messagesToWrite);
-                var messageHandling = setupMessageHandling(handler, messageHandlers, execTail);
+                var messageHandling = setupMessageHandling(handler, messageHandlers, execTail, parentObservation);
                 execTail = execTail.thenCompose(ignored -> messageHandling);
             }
             return CompletableFuture.completedStage(null);
@@ -235,7 +241,14 @@ public final class QueryApiBoltConnection implements BoltConnection {
             if (message instanceof BeginMessage beginMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new BeginMessageHandler(
-                        handler, httpContext, this::authHeader, beginMessage, readTimeout, valueFactory, logging));
+                        handler,
+                        httpContext,
+                        this::authHeader,
+                        beginMessage,
+                        readTimeout,
+                        valueFactory,
+                        logging,
+                        observationProvider));
             } else if (message instanceof RunMessage runMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new RunMessageHandler(
@@ -246,7 +259,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                         this::getTransactionInfo,
                         readTimeout,
                         valueFactory,
-                        logging));
+                        logging,
+                        observationProvider));
             } else if (message instanceof PullMessage pullMessage) {
                 if (pullMessage.qid() != -1 && !qidToQuery.containsKey(pullMessage.qid())) {
                     throw new BoltClientException("Pull query does not contain query id: " + pullMessage.qid());
@@ -268,7 +282,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                         this::getTransactionInfo,
                         readTimeout,
                         valueFactory,
-                        logging));
+                        logging,
+                        observationProvider));
             } else if (message instanceof RollbackMessage) {
                 var httpContext = new HttpContext(httpClient, baseUri, json, userAgent);
                 messageHandlers.add(new RollbackMessageHandler(
@@ -278,7 +293,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                         this::getTransactionInfo,
                         readTimeout,
                         valueFactory,
-                        logging));
+                        logging,
+                        observationProvider));
             } else if (message instanceof ResetMessage) {
                 if (i > 0) {
                     throw new BoltClientException(
@@ -306,7 +322,10 @@ public final class QueryApiBoltConnection implements BoltConnection {
     }
 
     private synchronized CompletionStage<Void> setupMessageHandling(
-            ResponseHandler handler, List<MessageHandler<?>> messageHandlers, CompletionStage<Void> previousExecution) {
+            ResponseHandler handler,
+            List<MessageHandler<?>> messageHandlers,
+            CompletionStage<Void> previousExecution,
+            ImmutableObservation parentObservation) {
         var messageHandlingFuture = new CompletableFuture<Void>();
         var exchange = previousExecution.whenComplete((result, throwable) -> {});
         for (var i = 0; i < messageHandlers.size(); i++) {
@@ -327,14 +346,16 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 });
             }
             if (messageHandler instanceof BeginMessageHandler beginMessageHandler) {
-                exchange = appendMessageHandler(
-                        handler, exchange, () -> beginMessageHandler.exchange().thenApply(transactionInfo -> {
+                exchange = appendMessageHandler(handler, exchange, () -> beginMessageHandler
+                        .exchange(parentObservation)
+                        .thenApply(transactionInfo -> {
                             setTransactionInfo(transactionInfo);
                             return null;
                         }));
             } else if (messageHandler instanceof RunMessageHandler runMessageHandler) {
-                exchange = appendMessageHandler(
-                        handler, exchange, () -> runMessageHandler.exchange().thenApply(query -> {
+                exchange = appendMessageHandler(handler, exchange, () -> runMessageHandler
+                        .exchange(parentObservation)
+                        .thenApply(query -> {
                             synchronized (this) {
                                 addQuery(query.id(), query);
                                 addQuery(-1L, query);
@@ -342,8 +363,9 @@ public final class QueryApiBoltConnection implements BoltConnection {
                             return null;
                         }));
             } else if (messageHandler instanceof CommitMessageHandler commitMessageHandler) {
-                exchange = appendMessageHandler(
-                        handler, exchange, () -> commitMessageHandler.exchange().thenApply(ignored0 -> {
+                exchange = appendMessageHandler(handler, exchange, () -> commitMessageHandler
+                        .exchange(parentObservation)
+                        .thenApply(ignored0 -> {
                             synchronized (this) {
                                 setTransactionInfo(null);
                                 qidToQuery.clear();
@@ -352,7 +374,7 @@ public final class QueryApiBoltConnection implements BoltConnection {
                         }));
             } else if (messageHandler instanceof RollbackMessageHandler rollbackMessageHandler) {
                 exchange = appendMessageHandler(handler, exchange, () -> rollbackMessageHandler
-                        .exchange()
+                        .exchange(parentObservation)
                         .thenApply(transactionInfo -> {
                             synchronized (this) {
                                 setTransactionInfo(null);
@@ -361,8 +383,9 @@ public final class QueryApiBoltConnection implements BoltConnection {
                             return null;
                         }));
             } else {
-                exchange = appendMessageHandler(
-                        handler, exchange, () -> messageHandler.exchange().thenApply(ignored0 -> null));
+                exchange = appendMessageHandler(handler, exchange, () -> messageHandler
+                        .exchange(parentObservation)
+                        .thenApply(ignored0 -> null));
             }
         }
         exchange.whenComplete((ignored, throwable) -> {

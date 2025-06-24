@@ -32,6 +32,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class RunWithMetadataMessage extends MessageWithMetadata {
     public static final byte SIGNATURE = 0x10;
+    private static final String NAME = "RUN";
 
     private final String query;
     private final Map<String, Value> parameters;
@@ -88,6 +89,11 @@ public class RunWithMetadataMessage extends MessageWithMetadata {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -108,6 +114,6 @@ public class RunWithMetadataMessage extends MessageWithMetadata {
 
     @Override
     public String toString() {
-        return "RUN \"" + query + "\" " + parameters + " " + metadata();
+        return NAME + " \"" + query + "\" " + parameters + " " + metadata();
     }
 }

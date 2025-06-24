@@ -16,15 +16,14 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
 /**
  * PULL_ALL request message
  * <p>
  * Sent by clients to pull the entirety of the remaining stream down.
  */
-public class PullAllMessage implements Message {
+public class PullAllMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x3F;
+    private static final String NAME = "PULL_ALL";
 
     public static final PullAllMessage PULL_ALL = new PullAllMessage();
 
@@ -36,7 +35,12 @@ public class PullAllMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "PULL_ALL";
+        return NAME;
     }
 }

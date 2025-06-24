@@ -16,8 +16,6 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
 /**
  * RESET request message
  * <p>
@@ -32,8 +30,9 @@ import org.neo4j.bolt.connection.netty.impl.messaging.Message;
  * This message acts as a barrier after an error, informing the server that we've seen the error
  * message, and that messages that follow this one are safe to execute.
  */
-public class ResetMessage implements Message {
+public class ResetMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x0F;
+    private static final String NAME = "RESET";
 
     public static final ResetMessage RESET = new ResetMessage();
 
@@ -45,7 +44,12 @@ public class ResetMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "RESET";
+        return NAME;
     }
 }

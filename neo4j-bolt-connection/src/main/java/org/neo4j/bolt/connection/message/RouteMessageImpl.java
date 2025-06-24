@@ -30,4 +30,9 @@ record RouteMessageImpl(String rawDatabaseName, String rawImpersonatedUser, Set<
     public Optional<String> impersonatedUser() {
         return Optional.ofNullable(rawImpersonatedUser);
     }
+
+    @Override
+    public String name() {
+        return NAME;
+    }
 }

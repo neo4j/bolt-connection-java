@@ -40,6 +40,8 @@ import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
@@ -50,13 +52,16 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
     private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
     private final Executor httpExecutor;
     private final Clock clock;
+    private final ObservationProvider observationProvider;
 
-    public QueryApiBoltConnectionProvider(LoggingProvider logging, ValueFactory valueFactory, Clock clock) {
+    public QueryApiBoltConnectionProvider(
+            LoggingProvider logging, ValueFactory valueFactory, Clock clock, ObservationProvider observationProvider) {
         this.logging = Objects.requireNonNull(logging);
         this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         this.clock = Objects.requireNonNull(clock);
+        this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
     @SuppressWarnings("resource") // not AutoCloseable in Java 17
@@ -70,7 +75,8 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             SecurityPlan securityPlan,
             AuthToken authToken,
             BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig) {
+            NotificationConfig notificationConfig,
+            ImmutableObservation parentObservation) {
         if (minVersion != null && minVersion.compareTo(BOLT_PROTOCOL_VERSION) > 0) {
             return CompletableFuture.failedStage(
                     new MinVersionAcquisitionException("lower version", BOLT_PROTOCOL_VERSION));
@@ -118,7 +124,8 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                                     serverAgent,
                                     BOLT_PROTOCOL_VERSION,
                                     clock,
-                                    logging);
+                                    logging,
+                                    observationProvider);
                         } catch (IOException e) {
                             throw new BoltClientException(
                                     "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);

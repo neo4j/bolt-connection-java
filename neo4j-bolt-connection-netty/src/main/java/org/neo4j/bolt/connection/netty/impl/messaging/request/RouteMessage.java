@@ -21,7 +21,6 @@ import static java.util.Collections.unmodifiableMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.values.Value;
 
 /**
@@ -32,8 +31,9 @@ import org.neo4j.bolt.connection.values.Value;
  */
 public record RouteMessage(
         Map<String, Value> routingContext, Set<String> bookmarks, String databaseName, String impersonatedUser)
-        implements Message {
+        implements RequestMessage {
     public static final byte SIGNATURE = 0x66;
+    private static final String NAME = "ROUTE";
 
     /**
      * Constructor
@@ -57,8 +57,13 @@ public record RouteMessage(
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return String.format("ROUTE %s %s %s %s", routingContext, bookmarks, databaseName, impersonatedUser);
+        return String.format("%s %s %s %s %s", NAME, routingContext, bookmarks, databaseName, impersonatedUser);
     }
 
     @Override

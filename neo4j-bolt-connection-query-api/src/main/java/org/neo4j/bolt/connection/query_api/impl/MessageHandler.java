@@ -17,7 +17,8 @@
 package org.neo4j.bolt.connection.query_api.impl;
 
 import java.util.concurrent.CompletionStage;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 interface MessageHandler<T> {
-    CompletionStage<T> exchange();
+    CompletionStage<T> exchange(ImmutableObservation parentObservation);
 }

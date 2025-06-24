@@ -27,6 +27,7 @@ import java.util.function.Function;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.message.PullMessage;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.values.Value;
 
 final class PullMessageHandler implements MessageHandler<Void> {
@@ -50,7 +51,7 @@ final class PullMessageHandler implements MessageHandler<Void> {
     }
 
     @Override
-    public CompletionStage<Void> exchange() {
+    public CompletionStage<Void> exchange(ImmutableObservation parentObservation) {
         return CompletableFuture.<Void>completedStage(null).thenApply(ignored -> {
             var query = queryFinder.apply(message.qid());
             var records = new ArrayList<List<Value>>();

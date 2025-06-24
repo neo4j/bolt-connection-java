@@ -42,6 +42,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.PullMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.summary.PullSummary;
 import org.neo4j.bolt.connection.summary.RouteSummary;
 import org.neo4j.bolt.connection.summary.RunSummary;
@@ -72,7 +73,8 @@ public class BoltProtocolV4 extends BoltProtocolV3 {
             MessageHandler<RouteSummary> handler,
             Clock clock,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var query = new Query(
                 MULTI_DB_GET_ROUTING_TABLE,
                 Map.of(
@@ -99,7 +101,10 @@ public class BoltProtocolV4 extends BoltProtocolV3 {
         var pullFuture = new CompletableFuture<Map<String, Value>>();
 
         runFuture
-                .thenCompose(ignored -> pullFuture)
+                .thenCompose(ignored -> {
+                    observation.onSummary(runMessage.name());
+                    return pullFuture;
+                })
                 .thenApply(map -> {
                     var ttl = map.get("ttl").asLong();
                     var expirationTimestamp = clock.millis() + ttl * 1000;
@@ -141,6 +146,7 @@ public class BoltProtocolV4 extends BoltProtocolV3 {
                 });
 
         return connection.write(runMessage, runHandler).thenCompose(ignored -> {
+            observation.onWrite(runMessage.name());
             var pullMessage = new PullMessage(-1, -1, valueFactory);
             var pullHandler = new PullResponseHandlerImpl(
                     new PullMessageHandler() {
@@ -148,6 +154,7 @@ public class BoltProtocolV4 extends BoltProtocolV3 {
 
                         @Override
                         public void onRecord(List<Value> fields) {
+                            observation.onRecord();
                             if (routingTable == null) {
                                 var keys = runFuture.join().keys();
                                 routingTable = new HashMap<>(keys.size());
@@ -165,20 +172,49 @@ public class BoltProtocolV4 extends BoltProtocolV3 {
 
                         @Override
                         public void onSummary(PullSummary success) {
+                            observation.onSummary(pullMessage.name());
                             pullFuture.complete(routingTable);
                         }
                     },
                     valueFactory);
-            return connection.write(pullMessage, pullHandler);
+            return connection
+                    .write(pullMessage, pullHandler)
+                    .thenAccept(message -> observation.onWrite(pullMessage.name()));
         });
     }
 
     @Override
     public CompletionStage<Void> pull(
-            Connection connection, long qid, long request, PullMessageHandler handler, ValueFactory valueFactory) {
+            Connection connection,
+            long qid,
+            long request,
+            PullMessageHandler handler,
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var pullMessage = new PullMessage(request, qid, valueFactory);
-        var pullHandler = new PullResponseHandlerImpl(handler, valueFactory);
-        return connection.write(pullMessage, pullHandler);
+        var pullHandler = new PullResponseHandlerImpl(
+                new PullMessageHandler() {
+                    @Override
+                    public void onRecord(List<Value> fields) {
+                        observation.onRecord();
+                        handler.onRecord(fields);
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        handler.onError(throwable);
+                    }
+
+                    @Override
+                    public void onSummary(PullSummary summary) {
+                        observation.onSummary(pullMessage.name());
+                        handler.onSummary(summary);
+                    }
+                },
+                valueFactory);
+        return connection
+                .write(pullMessage, pullHandler)
+                .thenAccept(ignored -> observation.onWrite(pullMessage.name()));
     }
 
     @Override

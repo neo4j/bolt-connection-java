@@ -26,6 +26,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.MessageHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.TelemetryMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v53.BoltProtocolV53;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 
 public class BoltProtocolV54 extends BoltProtocolV53 {
     public static final BoltProtocolVersion VERSION = new BoltProtocolVersion(5, 4);
@@ -37,17 +38,21 @@ public class BoltProtocolV54 extends BoltProtocolV53 {
     }
 
     @Override
-    public CompletionStage<Void> telemetry(Connection connection, Integer api, MessageHandler<Void> handler) {
+    public CompletionStage<Void> telemetry(
+            Connection connection, Integer api, MessageHandler<Void> handler, BoltExchangeObservation observation) {
         var telemetry = new TelemetryMessage(api);
         var future = new CompletableFuture<Void>();
         future.whenComplete((ignored, throwable) -> {
             if (throwable != null) {
                 handler.onError(throwable);
             } else {
+                observation.onSummary(telemetry.name());
                 handler.onSummary(null);
             }
         });
-        return connection.write(telemetry, new TelemetryResponseHandler(future));
+        return connection
+                .write(telemetry, new TelemetryResponseHandler(future))
+                .thenAccept(ignored -> observation.onWrite(telemetry.name()));
     }
 
     @Override

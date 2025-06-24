@@ -21,10 +21,12 @@ import static org.neo4j.bolt.connection.query_api.impl.HttpUtil.mapToString;
 
 import com.fasterxml.jackson.jr.ob.JSON;
 import java.io.IOException;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
@@ -36,6 +38,9 @@ import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
+import org.neo4j.bolt.connection.observation.HttpExchangeObservation;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
@@ -44,19 +49,34 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
     private final JSON json;
     protected final ResponseHandler handler;
     protected final ValueFactory valueFactory;
+    private final ObservationProvider observationProvider;
 
     AbstractMessageHandler(
-            HttpContext httpContext, ResponseHandler handler, ValueFactory valueFactory, LoggingProvider logging) {
+            HttpContext httpContext,
+            ResponseHandler handler,
+            ValueFactory valueFactory,
+            LoggingProvider logging,
+            ObservationProvider observationProvider) {
         this.log = logging.getLog(getClass());
         this.httpClient = Objects.requireNonNull(httpContext.httpClient());
         this.json = Objects.requireNonNull(httpContext.json());
         this.handler = Objects.requireNonNull(handler);
         this.valueFactory = Objects.requireNonNull(valueFactory);
+        this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
     @Override
-    public CompletionStage<T> exchange() {
-        var request = newHttpRequest();
+    public CompletionStage<T> exchange(ImmutableObservation parentObservation) {
+        var builder = HttpRequest.newBuilder();
+        var observationParameters = newHttpRequestBuilder(builder);
+        var observation = observationProvider.httpExchange(
+                parentObservation,
+                observationParameters.uri(),
+                observationParameters.method(),
+                observationParameters.uriTemplate(),
+                builder::header);
+        var request = builder.build();
+        observation.onHeaders(request.headers().map());
         log.log(System.Logger.Level.DEBUG, "Sending request %s".formatted(mapToString(request)));
         return httpClient
                 .sendAsync(request, HttpResponse.BodyHandlers.ofString())
@@ -66,6 +86,8 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                                 System.Logger.Level.DEBUG,
                                 "An error occurred while sending request %s".formatted(throwable.getMessage()));
                         throwable = completionExceptionCause(throwable);
+                        observation.error(throwable);
+                        observation.stop();
                         if (throwable instanceof HttpTimeoutException) {
                             throw new BoltConnectionReadTimeoutException("Read timedout has been exceeded", throwable);
                         } else if (throwable instanceof IOException) {
@@ -75,6 +97,14 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                             throw new BoltException("An error occurred while sending request", throwable);
                         }
                     } else {
+                        observation.onResponse(new Response(
+                                response.statusCode(),
+                                response.headers().map(),
+                                switch (response.version()) {
+                                    case HTTP_1_1 -> "1.1";
+                                    case HTTP_2 -> "2";
+                                }));
+                        observation.stop();
                         log.log(System.Logger.Level.DEBUG, "Received response %s".formatted(mapToString(response)));
                         return switch (response.statusCode()) {
                             case 200, 202 -> {
@@ -103,7 +133,7 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                 });
     }
 
-    protected abstract HttpRequest newHttpRequest();
+    protected abstract ObservationParameters newHttpRequestBuilder(HttpRequest.Builder builder);
 
     protected abstract T handleResponse(HttpResponse<String> response);
 
@@ -126,4 +156,9 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
             throw new BoltClientException("Cannot parse %s to ErrorsData".formatted(response.body()), e);
         }
     }
+
+    protected record ObservationParameters(URI uri, String method, String uriTemplate, String[] headers) {}
+
+    protected record Response(int statusCode, Map<String, List<String>> headers, String httpVersion)
+            implements HttpExchangeObservation.Response {}
 }

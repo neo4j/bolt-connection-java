@@ -27,4 +27,11 @@ public sealed interface Message
                 RollbackMessage,
                 RouteMessage,
                 RunMessage,
-                TelemetryMessage {}
+                TelemetryMessage {
+    /**
+     * Returns message name.
+     * @since 7.0.0
+     * @return the message name
+     */
+    String name();
+}
