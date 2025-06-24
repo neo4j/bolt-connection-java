@@ -38,7 +38,6 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.netty.impl.async.NetworkConnection;
@@ -91,8 +90,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             String userAgent,
             int connectTimeoutMillis,
             CompletableFuture<Long> latestAuthMillisFuture,
-            NotificationConfig notificationConfig,
-            MetricsListener metricsListener) {
+            NotificationConfig notificationConfig) {
         var bootstrap = new Bootstrap();
         bootstrap
                 .group(this.eventLoopGroup)

@@ -32,6 +32,7 @@ import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.Message;
 import org.neo4j.bolt.connection.message.Messages;
+import org.neo4j.bolt.connection.observation.Observation;
 import org.neo4j.bolt.connection.pooled.PooledBoltConnectionSource;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.CommitSummary;
@@ -51,17 +52,20 @@ public class PooledBoltConnection implements BoltConnection {
     private final PooledBoltConnectionSource source;
     private final Runnable releaseRunnable;
     private final Runnable purgeRunnable;
+    private final Observation inUseObservation;
     private CompletableFuture<Void> closeFuture;
 
     public PooledBoltConnection(
             BoltConnection delegate,
             PooledBoltConnectionSource source,
             Runnable releaseRunnable,
-            Runnable purgeRunnable) {
+            Runnable purgeRunnable,
+            Observation inUseObservation) {
         this.delegate = Objects.requireNonNull(delegate);
         this.source = Objects.requireNonNull(source);
         this.releaseRunnable = Objects.requireNonNull(releaseRunnable);
         this.purgeRunnable = Objects.requireNonNull(purgeRunnable);
+        this.inUseObservation = Objects.requireNonNull(inUseObservation);
     }
 
     @Override
@@ -100,10 +104,12 @@ public class PooledBoltConnection implements BoltConnection {
 
         if (close) {
             if (delegate.state() == BoltConnectionState.CLOSED) {
+                inUseObservation.stop();
                 purgeRunnable.run();
                 closeFuture.complete(null);
                 return closeFuture;
             } else if (delegate.state() == BoltConnectionState.ERROR) {
+                inUseObservation.stop();
                 purgeRunnable.run();
                 closeFuture.complete(null);
                 return closeFuture;
@@ -113,11 +119,11 @@ public class PooledBoltConnection implements BoltConnection {
             delegate.writeAndFlush(resetHandler, Messages.reset())
                     .thenCompose(ignored -> resetHandler.summaries())
                     .whenComplete((ignored, throwable) -> {
+                        inUseObservation.stop();
                         if (throwable != null) {
-                            delegate.close().whenComplete((closeResult, closeThrowable) -> purgeRunnable.run());
+                            purgeRunnable.run();
                         } else {
-                            CompletableFuture.<Void>completedStage(null)
-                                    .whenComplete((ignoredResult, nothing) -> releaseRunnable.run());
+                            releaseRunnable.run();
                         }
                         closeFuture.complete(null);
                     });
@@ -174,6 +180,10 @@ public class PooledBoltConnection implements BoltConnection {
     // internal use only
     public BoltConnection delegate() {
         return delegate;
+    }
+
+    public void onUsageStart() {
+        inUseObservation.start();
     }
 
     private record PooledResponseHandler(PooledBoltConnectionSource provider, ResponseHandler handler)

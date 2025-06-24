@@ -19,6 +19,7 @@
  */
 module org.neo4j.bolt.connection.pooled {
     exports org.neo4j.bolt.connection.pooled;
+    exports org.neo4j.bolt.connection.pooled.observation;
 
     requires transitive org.neo4j.bolt.connection;
 }

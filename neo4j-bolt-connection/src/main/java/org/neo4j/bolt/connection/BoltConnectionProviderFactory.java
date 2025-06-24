@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection;
 
 import java.util.Map;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 /**
@@ -38,7 +39,7 @@ public interface BoltConnectionProviderFactory {
      * Creates a new {@link BoltConnectionProvider} instance.
      * @param loggingProvider the {@link LoggingProvider} that should be used for logging
      * @param valueFactory the {@link ValueFactory} that should be used for value management
-     * @param metricsListener the {@link MetricsListener} that should be used for metrics
+     * @param observationProvider the {@link ObservationProvider} that should be used for observations
      * @param additionalConfig the additional config with arbitrary values that may be used by factories that recognise
      *                         them
      * @return the new {@link BoltConnectionProvider} instance
@@ -46,7 +47,7 @@ public interface BoltConnectionProviderFactory {
     BoltConnectionProvider create(
             LoggingProvider loggingProvider,
             ValueFactory valueFactory,
-            MetricsListener metricsListener,
+            ObservationProvider observationProvider,
             Map<String, ?> additionalConfig);
 
     /**
