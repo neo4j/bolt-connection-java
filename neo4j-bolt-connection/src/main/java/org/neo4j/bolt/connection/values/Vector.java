@@ -16,26 +16,21 @@
  */
 package org.neo4j.bolt.connection.values;
 
-public enum Type {
-    ANY,
-    BOOLEAN,
-    BYTES,
-    STRING,
-    NUMBER,
-    INTEGER,
-    FLOAT,
-    LIST,
-    MAP,
-    NODE,
-    RELATIONSHIP,
-    PATH,
-    POINT,
-    DATE,
-    TIME,
-    LOCAL_TIME,
-    LOCAL_DATE_TIME,
-    DATE_TIME,
-    DURATION,
-    VECTOR,
-    NULL
+/**
+ * Represents Neo4j Vector type.
+ *
+ * @since 6.0.0
+ */
+public interface Vector {
+    /**
+     * Vector element type.
+     * @return the element type
+     */
+    Class<?> elementType();
+
+    /**
+     * Vector elements as an array.
+     * @return the array of vector elements
+     */
+    Object elements();
 }

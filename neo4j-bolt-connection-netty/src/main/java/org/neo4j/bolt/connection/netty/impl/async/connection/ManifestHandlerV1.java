@@ -25,6 +25,7 @@ import io.netty.channel.Channel;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.netty.impl.logging.ChannelActivityLogger;
@@ -34,13 +35,15 @@ final class ManifestHandlerV1 implements ManifestHandler {
     private final ChannelActivityLogger log;
     private final Channel channel;
     private final VarLongBuilder expectedVersionRangesBuilder = new VarLongBuilder();
+    private final BoltProtocolVersion maxVersion;
 
     private long expectedVersionRanges = -1L;
     private Set<BoltProtocolMinorVersionRange> serverSupportedVersionRanges;
 
-    public ManifestHandlerV1(Channel channel, LoggingProvider logging) {
+    public ManifestHandlerV1(Channel channel, BoltProtocolVersion maxVersion, LoggingProvider logging) {
         this.channel = Objects.requireNonNull(channel);
         log = new ChannelActivityLogger(channel, logging, getClass());
+        this.maxVersion = maxVersion;
     }
 
     @Override
@@ -107,6 +110,9 @@ final class ManifestHandlerV1 implements ManifestHandler {
     private BoltProtocol findSupportedBoltProtocol() {
         for (var entry : BoltProtocolUtil.versionToProtocol.entrySet()) {
             var version = entry.getKey();
+            if (maxVersion != null && version.compareTo(maxVersion) > 0) {
+                continue;
+            }
             for (var range : serverSupportedVersionRanges) {
                 if (range.contains(version)) {
                     var protocol = entry.getValue();

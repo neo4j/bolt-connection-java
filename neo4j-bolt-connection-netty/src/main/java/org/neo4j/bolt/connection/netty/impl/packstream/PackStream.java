@@ -88,6 +88,7 @@ public class PackStream {
     public static final byte TINY_STRUCT = (byte) 0xB0;
     public static final byte NULL = (byte) 0xC0;
     public static final byte FLOAT_64 = (byte) 0xC1;
+    public static final byte FLOAT_32 = (byte) 0xC6;
     public static final byte FALSE = (byte) 0xC2;
     public static final byte TRUE = (byte) 0xC3;
 
@@ -96,9 +97,6 @@ public class PackStream {
 
     @SuppressWarnings("unused")
     public static final byte RESERVED_C5 = (byte) 0xC5;
-
-    @SuppressWarnings("unused")
-    public static final byte RESERVED_C6 = (byte) 0xC6;
 
     @SuppressWarnings("unused")
     public static final byte RESERVED_C7 = (byte) 0xC7;
@@ -394,6 +392,30 @@ public class PackStream {
                 throw new Overflow("Structures cannot have more than " + (PLUS_2_TO_THE_16 - 1) + " fields");
             }
         }
+
+        public void packRaw(long value) throws IOException {
+            out.writeLong(value);
+        }
+
+        public void packRaw(int value) throws IOException {
+            out.writeInt(value);
+        }
+
+        public void packRaw(short value) throws IOException {
+            out.writeShort(value);
+        }
+
+        public void packRaw(byte value) throws IOException {
+            out.writeByte(value);
+        }
+
+        public void packRaw(double value) throws IOException {
+            out.writeDouble(value);
+        }
+
+        public void packRaw(float value) throws IOException {
+            out.writeFloat(value);
+        }
     }
 
     public static class Unpacker {
@@ -476,25 +498,25 @@ public class PackStream {
             throw new Unexpected("Expected a double, but got: " + toHexString(markerByte));
         }
 
-        public byte[] unpackBytes() throws IOException {
-            final var markerByte = in.readByte();
-            switch (markerByte) {
-                case BYTES_8 -> {
-                    return unpackRawBytes(unpackUINT8());
-                }
-                case BYTES_16 -> {
-                    return unpackRawBytes(unpackUINT16());
-                }
+        public int unpackBytesSize() throws IOException {
+            var markerByte = in.readByte();
+            return switch (markerByte) {
+                case BYTES_8 -> unpackUINT8();
+                case BYTES_16 -> unpackUINT16();
                 case BYTES_32 -> {
                     var size = unpackUINT32();
                     if (size <= Integer.MAX_VALUE) {
-                        return unpackRawBytes((int) size);
+                        yield (int) size;
                     } else {
                         throw new Overflow("BYTES_32 too long for Java");
                     }
                 }
                 default -> throw new Unexpected("Expected bytes, but got: 0x" + toHexString(markerByte & 0xFF));
-            }
+            };
+        }
+
+        public byte[] unpackBytes() throws IOException {
+            return unpackRawBytes(unpackBytesSize());
         }
 
         public String unpackString() throws IOException {
@@ -600,6 +622,30 @@ public class PackStream {
                     default -> PackType.INTEGER;
                 };
             };
+        }
+
+        public long unpackRawLong() throws IOException {
+            return in.readLong();
+        }
+
+        public int unpackRawInt() throws IOException {
+            return in.readInt();
+        }
+
+        public short unpackRawShort() throws IOException {
+            return in.readShort();
+        }
+
+        public byte unpackRawByte() throws IOException {
+            return in.readByte();
+        }
+
+        public double unpackRawDouble() throws IOException {
+            return in.readDouble();
+        }
+
+        public float unpackRawFloat() throws IOException {
+            return in.readFloat();
         }
     }
 

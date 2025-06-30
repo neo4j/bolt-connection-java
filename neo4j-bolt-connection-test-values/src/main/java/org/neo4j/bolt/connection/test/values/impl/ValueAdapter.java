@@ -31,6 +31,7 @@ import org.neo4j.bolt.connection.test.values.TestValue;
 import org.neo4j.bolt.connection.values.IsoDuration;
 import org.neo4j.bolt.connection.values.Point;
 import org.neo4j.bolt.connection.values.Value;
+import org.neo4j.bolt.connection.values.Vector;
 
 public abstract class ValueAdapter extends InternalMapAccessorWithDefaultValue implements TestValue {
     @Override
@@ -151,6 +152,11 @@ public abstract class ValueAdapter extends InternalMapAccessorWithDefaultValue i
     @Override
     public TestPath asPath() {
         throw new Uncoercible(boltValueType().name(), "Path");
+    }
+
+    @Override
+    public Vector asBoltVector() {
+        throw new Uncoercible(boltValueType().name(), "Vector");
     }
 
     // Force implementation

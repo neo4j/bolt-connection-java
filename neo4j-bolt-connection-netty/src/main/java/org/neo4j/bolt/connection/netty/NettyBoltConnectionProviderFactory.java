@@ -27,6 +27,7 @@ import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltConnectionProviderFactory;
 import org.neo4j.bolt.connection.BoltConnectionSource;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DefaultDomainNameResolver;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
@@ -96,12 +97,14 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 DomainNameResolver.class,
                 DefaultDomainNameResolver::getInstance);
         var localAddress = getConfigEntry(logger, additionalConfig, "localAddress", LocalAddress.class, () -> null);
+        var maxVersion = getConfigEntry(logger, additionalConfig, "maxVersion", BoltProtocolVersion.class, () -> null);
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
                 clock,
                 domainNameResolver,
                 localAddress,
+                maxVersion,
                 loggingProvider,
                 valueFactory,
                 metricsListener,

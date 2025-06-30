@@ -25,6 +25,7 @@ import io.netty.channel.ChannelFutureListener;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
@@ -35,6 +36,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
     private final BoltServerAddress address;
     private final ChannelPipelineBuilder pipelineBuilder;
     private final CompletableFuture<Channel> handshakeCompletedFuture;
+    private final BoltProtocolVersion maxVersion;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
 
@@ -42,11 +44,13 @@ public class ChannelConnectedListener implements ChannelFutureListener {
             BoltServerAddress address,
             ChannelPipelineBuilder pipelineBuilder,
             CompletableFuture<Channel> handshakeCompletedFuture,
+            BoltProtocolVersion maxVersion,
             LoggingProvider logging,
             ValueFactory valueFactory) {
         this.address = address;
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
+        this.maxVersion = maxVersion;
         this.logging = logging;
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
@@ -59,7 +63,8 @@ public class ChannelConnectedListener implements ChannelFutureListener {
             log.log(System.Logger.Level.TRACE, "Channel %s connected, initiating bolt handshake", channel);
 
             var pipeline = channel.pipeline();
-            pipeline.addLast(new HandshakeHandler(pipelineBuilder, handshakeCompletedFuture, logging, valueFactory));
+            pipeline.addLast(
+                    new HandshakeHandler(pipelineBuilder, handshakeCompletedFuture, maxVersion, logging, valueFactory));
             log.log(System.Logger.Level.DEBUG, "C: [Bolt Handshake] %s", handshakeString());
             channel.writeAndFlush(BoltProtocolUtil.handshakeBuf()).addListener(f -> {
                 if (!f.isSuccess()) {

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.v57;
+package org.neo4j.bolt.connection.netty.impl.messaging.v6;
 
 import static java.util.Arrays.asList;
 import static java.util.Calendar.APRIL;
@@ -43,7 +43,7 @@ import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageReaderTestBase;
 import org.neo4j.bolt.connection.values.Value;
 
-class MessageReaderV57Test extends AbstractMessageReaderTestBase {
+class MessageReaderV6Test extends AbstractMessageReaderTestBase {
     private final Map<String, Value> DIAGNOSTIC_RECORD = Map.ofEntries(
             Map.entry("OPERATION", valueFactory.value("")),
             Map.entry("OPERATION_CODE", valueFactory.value("0")),
@@ -84,12 +84,12 @@ class MessageReaderV57Test extends AbstractMessageReaderTestBase {
 
     @Override
     protected MessageFormat.Reader newReader(PackInput input) {
-        return BoltProtocolV57.INSTANCE.createMessageFormat().newReader(input, valueFactory);
+        return BoltProtocolV6.INSTANCE.createMessageFormat().newReader(input, valueFactory);
     }
 
     @Test
     void shouldInitGqlError() {
-        var messageReader = new MessageReaderV57(mock(PackInput.class), valueFactory);
+        var messageReader = new MessageReaderV6(mock(PackInput.class), valueFactory);
         var gqlStatus = valueFactory.value("gql_status");
         var description = valueFactory.value("description");
         var message = valueFactory.value("message");
@@ -110,7 +110,7 @@ class MessageReaderV57Test extends AbstractMessageReaderTestBase {
 
     @Test
     void shouldInitGqlErrorWithMap() {
-        var messageReader = new MessageReaderV57(mock(PackInput.class), valueFactory);
+        var messageReader = new MessageReaderV6(mock(PackInput.class), valueFactory);
         var gqlStatus = valueFactory.value("gql_status");
         var description = valueFactory.value("description");
         var message = valueFactory.value("message");

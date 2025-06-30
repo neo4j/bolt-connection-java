@@ -38,6 +38,9 @@ public interface PackInput {
     /** Consume an 8-byte IEEE 754 "double format" floating-point number */
     double readDouble() throws IOException;
 
+    /** Consume a 4-byte IEEE 754 "double format" floating-point number */
+    float readFloat() throws IOException;
+
     /** Consume a specified number of bytes */
     void readBytes(byte[] into, int offset, int toRead) throws IOException;
 

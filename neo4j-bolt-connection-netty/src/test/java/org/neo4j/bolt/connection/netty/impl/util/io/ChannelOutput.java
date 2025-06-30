@@ -75,4 +75,13 @@ public class ChannelOutput implements PackOutput {
         channel.write(buffer);
         return this;
     }
+
+    @Override
+    public PackOutput writeFloat(float value) throws IOException {
+        var buffer = ByteBuffer.allocate(Float.BYTES);
+        buffer.putFloat(value);
+        buffer.flip();
+        channel.write(buffer);
+        return this;
+    }
 }

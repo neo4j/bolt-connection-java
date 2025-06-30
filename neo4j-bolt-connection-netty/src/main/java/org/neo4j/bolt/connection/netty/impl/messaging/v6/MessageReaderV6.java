@@ -14,19 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.v5;
+package org.neo4j.bolt.connection.netty.impl.messaging.v6;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonMessageReader;
+import java.util.Map;
+import org.neo4j.bolt.connection.GqlError;
+import org.neo4j.bolt.connection.netty.impl.messaging.v57.MessageReaderV57;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-public class MessageReaderV5 extends CommonMessageReader {
-    public MessageReaderV5(PackInput input, ValueFactory valueFactory) {
-        super(new ValueUnpackerV5(input, valueFactory), valueFactory);
+final class MessageReaderV6 extends MessageReaderV57 {
+    public MessageReaderV6(PackInput input, ValueFactory valueFactory) {
+        super(new ValueUnpackerV6(input, valueFactory), valueFactory);
     }
 
-    protected MessageReaderV5(ValueUnpacker unpacker, ValueFactory valueFactory) {
-        super(unpacker, valueFactory);
+    @Override
+    protected GqlError unpackGqlError(Map<String, Value> params) {
+        return super.unpackGqlError(params);
     }
 }
