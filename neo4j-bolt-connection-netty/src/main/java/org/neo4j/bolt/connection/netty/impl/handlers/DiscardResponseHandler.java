@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.handlers;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -41,7 +42,7 @@ public class DiscardResponseHandler implements ResponseHandler {
     }
 
     @Override
-    public void onRecord(Value[] fields) {}
+    public void onRecord(List<Value> fields) {}
 
     private record DiscardSummaryImpl(Map<String, Value> metadata) implements DiscardSummary {
         @Override

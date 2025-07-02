@@ -23,6 +23,7 @@ import java.util.Map;
 import org.neo4j.bolt.connection.GqlError;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.netty.impl.messaging.ResponseMessageHandler;
+import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.v5.MessageReaderV5;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.Type;
@@ -32,6 +33,10 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 public class MessageReaderV57 extends MessageReaderV5 {
     public MessageReaderV57(PackInput input, ValueFactory valueFactory) {
         super(input, valueFactory);
+    }
+
+    protected MessageReaderV57(ValueUnpacker unpacker, ValueFactory valueFactory) {
+        super(unpacker, valueFactory);
     }
 
     @Override
@@ -48,14 +53,14 @@ public class MessageReaderV57 extends MessageReaderV5 {
         var message = params.get("message").asString();
         Map<String, Value> diagnosticRecord;
         var diagnosticRecordValue = params.get("diagnostic_record");
-        if (diagnosticRecordValue != null && Type.MAP.equals(diagnosticRecordValue.type())) {
+        if (diagnosticRecordValue != null && Type.MAP.equals(diagnosticRecordValue.boltValueType())) {
             var containsOperation = diagnosticRecordValue.containsKey("OPERATION");
             var containsOperationCode = diagnosticRecordValue.containsKey("OPERATION_CODE");
             var containsCurrentSchema = diagnosticRecordValue.containsKey("CURRENT_SCHEMA");
             if (containsOperation && containsOperationCode && containsCurrentSchema) {
-                diagnosticRecord = diagnosticRecordValue.asMap(valueFactory::value);
+                diagnosticRecord = diagnosticRecordValue.asBoltMap();
             } else {
-                diagnosticRecord = new HashMap<>(diagnosticRecordValue.asMap(valueFactory::value));
+                diagnosticRecord = new HashMap<>(diagnosticRecordValue.asBoltMap());
                 if (!containsOperation) {
                     diagnosticRecord.put("OPERATION", valueFactory.value(""));
                 }
@@ -77,10 +82,10 @@ public class MessageReaderV57 extends MessageReaderV5 {
         GqlError gqlError = null;
         var cause = params.get("cause");
         if (cause != null) {
-            if (!Type.MAP.equals(cause.type())) {
+            if (!Type.MAP.equals(cause.boltValueType())) {
                 throw new BoltProtocolException("Unexpected type");
             }
-            gqlError = unpackGqlError(cause.asMap(valueFactory::value));
+            gqlError = unpackGqlError(cause.asBoltMap());
         }
 
         return new GqlError(gqlStatus, statusDescription, code, message, diagnosticRecord, gqlError);

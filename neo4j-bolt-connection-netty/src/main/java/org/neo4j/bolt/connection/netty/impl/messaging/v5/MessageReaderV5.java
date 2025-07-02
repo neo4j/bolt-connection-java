@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.v5;
 
+import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonMessageReader;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -23,5 +24,9 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 public class MessageReaderV5 extends CommonMessageReader {
     public MessageReaderV5(PackInput input, ValueFactory valueFactory) {
         super(new ValueUnpackerV5(input, valueFactory), valueFactory);
+    }
+
+    protected MessageReaderV5(ValueUnpacker unpacker, ValueFactory valueFactory) {
+        super(unpacker, valueFactory);
     }
 }

@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.netty.impl;
 
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.CodecException;
+import io.netty.handler.codec.EncoderException;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -41,6 +42,7 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
@@ -133,7 +135,22 @@ public final class BoltConnectionImpl implements BoltConnection {
                     this.messages.addAll(messages);
                     flush(handler, flushFuture);
                 })
-                .thenCompose(ignored -> flushFuture);
+                .thenCompose(ignored -> flushFuture)
+                .handle((ignored, throwable) -> {
+                    if (throwable != null) {
+                        throwable = FutureUtil.completionExceptionCause(throwable);
+                        updateState(throwable);
+                        if (throwable instanceof BoltException boltException) {
+                            throw boltException;
+                        } else if (throwable.getCause() instanceof BoltException boltException) {
+                            throw boltException;
+                        } else {
+                            throw new BoltClientException("Failed to write messages", throwable);
+                        }
+                    } else {
+                        return null;
+                    }
+                });
     }
 
     @Override
@@ -307,7 +324,7 @@ public final class BoltConnectionImpl implements BoltConnection {
                 pullMessage.request(),
                 new PullMessageHandler() {
                     @Override
-                    public void onRecord(Value[] fields) {
+                    public void onRecord(List<Value> fields) {
                         handler.onRecord(fields);
                     }
 
@@ -569,6 +586,8 @@ public final class BoltConnectionImpl implements BoltConnection {
             }
         } else if (throwable instanceof MessageIgnoredException) {
             stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.FAILURE);
+        } else if (throwable instanceof EncoderException) {
+            stateRef.compareAndExchange(BoltConnectionState.OPEN, BoltConnectionState.ERROR);
         } else {
             stateRef.updateAndGet(state -> switch (state) {
                 case OPEN, FAILURE, ERROR -> BoltConnectionState.ERROR;
@@ -626,7 +645,7 @@ public final class BoltConnectionImpl implements BoltConnection {
         }
 
         @Override
-        public void onRecord(Value[] fields) {
+        public void onRecord(List<Value> fields) {
             if (!summariesFuture.isDone()) {
                 runIgnoringError(() -> delegate.onRecord(fields));
             }

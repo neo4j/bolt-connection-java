@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl.spi;
 
+import java.util.List;
 import java.util.Map;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatcher;
 import org.neo4j.bolt.connection.values.Value;
@@ -25,7 +26,7 @@ public interface ResponseHandler {
 
     void onFailure(Throwable error);
 
-    void onRecord(Value[] fields);
+    void onRecord(List<Value> fields);
 
     /**
      * Tells whether this response handler is able to manage auto-read of the underlying connection using {@link Connection#enableAutoRead()} and

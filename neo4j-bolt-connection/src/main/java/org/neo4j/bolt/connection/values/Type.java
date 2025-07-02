@@ -36,5 +36,6 @@ public enum Type {
     LOCAL_DATE_TIME,
     DATE_TIME,
     DURATION,
+    VECTOR,
     NULL
 }

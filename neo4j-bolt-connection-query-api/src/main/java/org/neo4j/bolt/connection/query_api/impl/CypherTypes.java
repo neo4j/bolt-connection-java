@@ -26,6 +26,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -41,13 +42,13 @@ enum CypherTypes {
     List(
         Type.LIST,
         null, // manually handled in JSON converter
-        (v) -> v.values()
+        (v) -> v.boltValues()
     ),
 
     Map(
         Type.MAP,
         null, // manually handled in JSON converter
-        (v) -> v.asMap(Function.identity())
+        Value::asBoltMap
     ),
 
     Boolean(
@@ -124,7 +125,7 @@ enum CypherTypes {
     Duration(
         Type.DURATION,
         CypherTypes::parseDuration,
-        (v) -> v.asIsoDuration().toString()
+        (v) -> v.asBoltIsoDuration().toString()
     ),
 
     Point(
@@ -148,7 +149,12 @@ enum CypherTypes {
     Path(
         Type.PATH,
         null, // handled in DriverValueProvider
-        CypherTypes::unsupported);
+        CypherTypes::unsupported),
+
+    Vector(
+            Type.VECTOR,
+            null, // handled in DriverValueProvider
+            CypherTypes::unsupportedVector);
 
     // spotless:on
     private final BiFunction<ValueFactory, String, Value> reader;
@@ -162,14 +168,14 @@ enum CypherTypes {
     }
 
     public static CypherTypes typeFromValue(Value value) {
-        var valueType = value.type();
+        var valueType = value.boltValueType();
         for (CypherTypes cypherType : values()) {
             if (cypherType.type == valueType) {
                 return cypherType;
             }
         }
 
-        throw new IllegalArgumentException("no Cypher type found representing " + value.type());
+        throw new IllegalArgumentException("no Cypher type found representing " + value.boltValueType());
     }
 
     /**
@@ -208,8 +214,8 @@ enum CypherTypes {
     }
 
     private static String writePoint(Value value) {
-        if (value.type() == Type.POINT) {
-            var point = value.asPoint();
+        if (value.boltValueType() == Type.POINT) {
+            var point = value.asBoltPoint();
             var srid = point.srid();
             String pointArguments;
             if (Double.isNaN(point.z())) {
@@ -226,6 +232,10 @@ enum CypherTypes {
 
     private static Object unsupported(Value value) {
         throw new IllegalArgumentException("Node value type is not supported");
+    }
+
+    private static Object unsupportedVector(Value value) {
+        throw new BoltUnsupportedFeatureException("Vector type is not supported");
     }
 
     private static Value parseDuration(ValueFactory valueFactory, String input) {

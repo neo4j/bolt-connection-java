@@ -89,7 +89,7 @@ class MessageReaderV57Test extends AbstractMessageReaderTestBase {
 
     @Test
     void shouldInitGqlError() {
-        var messageReader = new MessageReaderV57(mock(), valueFactory);
+        var messageReader = new MessageReaderV57(mock(PackInput.class), valueFactory);
         var gqlStatus = valueFactory.value("gql_status");
         var description = valueFactory.value("description");
         var message = valueFactory.value("message");
@@ -110,7 +110,7 @@ class MessageReaderV57Test extends AbstractMessageReaderTestBase {
 
     @Test
     void shouldInitGqlErrorWithMap() {
-        var messageReader = new MessageReaderV57(mock(), valueFactory);
+        var messageReader = new MessageReaderV57(mock(PackInput.class), valueFactory);
         var gqlStatus = valueFactory.value("gql_status");
         var description = valueFactory.value("description");
         var message = valueFactory.value("message");
@@ -134,6 +134,6 @@ class MessageReaderV57Test extends AbstractMessageReaderTestBase {
     }
 
     private Message record(Value value) {
-        return new RecordMessage(new Value[] {value});
+        return new RecordMessage(List.of(value));
     }
 }

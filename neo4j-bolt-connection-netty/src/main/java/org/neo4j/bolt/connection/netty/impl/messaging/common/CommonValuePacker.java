@@ -26,12 +26,14 @@ import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Map;
+import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
 import org.neo4j.bolt.connection.values.IsoDuration;
 import org.neo4j.bolt.connection.values.Point;
 import org.neo4j.bolt.connection.values.Value;
+import org.neo4j.bolt.connection.values.Vector;
 
 public class CommonValuePacker implements ValuePacker {
 
@@ -62,6 +64,9 @@ public class CommonValuePacker implements ValuePacker {
     public static final byte POINT_3D_STRUCT_TYPE = 'Y';
     public static final int POINT_3D_STRUCT_SIZE = 4;
 
+    public static final byte VECTOR = 'V';
+    public static final int VECTOR_STRUCT_SIZE = 2;
+
     private final boolean dateTimeUtcEnabled;
     protected final PackStream.Packer packer;
 
@@ -82,7 +87,11 @@ public class CommonValuePacker implements ValuePacker {
 
     @Override
     public final void pack(Value value) throws IOException {
-        packInternalValue(value);
+        if (value != null) {
+            packInternalValue(value);
+        } else {
+            throw new IllegalArgumentException("Unable to pack: null");
+        }
     }
 
     @Override
@@ -99,7 +108,7 @@ public class CommonValuePacker implements ValuePacker {
     }
 
     protected void packInternalValue(Value value) throws IOException {
-        switch (value.type()) {
+        switch (value.boltValueType()) {
             case DATE -> packDate(value.asLocalDate());
             case TIME -> packTime(value.asOffsetTime());
             case LOCAL_TIME -> packLocalTime(value.asLocalTime());
@@ -111,8 +120,8 @@ public class CommonValuePacker implements ValuePacker {
                     packZonedDateTime(value.asZonedDateTime());
                 }
             }
-            case DURATION -> packDuration(value.asIsoDuration());
-            case POINT -> packPoint(value.asPoint());
+            case DURATION -> packDuration(value.asBoltIsoDuration());
+            case POINT -> packPoint(value.asBoltPoint());
             case NULL -> packer.packNull();
             case BYTES -> packer.pack(value.asByteArray());
             case STRING -> packer.pack(value.asString());
@@ -123,17 +132,23 @@ public class CommonValuePacker implements ValuePacker {
                 packer.packMapHeader(value.size());
                 for (var s : value.keys()) {
                     packer.pack(s);
-                    pack(value.get(s));
+                    pack(value.getBoltValue(s));
                 }
             }
             case LIST -> {
                 packer.packListHeader(value.size());
-                for (var item : value.values()) {
+                for (var item : value.boltValues()) {
                     pack(item);
                 }
             }
-            default -> throw new IOException("Unknown type: " + value.type().name());
+            case VECTOR -> packVector(value.asBoltVector());
+            default -> throw new IOException(
+                    "Unknown type: " + value.boltValueType().name());
         }
+    }
+
+    protected void packVector(Vector vector) throws IOException {
+        throw new BoltUnsupportedFeatureException("Vector type is not supported by this Bolt protocol version");
     }
 
     private void packDate(LocalDate localDate) throws IOException {

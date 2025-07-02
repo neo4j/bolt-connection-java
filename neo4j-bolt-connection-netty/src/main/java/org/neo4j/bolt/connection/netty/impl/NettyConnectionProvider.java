@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.BoltAgent;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
@@ -57,6 +58,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
     private final DomainNameResolver domainNameResolver;
     private final AddressResolverGroup<InetSocketAddress> addressResolverGroup;
     private final LocalAddress localAddress;
+    private final BoltProtocolVersion maxVersion;
 
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
@@ -66,6 +68,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             Clock clock,
             DomainNameResolver domainNameResolver,
             LocalAddress localAddress,
+            BoltProtocolVersion maxVersion,
             LoggingProvider logging,
             ValueFactory valueFactory) {
         this.eventLoopGroup = eventLoopGroup;
@@ -73,6 +76,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         this.domainNameResolver = requireNonNull(domainNameResolver);
         this.addressResolverGroup = new NettyDomainNameResolverGroup(this.domainNameResolver);
         this.localAddress = localAddress;
+        this.maxVersion = maxVersion;
         this.logging = logging;
         this.valueFactory = requireNonNull(valueFactory);
     }
@@ -137,7 +141,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         // add listener that sends Bolt handshake bytes when channel is connected
         var handshakeCompleted = new CompletableFuture<Channel>();
         channelConnected.addListener(new ChannelConnectedListener(
-                address, new ChannelPipelineBuilderImpl(), handshakeCompleted, logging, valueFactory));
+                address, new ChannelPipelineBuilderImpl(), handshakeCompleted, maxVersion, logging, valueFactory));
         return handshakeCompleted.whenComplete((channel, throwable) -> {
             if (throwable == null) {
                 // remove timeout handler from the pipeline once TLS and Bolt handshakes are

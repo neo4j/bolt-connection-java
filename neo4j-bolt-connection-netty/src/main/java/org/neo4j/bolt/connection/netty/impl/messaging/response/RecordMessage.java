@@ -16,11 +16,11 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.response;
 
-import java.util.Arrays;
+import java.util.List;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.values.Value;
 
-public record RecordMessage(Value[] fields) implements Message {
+public record RecordMessage(List<Value> fields) implements Message {
     public static final byte SIGNATURE = 0x71;
 
     @Override
@@ -30,7 +30,7 @@ public record RecordMessage(Value[] fields) implements Message {
 
     @Override
     public String toString() {
-        return "RECORD " + Arrays.toString(fields);
+        return "RECORD " + fields;
     }
 
     @Override
@@ -44,11 +44,11 @@ public record RecordMessage(Value[] fields) implements Message {
 
         var that = (RecordMessage) o;
 
-        return Arrays.equals(fields, that.fields);
+        return fields.equals(that.fields);
     }
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(fields);
+        return fields.hashCode();
     }
 }

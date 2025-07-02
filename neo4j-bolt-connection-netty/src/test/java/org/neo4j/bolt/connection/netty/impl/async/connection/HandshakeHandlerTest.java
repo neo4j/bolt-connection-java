@@ -301,7 +301,11 @@ class HandshakeHandlerTest {
     private static HandshakeHandler newHandler(
             ChannelPipelineBuilder pipelineBuilder, CompletableFuture<Channel> handshakeCompletedPromise) {
         return new HandshakeHandler(
-                pipelineBuilder, handshakeCompletedPromise, NoopLoggingProvider.INSTANCE, mock(ValueFactory.class));
+                pipelineBuilder,
+                handshakeCompletedPromise,
+                null,
+                NoopLoggingProvider.INSTANCE,
+                mock(ValueFactory.class));
     }
 
     private static class MemorizingChannelPipelineBuilder extends ChannelPipelineBuilderImpl {

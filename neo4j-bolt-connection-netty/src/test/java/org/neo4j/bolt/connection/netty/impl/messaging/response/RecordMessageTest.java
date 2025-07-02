@@ -19,12 +19,12 @@ package org.neo4j.bolt.connection.netty.impl.messaging.response;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
-import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class RecordMessageTest {
@@ -37,14 +37,11 @@ class RecordMessageTest {
     }
 
     static Stream<Arguments> equalsArgs() {
-        var message = new RecordMessage(new Value[] {valueFactory.value(1), valueFactory.value("1")});
+        var message = new RecordMessage(List.of(valueFactory.value(1), valueFactory.value("1")));
         return Stream.of(
+                Arguments.of(message, new RecordMessage(List.of(valueFactory.value(1), valueFactory.value("1"))), true),
                 Arguments.of(
-                        message, new RecordMessage(new Value[] {valueFactory.value(1), valueFactory.value("1")}), true),
-                Arguments.of(
-                        message,
-                        new RecordMessage(new Value[] {valueFactory.value(2), valueFactory.value("2")}),
-                        false),
+                        message, new RecordMessage(List.of(valueFactory.value(2), valueFactory.value("2"))), false),
                 Arguments.of(message, new SuccessMessage(Collections.emptyMap()), false),
                 Arguments.of(message, message, true),
                 Arguments.of(message, null, false));

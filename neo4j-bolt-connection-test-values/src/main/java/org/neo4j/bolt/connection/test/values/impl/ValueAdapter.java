@@ -24,7 +24,6 @@ import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZonedDateTime;
 import java.util.Map;
-import java.util.function.Function;
 import org.neo4j.bolt.connection.test.values.TestNode;
 import org.neo4j.bolt.connection.test.values.TestPath;
 import org.neo4j.bolt.connection.test.values.TestRelationship;
@@ -32,6 +31,7 @@ import org.neo4j.bolt.connection.test.values.TestValue;
 import org.neo4j.bolt.connection.values.IsoDuration;
 import org.neo4j.bolt.connection.values.Point;
 import org.neo4j.bolt.connection.values.Value;
+import org.neo4j.bolt.connection.values.Vector;
 
 public abstract class ValueAdapter extends InternalMapAccessorWithDefaultValue implements TestValue {
     @Override
@@ -46,77 +46,77 @@ public abstract class ValueAdapter extends InternalMapAccessorWithDefaultValue i
 
     @Override
     public boolean containsKey(String key) {
-        throw new NotMultiValued(type().name() + " is not a keyed collection");
+        throw new NotMultiValued(boltValueType().name() + " is not a keyed collection");
     }
 
     @Override
     public String asString() {
-        throw new Uncoercible(type().name(), "Java String");
+        throw new Uncoercible(boltValueType().name(), "Java String");
     }
 
     @Override
     public long asLong() {
-        throw new Uncoercible(type().name(), "Java long");
+        throw new Uncoercible(boltValueType().name(), "Java long");
     }
 
     @Override
     public double asDouble() {
-        throw new Uncoercible(type().name(), "Java double");
+        throw new Uncoercible(boltValueType().name(), "Java double");
     }
 
     @Override
     public boolean asBoolean() {
-        throw new Uncoercible(type().name(), "Java boolean");
+        throw new Uncoercible(boltValueType().name(), "Java boolean");
     }
 
     @Override
-    public <T> Map<String, T> asMap(Function<Value, T> mapFunction) {
-        throw new Uncoercible(type().name(), "Java Map");
+    public Map<String, Value> asBoltMap() {
+        throw new Uncoercible(boltValueType().name(), "Java Map");
     }
 
     @Override
     public LocalDate asLocalDate() {
-        throw new Uncoercible(type().name(), "LocalDate");
+        throw new Uncoercible(boltValueType().name(), "LocalDate");
     }
 
     @Override
     public OffsetTime asOffsetTime() {
-        throw new Uncoercible(type().name(), "OffsetTime");
+        throw new Uncoercible(boltValueType().name(), "OffsetTime");
     }
 
     @Override
     public LocalTime asLocalTime() {
-        throw new Uncoercible(type().name(), "LocalTime");
+        throw new Uncoercible(boltValueType().name(), "LocalTime");
     }
 
     @Override
     public LocalDateTime asLocalDateTime() {
-        throw new Uncoercible(type().name(), "LocalDateTime");
+        throw new Uncoercible(boltValueType().name(), "LocalDateTime");
     }
 
     @Override
     public ZonedDateTime asZonedDateTime() {
-        throw new Uncoercible(type().name(), "ZonedDateTime");
+        throw new Uncoercible(boltValueType().name(), "ZonedDateTime");
     }
 
     @Override
-    public IsoDuration asIsoDuration() {
-        throw new Uncoercible(type().name(), "Duration");
+    public IsoDuration asBoltIsoDuration() {
+        throw new Uncoercible(boltValueType().name(), "Duration");
     }
 
     @Override
-    public Point asPoint() {
-        throw new Uncoercible(type().name(), "Point");
+    public Point asBoltPoint() {
+        throw new Uncoercible(boltValueType().name(), "Point");
     }
 
     @Override
-    public Value get(String key) {
-        throw new NotMultiValued(type().name() + " is not a keyed collection");
+    public Value getBoltValue(String key) {
+        throw new NotMultiValued(boltValueType().name() + " is not a keyed collection");
     }
 
     @Override
     public int size() {
-        throw new Unsizable(type().name() + " does not have size");
+        throw new Unsizable(boltValueType().name() + " does not have size");
     }
 
     @Override
@@ -126,32 +126,37 @@ public abstract class ValueAdapter extends InternalMapAccessorWithDefaultValue i
 
     @Override
     public boolean isEmpty() {
-        return !values().iterator().hasNext();
+        return !boltValues().iterator().hasNext();
     }
 
     @Override
-    public Iterable<Value> values() {
-        throw new NotMultiValued(type().name() + " is not iterable");
+    public Iterable<Value> boltValues() {
+        throw new NotMultiValued(boltValueType().name() + " is not iterable");
     }
 
     @Override
     public byte[] asByteArray() {
-        throw new Uncoercible(type().name(), "byte[]");
+        throw new Uncoercible(boltValueType().name(), "byte[]");
     }
 
     @Override
     public TestNode asNode() {
-        throw new Uncoercible(type().name(), "Node");
+        throw new Uncoercible(boltValueType().name(), "Node");
     }
 
     @Override
     public TestRelationship asRelationship() {
-        throw new Uncoercible(type().name(), "Relationship");
+        throw new Uncoercible(boltValueType().name(), "Relationship");
     }
 
     @Override
     public TestPath asPath() {
-        throw new Uncoercible(type().name(), "Path");
+        throw new Uncoercible(boltValueType().name(), "Path");
+    }
+
+    @Override
+    public Vector asBoltVector() {
+        throw new Uncoercible(boltValueType().name(), "Vector");
     }
 
     // Force implementation

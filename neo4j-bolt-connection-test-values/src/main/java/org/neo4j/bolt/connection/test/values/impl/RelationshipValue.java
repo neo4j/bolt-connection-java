@@ -25,7 +25,7 @@ public class RelationshipValue extends EntityValueAdapter<TestRelationship> {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.RELATIONSHIP;
     }
 

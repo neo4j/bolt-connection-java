@@ -34,7 +34,7 @@ public class UnsupportedDateTimeValue extends ValueAdapter {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.DATE_TIME;
     }
 

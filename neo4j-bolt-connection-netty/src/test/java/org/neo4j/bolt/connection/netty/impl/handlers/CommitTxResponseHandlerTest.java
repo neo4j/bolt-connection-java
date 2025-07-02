@@ -23,10 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.neo4j.bolt.connection.netty.impl.util.TestUtil.await;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
-import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class CommitTxResponseHandlerTest {
@@ -62,6 +62,6 @@ class CommitTxResponseHandlerTest {
 
     @Test
     void shouldFailToHandleRecord() {
-        assertThrows(UnsupportedOperationException.class, () -> handler.onRecord(new Value[] {valueFactory.value(42)}));
+        assertThrows(UnsupportedOperationException.class, () -> handler.onRecord(List.of(valueFactory.value(42))));
     }
 }

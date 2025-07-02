@@ -42,6 +42,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final CompletableFuture<Channel> handshakeCompletedFuture;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
+    private final BoltProtocolVersion maxVersion;
 
     private boolean failed;
     private ChannelActivityLogger log;
@@ -51,12 +52,14 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     public HandshakeHandler(
             ChannelPipelineBuilder pipelineBuilder,
             CompletableFuture<Channel> handshakeCompletedFuture,
+            BoltProtocolVersion maxVersion,
             LoggingProvider logging,
             ValueFactory valueFactory) {
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
         this.logging = logging;
         this.valueFactory = Objects.requireNonNull(valueFactory);
+        this.maxVersion = maxVersion;
     }
 
     @Override
@@ -112,7 +115,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
 
             if (new BoltProtocolVersion(255, 1).equals(serverSuggestedVersion)) {
                 log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake Manifest] v1", serverSuggestedVersion);
-                manifestHandler = new ManifestHandlerV1(ctx.channel(), logging);
+                manifestHandler = new ManifestHandlerV1(ctx.channel(), maxVersion, logging);
             } else {
                 log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake] %s", serverSuggestedVersion);
 

@@ -48,7 +48,7 @@ public class MemorizingInboundMessageDispatcher extends InboundMessageDispatcher
     }
 
     @Override
-    public void handleRecordMessage(Value[] fields) {
+    public void handleRecordMessage(List<Value> fields) {
         messages.add(new RecordMessage(fields));
     }
 

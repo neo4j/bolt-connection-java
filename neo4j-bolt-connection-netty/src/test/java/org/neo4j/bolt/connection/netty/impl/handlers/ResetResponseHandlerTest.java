@@ -22,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
-import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class ResetResponseHandlerTest {
@@ -62,8 +62,7 @@ class ResetResponseHandlerTest {
 
         assertThrows(
                 UnsupportedOperationException.class,
-                () -> handler.onRecord(
-                        new Value[] {valueFactory.value(1), valueFactory.value(2), valueFactory.value(3)}));
+                () -> handler.onRecord(List.of(valueFactory.value(1), valueFactory.value(2), valueFactory.value(3))));
     }
 
     private static ResetResponseHandler newHandler(CompletableFuture<Void> future) {

@@ -103,7 +103,7 @@ public class KnowledgeableMessageFormat extends MessageFormatV3 {
 
         @Override
         protected void packInternalValue(Value value) throws IOException {
-            switch (value.type()) {
+            switch (value.boltValueType()) {
                 case NODE -> {
                     var node = ((TestValue) value).asNode();
                     packNode(node);

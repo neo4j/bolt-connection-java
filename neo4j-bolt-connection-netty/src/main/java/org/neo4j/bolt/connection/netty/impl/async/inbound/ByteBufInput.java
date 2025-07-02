@@ -59,6 +59,11 @@ public class ByteBufInput implements PackInput {
     }
 
     @Override
+    public float readFloat() {
+        return buf.readFloat();
+    }
+
+    @Override
     public void readBytes(byte[] into, int offset, int toRead) {
         buf.readBytes(into, offset, toRead);
     }

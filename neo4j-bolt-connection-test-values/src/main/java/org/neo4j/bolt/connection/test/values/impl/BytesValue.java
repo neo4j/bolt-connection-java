@@ -45,7 +45,7 @@ public class BytesValue extends ValueAdapter {
     }
 
     @Override
-    public Type type() {
+    public Type boltValueType() {
         return Type.BYTES;
     }
 

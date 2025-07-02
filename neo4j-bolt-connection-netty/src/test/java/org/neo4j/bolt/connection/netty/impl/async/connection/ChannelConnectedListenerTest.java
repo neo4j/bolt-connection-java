@@ -114,6 +114,7 @@ class ChannelConnectedListenerTest {
                 LOCAL_DEFAULT,
                 new ChannelPipelineBuilderImpl(),
                 handshakeCompletedFuture,
+                null,
                 NoopLoggingProvider.INSTANCE,
                 mock(ValueFactory.class));
     }

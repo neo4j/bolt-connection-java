@@ -21,9 +21,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZonedDateTime;
+import java.util.Map;
 
 public interface Value extends MapAccessor {
-    Type type();
+    Type boltValueType();
 
     boolean asBoolean();
 
@@ -45,9 +46,13 @@ public interface Value extends MapAccessor {
 
     ZonedDateTime asZonedDateTime();
 
-    IsoDuration asIsoDuration();
+    IsoDuration asBoltIsoDuration();
 
-    Point asPoint();
+    Point asBoltPoint();
+
+    Map<String, Value> asBoltMap();
+
+    Vector asBoltVector();
 
     boolean isNull();
 
