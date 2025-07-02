@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -45,8 +46,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.BDDMockito;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.AuthInfo;
@@ -555,5 +558,36 @@ class PooledBoltConnectionSourceTest {
         // then
         assertEquals(connection, ((PooledBoltConnection) actualConnection).delegate());
         then(connection).should().write(List.of(Messages.logoff(), Messages.logon(authToken)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldUseSessionAuth(boolean setupAcquiredConnection) {
+        // given
+        given(upstreamProvider.connect(any(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
+                .willReturn(CompletableFuture.completedStage(mock(BoltConnection.class)));
+        if (setupAcquiredConnection) {
+            boltConnectionSource.getConnection().toCompletableFuture().join();
+        }
+
+        // when
+        var authMap = Map.of("key", mock(Value.class));
+        var authToken = AuthTokens.custom(authMap);
+        var parameters =
+                BoltConnectionParameters.builder().withAuthToken(authToken).build();
+        var actualConnection = boltConnectionSource
+                .getConnection(parameters)
+                .toCompletableFuture()
+                .join();
+
+        // then
+        var inOrder = Mockito.inOrder(upstreamProvider);
+        if (setupAcquiredConnection) {
+            inOrder.verify(upstreamProvider)
+                    .connect(any(), any(), any(), any(), anyInt(), any(), eq(this.authToken), any(), any());
+        }
+        inOrder.verify(upstreamProvider)
+                .connect(any(), any(), any(), any(), anyInt(), any(), eq(authToken), any(), any());
+        inOrder.verifyNoMoreInteractions();
     }
 }

@@ -156,9 +156,15 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         }
 
         var acquisitionFuture = new CompletableFuture<PooledBoltConnection>();
-        var authTokenSupplier = parameters.authToken() != null
-                ? CompletableFuture.completedStage(parameters.authToken())
-                : this.authTokenManager.getToken();
+        CompletionStage<AuthToken> authTokenSupplier;
+        boolean overrideAuthToken;
+        if (parameters.authToken() != null) {
+            authTokenSupplier = CompletableFuture.completedStage(parameters.authToken());
+            overrideAuthToken = true;
+        } else {
+            authTokenSupplier = authTokenManager.getToken();
+            overrideAuthToken = false;
+        }
         authTokenSupplier.whenComplete((authToken, authThrowable) -> {
             if (authThrowable != null) {
                 acquisitionFuture.completeExceptionally(authThrowable);
@@ -178,7 +184,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                 }
                 metricsListener.afterAcquiringOrCreating(poolId);
             });
-            connect(acquisitionFuture, authToken, parameters.minVersion(), notificationConfig);
+            connect(acquisitionFuture, authToken, overrideAuthToken, parameters.minVersion(), notificationConfig);
         });
 
         return acquisitionFuture.thenApply(Function.identity());
@@ -188,6 +194,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     private void connect(
             CompletableFuture<PooledBoltConnection> acquisitionFuture,
             AuthToken authToken,
+            boolean overrideAuthToken,
             BoltProtocolVersion minVersion,
             NotificationConfig notificationConfig) {
 
@@ -272,7 +279,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                     if (throwable != null) {
                         // liveness check failed
                         purge(entry);
-                        connect(acquisitionFuture, authToken, minVersion, notificationConfig);
+                        connect(acquisitionFuture, authToken, overrideAuthToken, minVersion, notificationConfig);
                     } else {
                         // liveness check green or not needed
                         var inUseEvent = metricsListener.createListenerEvent();
@@ -315,7 +322,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                 metricsListener.beforeCreating(poolId, createEvent);
                 var entry = connectionEntryWithMetadata.connectionEntry;
                 var authStage = securityPlanSupplier.getPlan().thenCompose(securityPlan -> {
-                    if (empty.get()) {
+                    if (overrideAuthToken || empty.get()) {
                         return CompletableFuture.completedStage(new SecurityPlanAndAuthToken(securityPlan, authToken));
                     } else {
                         return authTokenManager
