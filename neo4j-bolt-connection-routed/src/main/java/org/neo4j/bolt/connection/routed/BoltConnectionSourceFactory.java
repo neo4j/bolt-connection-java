@@ -27,7 +27,7 @@ import org.neo4j.bolt.connection.BoltConnectionSource;
 @FunctionalInterface
 public interface BoltConnectionSourceFactory {
     /**
-     * Creates a {@link BoltConnectionSource} for a specofic {@link URI} provided by the {@link RoutedBoltConnectionSource}.
+     * Creates a {@link BoltConnectionSource} for a specific {@link URI} provided by the {@link RoutedBoltConnectionSource}.
      * <p>
      * As {@link URI} instances provided by the {@link RoutedBoltConnectionSource} use {@code bolt} schemes,
      * {@link BoltConnectionSource} instances MUST support such schemes.
