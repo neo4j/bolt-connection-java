@@ -114,10 +114,10 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
 
     @Override
     protected Query handleResponse(HttpResponse<String> response) {
-        QueryResult queryResult = null;
+        QueryResult queryResult;
         String body = response.body();
         try {
-            log.log(System.Logger.Level.DEBUG, "received body: " + body);
+            log.log(System.Logger.Level.DEBUG, () -> "received body: " + body);
             queryResult = httpContext.json().beanFrom(QueryResult.class, body);
         } catch (IOException e) {
             throw new BoltClientException("Cannot parse response %s to QueryResult".formatted(body), e);
