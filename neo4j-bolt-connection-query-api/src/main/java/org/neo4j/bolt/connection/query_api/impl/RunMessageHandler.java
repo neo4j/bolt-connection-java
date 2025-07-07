@@ -124,19 +124,21 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         }
         var id = new Random().nextLong();
         var counters = queryResult.counters();
-        var statsMap = Map.ofEntries(
-                Map.entry("nodes-created", valueFactory.value(counters.nodesCreated())),
-                Map.entry("nodes-deleted", valueFactory.value(counters.nodesDeleted())),
-                Map.entry("relationships-created", valueFactory.value(counters.relationshipsCreated())),
-                Map.entry("relationships-deleted", valueFactory.value(counters.relationshipsDeleted())),
-                Map.entry("properties-set", valueFactory.value(counters.propertiesSet())),
-                Map.entry("labels-added", valueFactory.value(counters.labelsAdded())),
-                Map.entry("labels-removed", valueFactory.value(counters.labelsRemoved())),
-                Map.entry("indexes-added", valueFactory.value(counters.indexesAdded())),
-                Map.entry("indexes-removed", valueFactory.value(counters.indexesRemoved())),
-                Map.entry("constraints-added", valueFactory.value(counters.constraintsAdded())),
-                Map.entry("constraints-removed", valueFactory.value(counters.constraintsRemoved())),
-                Map.entry("system-updates", valueFactory.value(counters.systemUpdates())));
+        var statsMap = counters == null
+                ? Map.of()
+                : Map.ofEntries(
+                        Map.entry("nodes-created", valueFactory.value(counters.nodesCreated())),
+                        Map.entry("nodes-deleted", valueFactory.value(counters.nodesDeleted())),
+                        Map.entry("relationships-created", valueFactory.value(counters.relationshipsCreated())),
+                        Map.entry("relationships-deleted", valueFactory.value(counters.relationshipsDeleted())),
+                        Map.entry("properties-set", valueFactory.value(counters.propertiesSet())),
+                        Map.entry("labels-added", valueFactory.value(counters.labelsAdded())),
+                        Map.entry("labels-removed", valueFactory.value(counters.labelsRemoved())),
+                        Map.entry("indexes-added", valueFactory.value(counters.indexesAdded())),
+                        Map.entry("indexes-removed", valueFactory.value(counters.indexesRemoved())),
+                        Map.entry("constraints-added", valueFactory.value(counters.constraintsAdded())),
+                        Map.entry("constraints-removed", valueFactory.value(counters.constraintsRemoved())),
+                        Map.entry("system-updates", valueFactory.value(counters.systemUpdates())));
         String bookmark = null;
         if (queryResult.bookmarks() != null && !queryResult.bookmarks().isEmpty()) {
             if (queryResult.bookmarks().size() > 1) {
@@ -157,8 +159,10 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         if (notifications != null && !notifications.isEmpty()) {
             metadata.put("notifications", valueFactory.value(notifications));
         }
-        var query = new Query(
-                id, queryResult.data().fields(), queryResult.data().values(), Collections.unmodifiableMap(metadata));
+        // Jackson on native image does a bit of different default, it does not create query data with two empty lists,
+        // but null. Juchhu.
+        var data = Objects.requireNonNullElseGet(queryResult.data(), QueryData::empty);
+        var query = new Query(id, data.fields(), data.values(), Collections.unmodifiableMap(metadata));
         handler.onRunSummary(new RunSummaryImpl(query.id(), query.fields(), -1, databaseName));
         return query;
     }
