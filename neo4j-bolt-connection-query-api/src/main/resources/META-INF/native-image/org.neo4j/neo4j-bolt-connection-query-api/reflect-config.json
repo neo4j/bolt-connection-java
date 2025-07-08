@@ -1,0 +1,80 @@
+[
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.DiscoveryResponse",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.BeginMessageHandler$TransactionEntry",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.BeginMessageHandler$Transaction",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.BeginMessageHandler$BeginMessageWrapper",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.CommitMessageHandler$BookmarksWrapper",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.ErrorsData",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.Error",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.QueryData",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.QueryCounters",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.QueryResult",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.DriverValueProvider$SerializedNode",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.DriverValueProvider$SerializedRelationship",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.neo4j.bolt.connection.query_api.impl.RunMessageHandler$QueryAPIRequestPayload",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  }
+]
