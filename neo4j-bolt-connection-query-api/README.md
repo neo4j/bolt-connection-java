@@ -4,7 +4,7 @@ This experimental module implements `BoltConnectionProvider` that communicates w
 
 It supports `http` and `https` URI schemes.
 
-## Limitataions
+## Limitations
 
 There are a number of limitations that apply to this module. For instance, it does not support streaming. All results are
 fetched immediately and streaming is simulated on the client-side on the `BoltConnection` level.
