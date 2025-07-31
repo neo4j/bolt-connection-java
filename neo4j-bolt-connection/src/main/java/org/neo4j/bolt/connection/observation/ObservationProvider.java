@@ -14,15 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.neo4j.bolt.connection.observation;
+
 /**
- * The Neo4j Bolt Connection module.
+ * An observation provider responsible for managing new and existing {@link Observation} instances.
+ * @since 7.0.0
  */
-module org.neo4j.bolt.connection {
-    exports org.neo4j.bolt.connection;
-    exports org.neo4j.bolt.connection.message;
-    exports org.neo4j.bolt.connection.exception;
-    exports org.neo4j.bolt.connection.summary;
-    exports org.neo4j.bolt.connection.values;
-    exports org.neo4j.bolt.connection.ssl;
-    exports org.neo4j.bolt.connection.observation;
+public interface ObservationProvider {
+    /**
+     * Returns an existing observation from an opened {@link Observation.Scope} or {@literal null} otherwise.
+     * @return an existing observation or {@literal null} otherwise
+     */
+    Observation scopedObservation();
 }

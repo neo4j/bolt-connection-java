@@ -63,13 +63,14 @@ import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.message.Messages;
+import org.neo4j.bolt.connection.observation.Observation;
 import org.neo4j.bolt.connection.pooled.impl.PooledBoltConnection;
+import org.neo4j.bolt.connection.pooled.observation.PoolObservationProvider;
 import org.neo4j.bolt.connection.summary.ResetSummary;
 import org.neo4j.bolt.connection.values.Value;
 
@@ -86,7 +87,10 @@ class PooledBoltConnectionSourceTest {
     Clock clock;
 
     @Mock
-    MetricsListener metricsListener;
+    PoolObservationProvider observationProvider;
+
+    @Mock
+    Observation observation;
 
     @Mock
     Consumer<DatabaseName> databaseNameConsumer;
@@ -123,8 +127,16 @@ class PooledBoltConnectionSourceTest {
     void beforeEach() {
         openMocks(this);
         given(loggingProvider.getLog(any(Class.class))).willReturn(mock(System.Logger.class));
+        given(observationProvider.connectionPoolCreate(any(), any(), anyInt())).willReturn(observation);
+        given(observationProvider.pooledConnectionAcquire(any(), any())).willReturn(observation);
+        given(observationProvider.pooledConnectionCreate(any(), any())).willReturn(observation);
+        given(observationProvider.pooledConnectionInUse(any(), any())).willReturn(observation);
+        given(observationProvider.pooledConnectionClose(any(), any())).willReturn(observation);
+        given(observationProvider.connectionPoolClose(any(), any())).willReturn(observation);
+        given(observation.start()).willReturn(observation);
         given(authTokenManager.getToken()).willReturn(CompletableFuture.completedStage(authToken));
         given(securityPlanSupplier.getPlan()).willReturn(CompletableFuture.completedStage(securityPlan));
+        given(connection.close()).willReturn(CompletableFuture.completedStage(null));
         boltConnectionSource = new PooledBoltConnectionSource(
                 loggingProvider,
                 clock,
@@ -136,7 +148,7 @@ class PooledBoltConnectionSourceTest {
                 acquisitionTimeout,
                 maxLifetime,
                 idleBeforeTest,
-                metricsListener,
+                observationProvider,
                 routingContextAddress,
                 boltAgent,
                 userAgent,
@@ -195,7 +207,7 @@ class PooledBoltConnectionSourceTest {
                 acquisitionTimeout,
                 maxLifetime,
                 idleBeforeTest,
-                metricsListener,
+                observationProvider,
                 routingContextAddress,
                 boltAgent,
                 userAgent,

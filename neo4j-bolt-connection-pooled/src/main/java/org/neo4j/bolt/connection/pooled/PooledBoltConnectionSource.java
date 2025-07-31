@@ -42,7 +42,6 @@ import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
@@ -51,6 +50,7 @@ import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.pooled.impl.PooledBoltConnection;
 import org.neo4j.bolt.connection.pooled.impl.util.FutureUtil;
+import org.neo4j.bolt.connection.pooled.observation.PoolObservationProvider;
 
 /**
  * A pooled {@link BoltConnectionSource} implementation that automatically pools {@link BoltConnection} instances.
@@ -68,7 +68,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     private final long maxLifetime;
     private final long idleBeforeTest;
     private final Clock clock;
-    private final MetricsListener metricsListener;
+    private final PoolObservationProvider observationProvider;
     private final URI uri;
     private final BoltServerAddress address;
     private final String routingContextAddress;
@@ -94,51 +94,43 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             long acquisitionTimeout,
             long maxLifetime,
             long idleBeforeTest,
-            MetricsListener metricsListener,
+            PoolObservationProvider observationProvider,
             String routingContextAddress,
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
             NotificationConfig notificationConfig) {
-        this.boltConnectionProvider = Objects.requireNonNull(boltConnectionProvider);
-        this.pooledConnectionEntries = new ArrayList<>();
-        this.pendingAcquisitions = new ArrayDeque<>(100);
-        this.maxSize = maxSize;
-        this.acquisitionTimeout = acquisitionTimeout;
-        this.maxLifetime = maxLifetime;
-        this.idleBeforeTest = idleBeforeTest;
-        this.clock = Objects.requireNonNull(clock);
-        this.log = loggingProvider.getLog(getClass());
-        this.metricsListener = Objects.requireNonNull(metricsListener);
         this.uri = Objects.requireNonNull(uri);
         this.address = switch (uri.getScheme()) {
             case "bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc" -> new BoltServerAddress(uri);
             default -> new BoltServerAddress(uri.getHost(), 0);};
-        this.routingContextAddress = routingContextAddress;
-        this.boltAgent = Objects.requireNonNull(boltAgent);
-        this.userAgent = Objects.requireNonNull(userAgent);
-        this.connectTimeoutMillis = connectTimeoutMillis;
-        this.authTokenManager = Objects.requireNonNull(authTokenManager);
-        this.securityPlanSupplier = Objects.requireNonNull(securityPlanSupplier);
-        this.notificationConfig = Objects.requireNonNull(notificationConfig);
         this.poolId = poolId(address);
-        metricsListener.registerPoolMetrics(
-                poolId,
-                address,
-                () -> {
-                    synchronized (this) {
-                        return (int) pooledConnectionEntries.stream()
-                                .filter(entry -> !entry.available)
-                                .count();
-                    }
-                },
-                () -> {
-                    synchronized (this) {
-                        return (int) pooledConnectionEntries.stream()
-                                .filter(entry -> entry.available)
-                                .count();
-                    }
-                });
+        this.observationProvider = Objects.requireNonNull(observationProvider);
+        this.maxSize = maxSize;
+        var createObservation =
+                observationProvider.connectionPoolCreate(poolId, uri, maxSize).start();
+        try {
+            this.boltConnectionProvider = Objects.requireNonNull(boltConnectionProvider);
+            this.pooledConnectionEntries = new ArrayList<>();
+            this.pendingAcquisitions = new ArrayDeque<>(100);
+            this.acquisitionTimeout = acquisitionTimeout;
+            this.maxLifetime = maxLifetime;
+            this.idleBeforeTest = idleBeforeTest;
+            this.clock = Objects.requireNonNull(clock);
+            this.log = loggingProvider.getLog(getClass());
+            this.routingContextAddress = routingContextAddress;
+            this.boltAgent = Objects.requireNonNull(boltAgent);
+            this.userAgent = Objects.requireNonNull(userAgent);
+            this.connectTimeoutMillis = connectTimeoutMillis;
+            this.authTokenManager = Objects.requireNonNull(authTokenManager);
+            this.securityPlanSupplier = Objects.requireNonNull(securityPlanSupplier);
+            this.notificationConfig = Objects.requireNonNull(notificationConfig);
+        } catch (RuntimeException ex) {
+            createObservation.error(ex);
+            throw ex;
+        } finally {
+            createObservation.stop();
+        }
     }
 
     @Override
@@ -155,6 +147,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             }
         }
 
+        var acquireObservation =
+                observationProvider.pooledConnectionAcquire(poolId, uri).start();
         var acquisitionFuture = new CompletableFuture<PooledBoltConnection>();
         CompletionStage<AuthToken> authTokenSupplier;
         boolean overrideAuthToken;
@@ -171,18 +165,14 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                 return;
             }
 
-            var beforeAcquiringOrCreatingEvent = metricsListener.createListenerEvent();
-            metricsListener.beforeAcquiringOrCreating(poolId, beforeAcquiringOrCreatingEvent);
             acquisitionFuture.whenComplete((connection, throwable) -> {
                 throwable = FutureUtil.completionExceptionCause(throwable);
                 if (throwable != null) {
-                    if (throwable instanceof TimeoutException) {
-                        metricsListener.afterTimedOutToAcquireOrCreate(poolId);
-                    }
+                    acquireObservation.error(throwable);
                 } else {
-                    metricsListener.afterAcquiredOrCreated(poolId, beforeAcquiringOrCreatingEvent);
+                    connection.onUsageStart();
                 }
-                metricsListener.afterAcquiringOrCreating(poolId);
+                acquireObservation.stop();
             });
             connect(acquisitionFuture, authToken, overrideAuthToken, parameters.minVersion(), notificationConfig);
         });
@@ -282,18 +272,12 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                         connect(acquisitionFuture, authToken, overrideAuthToken, minVersion, notificationConfig);
                     } else {
                         // liveness check green or not needed
-                        var inUseEvent = metricsListener.createListenerEvent();
                         var pooledConnection = new PooledBoltConnection(
                                 entry.connection,
                                 this,
-                                () -> {
-                                    release(entry);
-                                    metricsListener.afterConnectionReleased(poolId, inUseEvent);
-                                },
-                                () -> {
-                                    purge(entry);
-                                    metricsListener.afterConnectionReleased(poolId, inUseEvent);
-                                });
+                                () -> release(entry),
+                                () -> purge(entry),
+                                observationProvider.pooledConnectionInUse(poolId, uri));
                         reauthStage(entryWithMetadata, authToken).whenComplete((ignored2, throwable2) -> {
                             if (!acquisitionFuture.complete(pooledConnection)) {
                                 // acquisition timed out
@@ -306,20 +290,16 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                     }
                                 }
                                 if (pendingAcquisition != null) {
-                                    if (pendingAcquisition.complete(pooledConnection)) {
-                                        metricsListener.afterConnectionCreated(poolId, inUseEvent);
-                                    }
+                                    pendingAcquisition.complete(pooledConnection);
                                 }
-                            } else {
-                                metricsListener.afterConnectionCreated(poolId, inUseEvent);
                             }
                         });
                     }
                 });
             } else {
+                var createObservation =
+                        observationProvider.pooledConnectionCreate(poolId, uri).start();
                 // get reserved entry
-                var createEvent = metricsListener.createListenerEvent();
-                metricsListener.beforeCreating(poolId, createEvent);
                 var entry = connectionEntryWithMetadata.connectionEntry;
                 var authStage = securityPlanSupplier.getPlan().thenCompose(securityPlan -> {
                     if (overrideAuthToken || empty.get()) {
@@ -347,7 +327,6 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                 synchronized (this) {
                                     pooledConnectionEntries.remove(entry);
                                 }
-                                metricsListener.afterFailedToCreate(poolId);
                                 if (error instanceof BoltFailureException boltFailureException) {
                                     var usedAuth =
                                             authStage.toCompletableFuture().getNow(null);
@@ -356,25 +335,21 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                                 usedAuth.authToken(), boltFailureException);
                                     }
                                 }
+                                createObservation.error(error);
+                                createObservation.stop();
                                 acquisitionFuture.completeExceptionally(error);
                             } else {
                                 synchronized (this) {
                                     entry.connection = boltConnection;
                                     entry.createdTimestamp = clock.millis();
                                 }
-                                metricsListener.afterCreated(poolId, createEvent);
-                                var inUseEvent = metricsListener.createListenerEvent();
+                                createObservation.stop();
                                 var pooledConnection = new PooledBoltConnection(
                                         boltConnection,
                                         this,
-                                        () -> {
-                                            release(entry);
-                                            metricsListener.afterConnectionReleased(poolId, inUseEvent);
-                                        },
-                                        () -> {
-                                            purge(entry);
-                                            metricsListener.afterConnectionReleased(poolId, inUseEvent);
-                                        });
+                                        () -> release(entry),
+                                        () -> purge(entry),
+                                        observationProvider.pooledConnectionInUse(poolId, uri));
                                 if (!acquisitionFuture.complete(pooledConnection)) {
                                     // acquisition timed out
                                     CompletableFuture<PooledBoltConnection> pendingAcquisition;
@@ -386,12 +361,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                         }
                                     }
                                     if (pendingAcquisition != null) {
-                                        if (pendingAcquisition.complete(pooledConnection)) {
-                                            metricsListener.afterConnectionCreated(poolId, inUseEvent);
-                                        }
+                                        pendingAcquisition.complete(pooledConnection);
                                     }
-                                } else {
-                                    metricsListener.afterConnectionCreated(poolId, inUseEvent);
                                 }
                             }
                         });
@@ -428,9 +399,11 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             if (maxLifetime > 0) {
                 var currentTime = clock.millis();
                 if (currentTime - connectionEntry.createdTimestamp > maxLifetime) {
-                    connection.close();
                     iterator.remove();
-                    metricsListener.afterClosed(poolId);
+                    var closeObservation = observationProvider
+                            .pooledConnectionClose(poolId, uri)
+                            .start();
+                    connection.close().whenComplete((ignored, throwable) -> closeObservation.stop());
                     continue;
                 }
             }
@@ -446,6 +419,9 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                 if (new BoltProtocolVersion(5, 1).compareTo(connectionEntry.connection.protocolVersion()) > 0) {
                     log.log(System.Logger.Level.DEBUG, "reauth is not supported, the connection is voided");
                     iterator.remove();
+                    var observation = observationProvider
+                            .pooledConnectionClose(poolId, uri)
+                            .start();
                     connectionEntry.connection.close().whenComplete((ignored, throwable) -> {
                         if (throwable != null) {
                             log.log(
@@ -453,6 +429,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                     "Connection close has failed with %s.",
                                     throwable.getClass().getCanonicalName());
                         }
+                        observation.stop();
                     });
                     continue;
                 }
@@ -528,6 +505,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         CompletionStage<Void> closeStage;
         synchronized (this) {
             if (this.closeStage == null) {
+                var closeObservation =
+                        observationProvider.connectionPoolClose(poolId, uri).start();
                 this.closeStage = CompletableFuture.completedStage(null);
                 var iterator = pooledConnectionEntries.iterator();
                 while (iterator.hasNext()) {
@@ -538,11 +517,13 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                     }
                     iterator.remove();
                 }
-                metricsListener.removePoolMetrics(poolId);
                 this.closeStage = this.closeStage
                         .thenCompose(ignored -> boltConnectionProvider.close())
                         .exceptionally(throwable -> null)
-                        .whenComplete((ignored, throwable) -> executorService.shutdown());
+                        .whenComplete((ignored, throwable) -> {
+                            executorService.shutdown();
+                            closeObservation.stop();
+                        });
             }
             closeStage = this.closeStage;
         }
@@ -577,20 +558,12 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             }
         }
         if (pendingAcquisition != null) {
-            var inUseEvent = metricsListener.createListenerEvent();
-            if (pendingAcquisition.complete(new PooledBoltConnection(
+            pendingAcquisition.complete(new PooledBoltConnection(
                     entry.connection,
                     this,
-                    () -> {
-                        release(entry);
-                        metricsListener.afterConnectionReleased(poolId, inUseEvent);
-                    },
-                    () -> {
-                        purge(entry);
-                        metricsListener.afterConnectionReleased(poolId, inUseEvent);
-                    }))) {
-                metricsListener.afterConnectionCreated(poolId, inUseEvent);
-            }
+                    () -> release(entry),
+                    () -> purge(entry),
+                    observationProvider.pooledConnectionInUse(poolId, uri)));
         }
         log.log(System.Logger.Level.DEBUG, "Connection released to the pool.");
     }
@@ -599,8 +572,9 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         synchronized (this) {
             pooledConnectionEntries.remove(entry);
         }
-        metricsListener.afterClosed(poolId);
-        entry.connection.close();
+        var closeObservation =
+                observationProvider.pooledConnectionClose(poolId, uri).start();
+        entry.connection.close().whenComplete((ignored, throwable) -> closeObservation.stop());
         log.log(System.Logger.Level.DEBUG, "Connection purged from the pool.");
     }
 

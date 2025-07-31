@@ -34,7 +34,6 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
@@ -47,7 +46,6 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     private final System.Logger log;
     private final EventLoopGroup eventLoopGroup;
     private final ConnectionProvider connectionProvider;
-    private final MetricsListener metricsListener;
     private final Clock clock;
     private final ValueFactory valueFactory;
     private final boolean shutdownEventLoopGroupOnClose;
@@ -62,7 +60,6 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             BoltProtocolVersion maxVersion,
             LoggingProvider logging,
             ValueFactory valueFactory,
-            MetricsListener metricsListener,
             boolean shutdownEventLoopGroupOnClose) {
         Objects.requireNonNull(eventLoopGroup);
         this.clock = Objects.requireNonNull(clock);
@@ -72,7 +69,6 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.connectionProvider = ConnectionProviders.netty(
                 eventLoopGroup, clock, domainNameResolver, localAddress, maxVersion, logging, valueFactory);
         this.valueFactory = Objects.requireNonNull(valueFactory);
-        this.metricsListener = NoopMetricsListener.getInstance();
         InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));
         this.shutdownEventLoopGroupOnClose = shutdownEventLoopGroupOnClose;
     }
@@ -129,8 +125,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         userAgent,
                         connectTimeoutMillis,
                         latestAuthMillisFuture,
-                        notificationConfig,
-                        metricsListener)
+                        notificationConfig)
                 .thenCompose(connection -> {
                     if (minVersion != null
                             && minVersion.compareTo(connection.protocol().version()) > 0) {
