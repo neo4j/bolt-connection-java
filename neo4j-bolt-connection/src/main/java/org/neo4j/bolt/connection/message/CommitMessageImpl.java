@@ -16,4 +16,9 @@
  */
 package org.neo4j.bolt.connection.message;
 
-record CommitMessageImpl() implements CommitMessage {}
+record CommitMessageImpl() implements CommitMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

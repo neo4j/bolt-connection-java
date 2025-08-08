@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.message.LogonMessage;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 final class LogonMessageHandler implements MessageHandler<Void> {
     private final ResponseHandler handler;
@@ -36,7 +37,7 @@ final class LogonMessageHandler implements MessageHandler<Void> {
     }
 
     @Override
-    public CompletionStage<Void> exchange() {
+    public CompletionStage<Void> exchange(ImmutableObservation parentObservation) {
         return CompletableFuture.completedStage(null).thenApply(ignored -> {
             authTokenHandler.accept(message.authToken());
             handler.onLogonSummary(LogonSummaryImpl.INSTANCE);

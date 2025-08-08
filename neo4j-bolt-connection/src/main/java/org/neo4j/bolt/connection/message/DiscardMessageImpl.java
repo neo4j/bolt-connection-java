@@ -16,4 +16,9 @@
  */
 package org.neo4j.bolt.connection.message;
 
-record DiscardMessageImpl(long qid, long number) implements DiscardMessage {}
+record DiscardMessageImpl(long qid, long number) implements DiscardMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

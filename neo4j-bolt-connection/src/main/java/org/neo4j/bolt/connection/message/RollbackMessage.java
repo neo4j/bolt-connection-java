@@ -16,4 +16,6 @@
  */
 package org.neo4j.bolt.connection.message;
 
-public sealed interface RollbackMessage extends Message permits RollbackMessageImpl {}
+public sealed interface RollbackMessage extends Message permits RollbackMessageImpl {
+    String NAME = "ROLLBACK";
+}

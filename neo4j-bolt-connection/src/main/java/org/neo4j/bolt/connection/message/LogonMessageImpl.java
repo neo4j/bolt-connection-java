@@ -18,4 +18,9 @@ package org.neo4j.bolt.connection.message;
 
 import org.neo4j.bolt.connection.AuthToken;
 
-record LogonMessageImpl(AuthToken authToken) implements LogonMessage {}
+record LogonMessageImpl(AuthToken authToken) implements LogonMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

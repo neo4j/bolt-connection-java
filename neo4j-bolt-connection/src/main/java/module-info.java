@@ -24,4 +24,5 @@ module org.neo4j.bolt.connection {
     exports org.neo4j.bolt.connection.summary;
     exports org.neo4j.bolt.connection.values;
     exports org.neo4j.bolt.connection.ssl;
+    exports org.neo4j.bolt.connection.observation;
 }

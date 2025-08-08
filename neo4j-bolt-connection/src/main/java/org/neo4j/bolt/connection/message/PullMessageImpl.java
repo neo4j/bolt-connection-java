@@ -16,4 +16,9 @@
  */
 package org.neo4j.bolt.connection.message;
 
-record PullMessageImpl(long qid, long request) implements PullMessage {}
+record PullMessageImpl(long qid, long request) implements PullMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

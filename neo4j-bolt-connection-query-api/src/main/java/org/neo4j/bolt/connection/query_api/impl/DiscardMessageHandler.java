@@ -24,6 +24,7 @@ import java.util.function.Function;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.message.DiscardMessage;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 final class DiscardMessageHandler implements MessageHandler<Void> {
     private final System.Logger log;
@@ -46,7 +47,7 @@ final class DiscardMessageHandler implements MessageHandler<Void> {
     }
 
     @Override
-    public CompletionStage<Void> exchange() {
+    public CompletionStage<Void> exchange(ImmutableObservation parentObservation) {
         return CompletableFuture.<Void>completedStage(null).thenApply(ignored -> {
             var query = queryFinder.apply(message.qid());
             queryDeleteConsumer.accept(query.id());

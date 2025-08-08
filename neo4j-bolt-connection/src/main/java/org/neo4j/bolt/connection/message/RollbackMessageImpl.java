@@ -16,4 +16,9 @@
  */
 package org.neo4j.bolt.connection.message;
 
-record RollbackMessageImpl() implements RollbackMessage {}
+record RollbackMessageImpl() implements RollbackMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

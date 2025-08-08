@@ -22,6 +22,7 @@ import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -70,6 +71,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.HelloMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.PullMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.RunSummary;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
@@ -126,7 +128,8 @@ public class BoltProtocolV44Test {
                         null,
                         clock,
                         latestAuthMillisFuture,
-                        valueFactory)
+                        valueFactory,
+                        mock(BoltExchangeObservation.class))
                 .toCompletableFuture();
 
         assertEquals(1, channel.outboundMessages().size());
@@ -158,7 +161,8 @@ public class BoltProtocolV44Test {
                         null,
                         mock(Clock.class),
                         new CompletableFuture<>(),
-                        valueFactory)
+                        valueFactory,
+                        mock(BoltExchangeObservation.class))
                 .toCompletableFuture();
 
         assertEquals(1, channel.outboundMessages().size());
@@ -198,9 +202,10 @@ public class BoltProtocolV44Test {
                 null,
                 handler,
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, stage);
+        assertNull(stage.toCompletableFuture().join());
         var message = new BeginMessage(
                 Collections.emptySet(),
                 null,
@@ -243,9 +248,10 @@ public class BoltProtocolV44Test {
                 null,
                 handler,
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, stage);
+        assertNull(stage.toCompletableFuture().join());
         var message = new BeginMessage(
                 bookmarks,
                 null,
@@ -287,9 +293,10 @@ public class BoltProtocolV44Test {
                 null,
                 handler,
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, stage);
+        assertNull(stage.toCompletableFuture().join());
         var message = new BeginMessage(
                 Collections.emptySet(),
                 txTimeout,
@@ -320,9 +327,9 @@ public class BoltProtocolV44Test {
         @SuppressWarnings("unchecked")
         var handler = (MessageHandler<String>) mock(MessageHandler.class);
 
-        var stage = protocol.commitTransaction(connection, handler);
+        var stage = protocol.commitTransaction(connection, handler, mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, stage);
+        assertNull(stage.toCompletableFuture().join());
         then(connection).should().write(eq(CommitMessage.COMMIT), any(CommitTxResponseHandler.class));
         then(handler).should().onSummary(bookmarkString);
     }
@@ -340,9 +347,9 @@ public class BoltProtocolV44Test {
         @SuppressWarnings("unchecked")
         var handler = (MessageHandler<Void>) mock(MessageHandler.class);
 
-        var stage = protocol.rollbackTransaction(connection, handler);
+        var stage = protocol.rollbackTransaction(connection, handler, mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, stage);
+        assertNull(stage.toCompletableFuture().join());
         then(connection).should().write(eq(RollbackMessage.ROLLBACK), any(RollbackTxResponseHandler.class));
         then(handler).should().onSummary(any());
     }
@@ -429,9 +436,10 @@ public class BoltProtocolV44Test {
                 null,
                 mock(),
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, future);
+        assertNull(future.toCompletableFuture().join());
         then(connection).should().write(any(), any());
     }
 
@@ -453,9 +461,10 @@ public class BoltProtocolV44Test {
                 null,
                 mock(),
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, future);
+        assertNull(future.toCompletableFuture().join());
         then(connection).should().write(any(), any());
     }
 
@@ -465,7 +474,8 @@ public class BoltProtocolV44Test {
         @SuppressWarnings("unchecked")
         var handler = (MessageHandler<Void>) mock(MessageHandler.class);
 
-        var future = protocol.telemetry(connection, 1, handler).toCompletableFuture();
+        var future = protocol.telemetry(connection, 1, handler, mock(BoltExchangeObservation.class))
+                .toCompletableFuture();
 
         assertTrue(future.isCompletedExceptionally());
         then(connection).shouldHaveNoInteractions();
@@ -502,8 +512,9 @@ public class BoltProtocolV44Test {
                 null,
                 handler,
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
-        assertEquals(expectedStage, stage);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
+        assertNull(stage.toCompletableFuture().join());
         var message = autoCommitTxRunMessage(
                 query,
                 query_params,
@@ -556,11 +567,13 @@ public class BoltProtocolV44Test {
                 null,
                 runHandler,
                 NoopLoggingProvider.INSTANCE,
-                valueFactory);
-        var pullStage = protocol.pull(connection, 0, UNLIMITED_FETCH_SIZE, pullHandler, valueFactory);
+                valueFactory,
+                mock(BoltExchangeObservation.class));
+        var pullStage = protocol.pull(
+                connection, 0, UNLIMITED_FETCH_SIZE, pullHandler, valueFactory, mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedRunStage, runStage);
-        assertEquals(expectedPullStage, pullStage);
+        assertNull(runStage.toCompletableFuture().join());
+        assertNull(pullStage.toCompletableFuture().join());
         var runMessage = autoCommitTxRunMessage(
                 query,
                 query_params,
@@ -601,9 +614,9 @@ public class BoltProtocolV44Test {
         @SuppressWarnings("unchecked")
         var handler = (MessageHandler<RunSummary>) mock(MessageHandler.class);
 
-        var stage = protocol.run(connection, query, query_params, handler);
+        var stage = protocol.run(connection, query, query_params, handler, mock(BoltExchangeObservation.class));
 
-        assertEquals(expectedStage, stage);
+        assertNull(stage.toCompletableFuture().join());
         var message = unmanagedTxRunMessage(query, query_params);
         then(connection).should().write(eq(message), any(RunResponseHandler.class));
         if (success) {
@@ -641,8 +654,9 @@ public class BoltProtocolV44Test {
                     null,
                     handler,
                     NoopLoggingProvider.INSTANCE,
-                    valueFactory);
-            assertEquals(expectedStage, stage);
+                    valueFactory,
+                    mock(BoltExchangeObservation.class));
+            assertNull(stage.toCompletableFuture().join());
             var message = autoCommitTxRunMessage(
                     query,
                     query_params,
@@ -660,9 +674,9 @@ public class BoltProtocolV44Test {
             then(connection).should().write(eq(message), any(RunResponseHandler.class));
             then(handler).should().onSummary(any());
         } else {
-            var stage = protocol.run(connection, query, query_params, handler);
+            var stage = protocol.run(connection, query, query_params, handler, mock(BoltExchangeObservation.class));
 
-            assertEquals(expectedStage, stage);
+            assertNull(stage.toCompletableFuture().join());
             var message = unmanagedTxRunMessage(query, query_params);
             then(connection).should().write(eq(message), any(RunResponseHandler.class));
             then(handler).should().onSummary(any());
@@ -695,8 +709,9 @@ public class BoltProtocolV44Test {
                     null,
                     handler,
                     NoopLoggingProvider.INSTANCE,
-                    valueFactory);
-            assertEquals(expectedStage, stage);
+                    valueFactory,
+                    mock(BoltExchangeObservation.class));
+            assertNull(stage.toCompletableFuture().join());
             var message = autoCommitTxRunMessage(
                     query,
                     query_params,
@@ -733,9 +748,10 @@ public class BoltProtocolV44Test {
                     null,
                     handler,
                     NoopLoggingProvider.INSTANCE,
-                    valueFactory);
+                    valueFactory,
+                    mock(BoltExchangeObservation.class));
 
-            assertEquals(expectedStage, stage);
+            assertNull(stage.toCompletableFuture().join());
             var message = new BeginMessage(
                     Collections.emptySet(),
                     null,

@@ -22,7 +22,7 @@ import java.util.Set;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltConnectionProviderFactory;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.query_api.impl.QueryApiBoltConnectionProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -51,9 +51,10 @@ public final class QueryApiBoltConnectionProviderFactory implements BoltConnecti
     public BoltConnectionProvider create(
             LoggingProvider loggingProvider,
             ValueFactory valueFactory,
-            MetricsListener metricsListener,
+            ObservationProvider observationProvider,
             Map<String, ?> additionalConfig) {
-        return new QueryApiBoltConnectionProvider(loggingProvider, valueFactory, getClock(additionalConfig));
+        return new QueryApiBoltConnectionProvider(
+                loggingProvider, valueFactory, getClock(additionalConfig), observationProvider);
     }
 
     private Clock getClock(Map<String, ?> additionalConfig) {

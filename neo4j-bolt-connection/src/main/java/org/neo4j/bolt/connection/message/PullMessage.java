@@ -17,6 +17,8 @@
 package org.neo4j.bolt.connection.message;
 
 public sealed interface PullMessage extends Message permits PullMessageImpl {
+    String NAME = "PULL";
+
     long qid();
 
     long request();

@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v53;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.messageDispatcher;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import java.time.Clock;
 import java.util.Collections;
 import java.util.Map;
@@ -34,6 +35,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.BoltProtocol;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.HelloMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.LogonMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v52.BoltProtocolV52;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -52,7 +54,8 @@ public class BoltProtocolV53 extends BoltProtocolV52 {
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         var exception = verifyNotificationConfigSupported(notificationConfig);
         if (exception != null) {
             return CompletableFuture.failedStage(exception);
@@ -83,15 +86,31 @@ public class BoltProtocolV53 extends BoltProtocolV52 {
 
         var helloFuture = new CompletableFuture<String>();
         messageDispatcher(channel).enqueue(new HelloV51ResponseHandler(channel, helloFuture));
-        channel.write(message, channel.voidPromise());
+        channel.write(message).addListener((ChannelFutureListener) writeFuture -> {
+            if (writeFuture.isSuccess()) {
+                observation.onWrite(message.name());
+            }
+        });
 
         var logonFuture = new CompletableFuture<Void>();
         var logon = new LogonMessage(authMap, valueFactory);
         messageDispatcher(channel)
                 .enqueue(new LogonResponseHandler(logonFuture, channel, clock, latestAuthMillisFuture));
-        channel.writeAndFlush(logon, channel.voidPromise());
+        channel.writeAndFlush(logon).addListener((ChannelFutureListener) writeFuture -> {
+            if (writeFuture.isSuccess()) {
+                observation.onWrite(logon.name());
+            }
+        });
 
-        return helloFuture.thenCompose(ignored -> logonFuture).thenApply(ignored -> channel);
+        return helloFuture
+                .thenCompose(ignored -> {
+                    observation.onSummary(message.name());
+                    return logonFuture;
+                })
+                .thenApply(ignored -> {
+                    observation.onSummary(logon.name());
+                    return channel;
+                });
     }
 
     @Override

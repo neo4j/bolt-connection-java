@@ -30,6 +30,7 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.message.BeginMessage;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> {
@@ -48,8 +49,9 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
             BeginMessage message,
             Duration readTimeout,
             ValueFactory valueFactory,
-            LoggingProvider logging) {
-        super(httpContext, handler, valueFactory, logging);
+            LoggingProvider logging,
+            ObservationProvider observationProvider) {
+        super(httpContext, handler, valueFactory, logging, observationProvider);
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
@@ -72,14 +74,14 @@ final class BeginMessageHandler extends AbstractMessageHandler<TransactionInfo> 
     }
 
     @Override
-    protected HttpRequest newHttpRequest() {
-        var builder = HttpRequest.newBuilder(httpContext.txUrl(databaseName))
-                .headers(httpContext.headers(authHeaderSupplier.get()))
-                .POST(bodyPublisher);
+    protected ObservationParameters newHttpRequestBuilder(HttpRequest.Builder builder) {
+        var uri = httpContext.txUrl(databaseName);
+        var headers = httpContext.headers(authHeaderSupplier.get());
+        builder.uri(uri).headers(headers).POST(bodyPublisher);
         if (readTimeout != null) {
-            builder = builder.timeout(readTimeout);
+            builder.timeout(readTimeout);
         }
-        return builder.build();
+        return new ObservationParameters(uri, "POST", HttpContext.TRANSACTION_BASE_URL_TEMPLATE, headers);
     }
 
     @Override

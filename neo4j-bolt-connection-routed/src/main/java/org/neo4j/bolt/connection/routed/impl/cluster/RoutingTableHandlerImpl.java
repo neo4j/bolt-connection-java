@@ -32,6 +32,7 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
@@ -79,7 +80,8 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
     }
 
     @Override
-    public synchronized CompletionStage<RoutingTable> ensureRoutingTable(RoutedBoltConnectionParameters parameters) {
+    public synchronized CompletionStage<RoutingTable> ensureRoutingTable(
+            RoutedBoltConnectionParameters parameters, ImmutableObservation parentObservation) {
         if (refreshRoutingTableFuture != null) {
             // refresh is already happening concurrently, just use it's result
             return refreshRoutingTableFuture;
@@ -95,7 +97,7 @@ public class RoutingTableHandlerImpl implements RoutingTableHandler {
             refreshRoutingTableFuture = resultFuture;
 
             rediscovery
-                    .lookupClusterComposition(routingTable, connectionSourceGetter, parameters)
+                    .lookupClusterComposition(routingTable, connectionSourceGetter, parameters, parentObservation)
                     .whenComplete((composition, completionError) -> {
                         var error = FutureUtil.completionExceptionCause(completionError);
                         if (error != null) {

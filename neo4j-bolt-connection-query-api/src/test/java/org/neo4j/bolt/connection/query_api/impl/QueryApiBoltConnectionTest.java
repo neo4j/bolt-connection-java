@@ -58,6 +58,9 @@ import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.BeginMessage;
 import org.neo4j.bolt.connection.message.Messages;
 import org.neo4j.bolt.connection.message.RunMessage;
+import org.neo4j.bolt.connection.observation.HttpExchangeObservation;
+import org.neo4j.bolt.connection.observation.Observation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 
 final class QueryApiBoltConnectionTest {
@@ -78,6 +81,12 @@ final class QueryApiBoltConnectionTest {
     @Mock
     HttpResponse<String> response;
 
+    @Mock
+    ObservationProvider observationProvider;
+
+    @Mock
+    HttpExchangeObservation observation;
+
     @SuppressWarnings("resource")
     @BeforeEach
     void beforeEach() {
@@ -85,8 +94,11 @@ final class QueryApiBoltConnectionTest {
         given(loggingProvider.getLog(any(Class.class))).willReturn(logger);
         given(response.headers()).willReturn(HttpHeaders.of(Map.of(), (k, v) -> true));
         given(response.statusCode()).willReturn(202);
+        given(response.version()).willReturn(HttpClient.Version.HTTP_1_1);
         given(httpClient.sendAsync(any(), eq(HttpResponse.BodyHandlers.ofString())))
                 .willReturn(CompletableFuture.completedFuture(response));
+        given(observationProvider.httpExchange(any(), any(), any(), any(), any()))
+                .willReturn(observation);
         boltConnection = new QueryApiBoltConnection(
                 TestValueFactory.INSTANCE,
                 httpClient,
@@ -96,7 +108,8 @@ final class QueryApiBoltConnectionTest {
                 "serverAgent",
                 new BoltProtocolVersion(5, 6),
                 Clock.systemUTC(),
-                loggingProvider);
+                loggingProvider,
+                observationProvider);
     }
 
     @Test
@@ -117,7 +130,7 @@ final class QueryApiBoltConnectionTest {
 
         // when
         boltConnection
-                .writeAndFlush(handler, newRunMessage())
+                .writeAndFlush(handler, newRunMessage(), mock(Observation.class))
                 .toCompletableFuture()
                 .join();
 
@@ -134,7 +147,10 @@ final class QueryApiBoltConnectionTest {
         var messages = List.of(newRunMessage(), Messages.pull(-1, -1));
 
         // when
-        boltConnection.writeAndFlush(handler, messages).toCompletableFuture().join();
+        boltConnection
+                .writeAndFlush(handler, messages, mock(Observation.class))
+                .toCompletableFuture()
+                .join();
 
         // then
         then(handler).should(times(2)).onIgnored();
@@ -155,7 +171,10 @@ final class QueryApiBoltConnectionTest {
         var messages = List.of(Messages.reset(), newBeginMessage());
 
         // when
-        boltConnection.writeAndFlush(handler, messages).toCompletableFuture().join();
+        boltConnection
+                .writeAndFlush(handler, messages, mock(Observation.class))
+                .toCompletableFuture()
+                .join();
 
         // then
         then(handler).should().onResetSummary(any());
@@ -171,7 +190,9 @@ final class QueryApiBoltConnectionTest {
         boltConnection.updateState(state);
 
         // when
-        var result = boltConnection.writeAndFlush(handler, newRunMessage()).toCompletableFuture();
+        var result = boltConnection
+                .writeAndFlush(handler, newRunMessage(), mock(Observation.class))
+                .toCompletableFuture();
 
         // then
         var ex = assertThrows(CompletionException.class, result::join);
@@ -186,7 +207,7 @@ final class QueryApiBoltConnectionTest {
 
         // when
         boltConnection
-                .writeAndFlush(handler, Messages.reset())
+                .writeAndFlush(handler, Messages.reset(), mock(Observation.class))
                 .toCompletableFuture()
                 .join();
 

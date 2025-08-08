@@ -20,14 +20,15 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class DiscardMessage extends AbstractStreamingMessage {
     public static final byte SIGNATURE = 0x2F;
+    private static final String NAME = "DISCARD";
 
     public DiscardMessage(long n, long id, ValueFactory valueFactory) {
         super(n, id, valueFactory);
     }
 
     @Override
-    protected String name() {
-        return "DISCARD";
+    public String name() {
+        return NAME;
     }
 
     @Override

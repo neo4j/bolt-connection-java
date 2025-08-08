@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.message;
 import org.neo4j.bolt.connection.TransactionType;
 
 public sealed interface BeginMessage extends Message, BasicTransactionParams permits BeginMessageImpl {
+    String NAME = "BEGIN";
 
     TransactionType transactionType();
 }

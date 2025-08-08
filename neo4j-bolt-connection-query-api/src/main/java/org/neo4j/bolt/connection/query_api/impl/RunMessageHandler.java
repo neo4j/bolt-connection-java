@@ -37,6 +37,7 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.message.RunMessage;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -61,8 +62,9 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
             Supplier<TransactionInfo> transactionInfoSupplier,
             Duration readTimeout,
             ValueFactory valueFactory,
-            LoggingProvider logging) {
-        super(httpContext, handler, valueFactory, logging);
+            LoggingProvider logging,
+            ObservationProvider observationProvider) {
+        super(httpContext, handler, valueFactory, logging, observationProvider);
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
@@ -83,14 +85,16 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
     }
 
     @Override
-    protected HttpRequest newHttpRequest() {
+    protected ObservationParameters newHttpRequestBuilder(HttpRequest.Builder builder) {
         var transactionInfo = transactionInfoSupplier.get();
         String databaseName;
         URI uri;
+        String uriTemplate;
         var headers = httpContext.headers(authHeaderSupplier.get());
         if (transactionInfo != null) {
             databaseName = transactionInfo.databaseName();
             uri = httpContext.txUrl(transactionInfo);
+            uriTemplate = HttpContext.TRANSACTION_QUERY_URL_TEMPLATE;
             if (transactionInfo.affinity() != null) {
                 headers = Arrays.copyOf(headers, headers.length + 2);
                 headers[headers.length - 2] = "neo4j-cluster-affinity";
@@ -103,13 +107,14 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
                 throw new BoltClientException("Database not specified");
             }
             uri = httpContext.queryUrl(databaseName);
+            uriTemplate = HttpContext.QUERY_URL_TEMPLATE;
         }
         this.databaseName.set(databaseName);
-        var builder = HttpRequest.newBuilder(uri).headers(headers).POST(bodyPublisher);
+        builder.uri(uri).headers(headers).POST(bodyPublisher);
         if (readTimeout != null) {
-            builder = builder.timeout(readTimeout);
+            builder.timeout(readTimeout);
         }
-        return builder.build();
+        return new ObservationParameters(uri, "POST", uriTemplate, headers);
     }
 
     @Override

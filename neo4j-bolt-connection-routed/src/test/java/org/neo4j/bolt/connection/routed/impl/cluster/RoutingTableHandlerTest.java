@@ -64,6 +64,8 @@ import org.neo4j.bolt.connection.ClusterComposition;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.Observation;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
@@ -115,14 +117,15 @@ class RoutingTableHandlerTest {
         Set<BoltServerAddress> routers = new LinkedHashSet<>(singletonList(router1));
         var clusterComposition = new ClusterComposition(42, readers, writers, routers, null);
         Rediscovery rediscovery = Mockito.mock(RediscoveryImpl.class);
-        when(rediscovery.lookupClusterComposition(any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any(), any()))
                 .thenReturn(completedFuture(new ClusterCompositionLookupResult(clusterComposition)));
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionPool);
-        assertNotNull(
-                handler.ensureRoutingTable(parameters).toCompletableFuture().join());
+        assertNotNull(handler.ensureRoutingTable(parameters, mock(Observation.class))
+                .toCompletableFuture()
+                .join());
 
-        verify(rediscovery).lookupClusterComposition(any(), any(), any());
+        verify(rediscovery).lookupClusterComposition(any(), any(), any(), any());
         assertArrayEquals(
                 new BoltServerAddress[] {reader1, reader2},
                 routingTable.readers().toArray());
@@ -160,14 +163,16 @@ class RoutingTableHandlerTest {
         var connectionPool = newConnectionPoolMock();
 
         var rediscovery = newRediscoveryMock();
-        when(rediscovery.lookupClusterComposition(any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any(), any()))
                 .thenReturn(completedFuture(new ClusterCompositionLookupResult(
                         new ClusterComposition(42, asOrderedSet(A, B), asOrderedSet(B, C), asOrderedSet(A, C), null))));
 
         var registry = new RoutingTableRegistry() {
             @Override
             public CompletionStage<RoutingTableHandler> ensureRoutingTable(
-                    CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters) {
+                    CompletableFuture<DatabaseName> databaseNameFuture,
+                    RoutedBoltConnectionParameters parameters,
+                    ImmutableObservation parentObservation) {
                 throw new UnsupportedOperationException();
             }
 
@@ -194,8 +199,9 @@ class RoutingTableHandlerTest {
         var handler =
                 newRoutingTableHandler(routingTable, rediscovery, connectionPool, registry, addressesToRetainRef::set);
 
-        var actual =
-                handler.ensureRoutingTable(parameters).toCompletableFuture().join();
+        var actual = handler.ensureRoutingTable(parameters, mock(Observation.class))
+                .toCompletableFuture()
+                .join();
         assertEquals(routingTable, actual);
 
         assertEquals(Set.of(A, B, C), addressesToRetainRef.get());
@@ -207,7 +213,7 @@ class RoutingTableHandlerTest {
         RoutingTable routingTable = new ClusterRoutingTable(defaultDatabase(), new FakeClock());
 
         var rediscovery = newRediscoveryMock();
-        when(rediscovery.lookupClusterComposition(any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any(), any()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Bang!")));
 
         var connectionPool = newConnectionPoolMock();
@@ -215,7 +221,7 @@ class RoutingTableHandlerTest {
         // When
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionPool, registry);
-        assertThrows(RuntimeException.class, () -> handler.ensureRoutingTable(parameters)
+        assertThrows(RuntimeException.class, () -> handler.ensureRoutingTable(parameters, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
 
@@ -238,16 +244,18 @@ class RoutingTableHandlerTest {
         var rediscovery = newRediscoveryMock();
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionSourceGetter);
-        var actual = handler.ensureRoutingTable(RoutedBoltConnectionParameters.builder()
-                        .withAccessMode(mode)
-                        .withMinVersion(new BoltProtocolVersion(4, 1))
-                        .build())
+        var actual = handler.ensureRoutingTable(
+                        RoutedBoltConnectionParameters.builder()
+                                .withAccessMode(mode)
+                                .withMinVersion(new BoltProtocolVersion(4, 1))
+                                .build(),
+                        mock(Observation.class))
                 .toCompletableFuture()
                 .join();
         assertEquals(routingTable, actual);
 
         verify(routingTable).isStaleFor(mode);
-        verify(rediscovery).lookupClusterComposition(any(), any(), any());
+        verify(rediscovery).lookupClusterComposition(any(), any(), any(), any());
     }
 
     private void testNoRediscoveryWhenNotStale(AccessMode staleMode, AccessMode notStaleMode) {
@@ -266,14 +274,16 @@ class RoutingTableHandlerTest {
 
         var handler = newRoutingTableHandler(routingTable, rediscovery, connectionSourceGetter);
 
-        assertNotNull(handler.ensureRoutingTable(RoutedBoltConnectionParameters.builder()
-                        .withAccessMode(notStaleMode)
-                        .withMinVersion(new BoltProtocolVersion(4, 1))
-                        .build())
+        assertNotNull(handler.ensureRoutingTable(
+                        RoutedBoltConnectionParameters.builder()
+                                .withAccessMode(notStaleMode)
+                                .withMinVersion(new BoltProtocolVersion(4, 1))
+                                .build(),
+                        mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         verify(routingTable).isStaleFor(notStaleMode);
-        verify(rediscovery, never()).lookupClusterComposition(any(), any(), any());
+        verify(rediscovery, never()).lookupClusterComposition(any(), any(), any(), any());
     }
 
     private static RoutingTable newStaleRoutingTableMock(AccessMode mode) {
@@ -296,7 +306,7 @@ class RoutingTableHandlerTest {
         Rediscovery rediscovery = Mockito.mock(RediscoveryImpl.class);
         Set<BoltServerAddress> noServers = Collections.emptySet();
         var clusterComposition = new ClusterComposition(1, noServers, noServers, noServers, null);
-        when(rediscovery.lookupClusterComposition(any(), any(), any()))
+        when(rediscovery.lookupClusterComposition(any(), any(), any(), any()))
                 .thenReturn(completedFuture(new ClusterCompositionLookupResult(clusterComposition)));
         return rediscovery;
     }

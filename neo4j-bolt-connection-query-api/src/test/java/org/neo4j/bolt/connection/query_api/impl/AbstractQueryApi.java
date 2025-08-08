@@ -59,6 +59,10 @@ import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionReadTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.message.Messages;
+import org.neo4j.bolt.connection.observation.HttpExchangeObservation;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.Observation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.CommitSummary;
 import org.neo4j.bolt.connection.summary.DiscardSummary;
@@ -75,6 +79,12 @@ abstract class AbstractQueryApi {
     @Mock
     ResponseHandler responseHandler;
 
+    @Mock
+    ObservationProvider observationProvider;
+
+    @Mock
+    HttpExchangeObservation observation;
+
     QueryApiBoltConnection connection;
 
     @SuppressWarnings("resource")
@@ -84,7 +94,10 @@ abstract class AbstractQueryApi {
         var valueFactory = TestValueFactory.INSTANCE;
         given(logging.getLog(any(Class.class))).willAnswer((Answer<System.Logger>) invocation ->
                 System.getLogger(invocation.getArgument(0).getClass().getCanonicalName()));
-        var provider = new QueryApiBoltConnectionProvider(logging, valueFactory, Clock.systemUTC());
+        given(observationProvider.httpExchange(any(), any(), any(), any(), any()))
+                .willReturn(observation);
+        var provider =
+                new QueryApiBoltConnectionProvider(logging, valueFactory, Clock.systemUTC(), observationProvider);
         connection = (QueryApiBoltConnection) provider.connect(
                         uri(),
                         null,
@@ -94,7 +107,8 @@ abstract class AbstractQueryApi {
                         SecurityPlans.encryptedForSystemCASignedCertificates(),
                         AuthTokens.basic(username(), password(), "basic", valueFactory),
                         null,
-                        null)
+                        null,
+                        mock(ImmutableObservation.class))
                 .toCompletableFuture()
                 .join();
     }
@@ -122,7 +136,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, message)
+                .writeAndFlush(responseHandler, message, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -165,7 +179,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, message)
+                .writeAndFlush(responseHandler, message, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -201,7 +215,7 @@ abstract class AbstractQueryApi {
 
         // when & then
         var exception = assertThrows(CompletionException.class, () -> connection
-                .writeAndFlush(responseHandler, message)
+                .writeAndFlush(responseHandler, message, mock(Observation.class))
                 .toCompletableFuture()
                 .join());
         var boltException = assertInstanceOf(BoltClientException.class, exception.getCause());
@@ -234,7 +248,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -293,7 +307,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -344,7 +358,7 @@ abstract class AbstractQueryApi {
                 Map.of(),
                 NotificationConfig.defaultConfig());
         connection
-                .writeAndFlush(runResponseHandler, runMessage)
+                .writeAndFlush(runResponseHandler, runMessage, mock(Observation.class))
                 .thenCompose(ignored -> runResponseFuture)
                 .toCompletableFuture()
                 .join();
@@ -362,7 +376,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, Messages.pull(runSummary.queryId(), -1))
+                .writeAndFlush(responseHandler, Messages.pull(runSummary.queryId(), -1), mock(Observation.class))
                 .thenCompose(ignored -> pullResponseFuture)
                 .toCompletableFuture()
                 .join();
@@ -409,7 +423,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, message)
+                .writeAndFlush(responseHandler, message, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -452,7 +466,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -518,7 +532,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -591,7 +605,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -661,7 +675,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -703,7 +717,7 @@ abstract class AbstractQueryApi {
                 Map.of(),
                 NotificationConfig.defaultConfig());
         connection
-                .writeAndFlush(responseHandler, message)
+                .writeAndFlush(responseHandler, message, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -721,7 +735,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, Messages.reset())
+                .writeAndFlush(responseHandler, Messages.reset(), mock(Observation.class))
                 .thenCompose(ignored -> resetResponseFuture)
                 .toCompletableFuture()
                 .join();
@@ -757,7 +771,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, messages)
+                .writeAndFlush(responseHandler, messages, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();
@@ -800,7 +814,7 @@ abstract class AbstractQueryApi {
 
         // when
         connection
-                .writeAndFlush(responseHandler, message)
+                .writeAndFlush(responseHandler, message, mock(Observation.class))
                 .thenCompose(ignored -> responseFuture)
                 .toCompletableFuture()
                 .join();

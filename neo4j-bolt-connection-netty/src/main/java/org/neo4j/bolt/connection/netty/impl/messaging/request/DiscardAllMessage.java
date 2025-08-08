@@ -16,10 +16,9 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
-public class DiscardAllMessage implements Message {
+public class DiscardAllMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x2F;
+    private static final String NAME = "DISCARD_ALL";
 
     public static final DiscardAllMessage DISCARD_ALL = new DiscardAllMessage();
 
@@ -31,7 +30,12 @@ public class DiscardAllMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "DISCARD_ALL";
+        return NAME;
     }
 }

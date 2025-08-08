@@ -16,4 +16,6 @@
  */
 package org.neo4j.bolt.connection.message;
 
-public sealed interface LogoffMessage extends Message permits LogoffMessageImpl {}
+public sealed interface LogoffMessage extends Message permits LogoffMessageImpl {
+    String NAME = "LOGOFF";
+}

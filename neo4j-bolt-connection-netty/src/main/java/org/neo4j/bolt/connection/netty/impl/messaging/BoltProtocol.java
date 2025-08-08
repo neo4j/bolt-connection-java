@@ -36,6 +36,7 @@ import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.netty.impl.RoutingContext;
 import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.observation.BoltExchangeObservation;
 import org.neo4j.bolt.connection.summary.BeginSummary;
 import org.neo4j.bolt.connection.summary.DiscardSummary;
 import org.neo4j.bolt.connection.summary.RouteSummary;
@@ -55,7 +56,8 @@ public interface BoltProtocol {
             NotificationConfig notificationConfig,
             Clock clock,
             CompletableFuture<Long> latestAuthMillisFuture,
-            ValueFactory valueFactory);
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation);
 
     CompletionStage<Void> route(
             Connection connection,
@@ -66,7 +68,8 @@ public interface BoltProtocol {
             MessageHandler<RouteSummary> handler,
             Clock clock,
             LoggingProvider logging,
-            ValueFactory valueFactory);
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation);
 
     CompletionStage<Void> beginTransaction(
             Connection connection,
@@ -80,13 +83,17 @@ public interface BoltProtocol {
             NotificationConfig notificationConfig,
             MessageHandler<BeginSummary> handler,
             LoggingProvider logging,
-            ValueFactory valueFactory);
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation);
 
-    CompletionStage<Void> commitTransaction(Connection connection, MessageHandler<String> handler);
+    CompletionStage<Void> commitTransaction(
+            Connection connection, MessageHandler<String> handler, BoltExchangeObservation observation);
 
-    CompletionStage<Void> rollbackTransaction(Connection connection, MessageHandler<Void> handler);
+    CompletionStage<Void> rollbackTransaction(
+            Connection connection, MessageHandler<Void> handler, BoltExchangeObservation observation);
 
-    CompletionStage<Void> telemetry(Connection connection, Integer api, MessageHandler<Void> handler);
+    CompletionStage<Void> telemetry(
+            Connection connection, Integer api, MessageHandler<Void> handler, BoltExchangeObservation observation);
 
     CompletionStage<Void> runAuto(
             Connection connection,
@@ -101,24 +108,37 @@ public interface BoltProtocol {
             NotificationConfig notificationConfig,
             MessageHandler<RunSummary> handler,
             LoggingProvider logging,
-            ValueFactory valueFactory);
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation);
 
     CompletionStage<Void> run(
-            Connection connection, String query, Map<String, Value> parameters, MessageHandler<RunSummary> handler);
+            Connection connection,
+            String query,
+            Map<String, Value> parameters,
+            MessageHandler<RunSummary> handler,
+            BoltExchangeObservation observation);
 
     CompletionStage<Void> pull(
-            Connection connection, long qid, long request, PullMessageHandler handler, ValueFactory valueFactory);
+            Connection connection,
+            long qid,
+            long request,
+            PullMessageHandler handler,
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation);
 
     CompletionStage<Void> discard(
             Connection connection,
             long qid,
             long number,
             MessageHandler<DiscardSummary> handler,
-            ValueFactory valueFactory);
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation);
 
-    CompletionStage<Void> reset(Connection connection, MessageHandler<Void> handler);
+    CompletionStage<Void> reset(
+            Connection connection, MessageHandler<Void> handler, BoltExchangeObservation observation);
 
-    default CompletionStage<Void> logoff(Connection connection, MessageHandler<Void> handler) {
+    default CompletionStage<Void> logoff(
+            Connection connection, MessageHandler<Void> handler, BoltExchangeObservation observation) {
         return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("logoff not supported"));
     }
 
@@ -127,7 +147,8 @@ public interface BoltProtocol {
             Map<String, Value> authMap,
             Clock clock,
             MessageHandler<Void> handler,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            BoltExchangeObservation observation) {
         return CompletableFuture.failedStage(new BoltUnsupportedFeatureException("logon not supported"));
     }
 

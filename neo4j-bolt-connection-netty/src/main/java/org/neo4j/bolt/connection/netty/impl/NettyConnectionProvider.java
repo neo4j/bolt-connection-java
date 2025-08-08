@@ -31,6 +31,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.time.Clock;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.BoltAgent;
@@ -38,7 +39,6 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.netty.impl.async.NetworkConnection;
@@ -49,6 +49,9 @@ import org.neo4j.bolt.connection.netty.impl.async.connection.NettyDomainNameReso
 import org.neo4j.bolt.connection.netty.impl.async.inbound.ConnectTimeoutHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.BoltProtocol;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
+import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -62,6 +65,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
 
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
+    private final ObservationProvider observationProvider;
 
     public NettyConnectionProvider(
             EventLoopGroup eventLoopGroup,
@@ -70,7 +74,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            ObservationProvider observationProvider) {
         this.eventLoopGroup = eventLoopGroup;
         this.clock = requireNonNull(clock);
         this.domainNameResolver = requireNonNull(domainNameResolver);
@@ -79,6 +84,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         this.maxVersion = maxVersion;
         this.logging = logging;
         this.valueFactory = requireNonNull(valueFactory);
+        this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
     @Override
@@ -92,7 +98,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             int connectTimeoutMillis,
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
-            MetricsListener metricsListener) {
+            ImmutableObservation parentObservation) {
         var bootstrap = new Bootstrap();
         bootstrap
                 .group(this.eventLoopGroup)
@@ -112,19 +118,35 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         } else {
             socketAddress = localAddress;
         }
-
         return installChannelConnectedListeners(address, bootstrap.connect(socketAddress), connectTimeoutMillis)
-                .thenCompose(channel -> BoltProtocol.forChannel(channel)
-                        .initializeChannel(
-                                channel,
-                                requireNonNull(userAgent),
-                                requireNonNull(boltAgent),
-                                authMap,
-                                routingContext,
-                                notificationConfig,
-                                clock,
-                                latestAuthMillisFuture,
-                                valueFactory))
+                .thenCompose(channel -> {
+                    var boltProtocol = BoltProtocol.forChannel(channel);
+                    var exchangeObservation = observationProvider.boltExchange(
+                            parentObservation,
+                            address.connectionHost(),
+                            address.port(),
+                            boltProtocol.version(),
+                            (k, v) -> {});
+                    return boltProtocol
+                            .initializeChannel(
+                                    channel,
+                                    requireNonNull(userAgent),
+                                    requireNonNull(boltAgent),
+                                    authMap,
+                                    routingContext,
+                                    notificationConfig,
+                                    clock,
+                                    latestAuthMillisFuture,
+                                    valueFactory,
+                                    exchangeObservation)
+                            .whenComplete((ignored, throwable) -> {
+                                if (throwable != null) {
+                                    throwable = FutureUtil.completionExceptionCause(throwable);
+                                    exchangeObservation.error(throwable);
+                                }
+                                exchangeObservation.stop();
+                            });
+                })
                 .thenApply(channel -> new NetworkConnection(channel, logging));
     }
 

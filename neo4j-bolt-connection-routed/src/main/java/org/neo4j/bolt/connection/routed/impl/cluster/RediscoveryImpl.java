@@ -49,6 +49,7 @@ import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.message.Messages;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.Rediscovery;
 import org.neo4j.bolt.connection.routed.RoutingTable;
@@ -93,12 +94,14 @@ public class RediscoveryImpl implements Rediscovery {
     public CompletionStage<ClusterCompositionLookupResult> lookupClusterComposition(
             RoutingTable routingTable,
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionSourceGetter,
-            RoutedBoltConnectionParameters parameters) {
+            RoutedBoltConnectionParameters parameters,
+            ImmutableObservation parentObservation) {
         var result = new CompletableFuture<ClusterCompositionLookupResult>();
         // if we failed discovery, we will chain all errors into this one.
         var baseError = new BoltServiceUnavailableException(
                 String.format(NO_ROUTERS_AVAILABLE, routingTable.database().description()));
-        lookupClusterComposition(routingTable, connectionSourceGetter, result, parameters, baseError);
+        lookupClusterComposition(
+                routingTable, connectionSourceGetter, result, parameters, baseError, parentObservation);
         return result;
     }
 
@@ -107,8 +110,9 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             CompletableFuture<ClusterCompositionLookupResult> result,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
-        lookup(routingTable, connectionProviderGetter, parameters, baseError)
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
+        lookup(routingTable, connectionProviderGetter, parameters, baseError, parentObservation)
                 .whenComplete((compositionLookupResult, completionError) -> {
                     var error = FutureUtil.completionExceptionCause(completionError);
                     if (error != null) {
@@ -125,15 +129,16 @@ public class RediscoveryImpl implements Rediscovery {
             RoutingTable routingTable,
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
         CompletionStage<ClusterCompositionLookupResult> compositionStage;
 
         if (routingTable.preferInitialRouter()) {
             compositionStage = lookupOnInitialRouterThenOnKnownRouters(
-                    routingTable, connectionProviderGetter, parameters, baseError);
+                    routingTable, connectionProviderGetter, parameters, baseError, parentObservation);
         } else {
             compositionStage = lookupOnKnownRoutersThenOnInitialRouter(
-                    routingTable, connectionProviderGetter, parameters, baseError);
+                    routingTable, connectionProviderGetter, parameters, baseError, parentObservation);
         }
 
         return compositionStage;
@@ -143,15 +148,22 @@ public class RediscoveryImpl implements Rediscovery {
             RoutingTable routingTable,
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
         Set<BoltServerAddress> seenServers = new HashSet<>();
-        return lookupOnKnownRouters(routingTable, connectionProviderGetter, seenServers, parameters, baseError)
+        return lookupOnKnownRouters(
+                        routingTable, connectionProviderGetter, seenServers, parameters, baseError, parentObservation)
                 .thenCompose(compositionLookupResult -> {
                     if (compositionLookupResult != null) {
                         return completedFuture(compositionLookupResult);
                     }
                     return lookupOnInitialRouter(
-                            routingTable, connectionProviderGetter, seenServers, parameters, baseError);
+                            routingTable,
+                            connectionProviderGetter,
+                            seenServers,
+                            parameters,
+                            baseError,
+                            parentObservation);
                 });
     }
 
@@ -159,15 +171,22 @@ public class RediscoveryImpl implements Rediscovery {
             RoutingTable routingTable,
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
         Set<BoltServerAddress> seenServers = emptySet();
-        return lookupOnInitialRouter(routingTable, connectionProviderGetter, seenServers, parameters, baseError)
+        return lookupOnInitialRouter(
+                        routingTable, connectionProviderGetter, seenServers, parameters, baseError, parentObservation)
                 .thenCompose(compositionLookupResult -> {
                     if (compositionLookupResult != null) {
                         return completedFuture(compositionLookupResult);
                     }
                     return lookupOnKnownRouters(
-                            routingTable, connectionProviderGetter, new HashSet<>(), parameters, baseError);
+                            routingTable,
+                            connectionProviderGetter,
+                            new HashSet<>(),
+                            parameters,
+                            baseError,
+                            parentObservation);
                 });
     }
 
@@ -176,7 +195,8 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Set<BoltServerAddress> seenServers,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
         CompletableFuture<ClusterComposition> result = CompletableFuture.completedFuture(null);
         for (var address : routingTable.routers()) {
             result = result.thenCompose(composition -> {
@@ -184,7 +204,14 @@ public class RediscoveryImpl implements Rediscovery {
                     return completedFuture(composition);
                 } else {
                     return lookupOnRouter(
-                            address, true, routingTable, connectionProviderGetter, seenServers, parameters, baseError);
+                            address,
+                            true,
+                            routingTable,
+                            connectionProviderGetter,
+                            seenServers,
+                            parameters,
+                            baseError,
+                            parentObservation);
                 }
             });
         }
@@ -197,7 +224,8 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Set<BoltServerAddress> seenServers,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
         List<BoltServerAddress> resolvedRouters;
         try {
             resolvedRouters = resolve();
@@ -214,7 +242,14 @@ public class RediscoveryImpl implements Rediscovery {
                     return completedFuture(composition);
                 }
                 return lookupOnRouter(
-                        address, false, routingTable, connectionProviderGetter, null, parameters, baseError);
+                        address,
+                        false,
+                        routingTable,
+                        connectionProviderGetter,
+                        null,
+                        parameters,
+                        baseError,
+                        parentObservation);
             });
         }
         return result.thenApply(composition ->
@@ -228,7 +263,8 @@ public class RediscoveryImpl implements Rediscovery {
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionProviderGetter,
             Set<BoltServerAddress> seenServers,
             RoutedBoltConnectionParameters parameters,
-            Throwable baseError) {
+            Throwable baseError,
+            ImmutableObservation parentObservation) {
         var addressFuture = CompletableFuture.completedFuture(routerAddress);
 
         var future = new CompletableFuture<ClusterComposition>();
@@ -271,7 +307,8 @@ public class RediscoveryImpl implements Rediscovery {
                         Messages.route(
                                 routingTable.database().databaseName().orElse(null),
                                 parameters.impersonatedUser(),
-                                parameters.bookmarks())))
+                                parameters.bookmarks()),
+                        parentObservation))
                 .thenCompose(ignored -> compositionFuture)
                 .thenApply(clusterComposition -> {
                     if (clusterComposition.routers().isEmpty()

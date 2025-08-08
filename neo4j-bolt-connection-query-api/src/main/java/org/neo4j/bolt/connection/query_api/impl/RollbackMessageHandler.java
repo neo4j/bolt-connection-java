@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.summary.RollbackSummary;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -43,8 +44,9 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
             Supplier<TransactionInfo> transactionInfoSupplier,
             Duration readTimeout,
             ValueFactory valueFactory,
-            LoggingProvider logging) {
-        super(httpContext, handler, valueFactory, logging);
+            LoggingProvider logging,
+            ObservationProvider observationProvider) {
+        super(httpContext, handler, valueFactory, logging, observationProvider);
         this.log = logging.getLog(getClass());
         this.handler = Objects.requireNonNull(handler);
         this.httpContext = Objects.requireNonNull(httpContext);
@@ -54,7 +56,7 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
     }
 
     @Override
-    protected HttpRequest newHttpRequest() {
+    protected ObservationParameters newHttpRequestBuilder(HttpRequest.Builder builder) {
         var transactionInfo = transactionInfoSupplier.get();
         if (transactionInfo == null) {
             throw new BoltClientException("No transaction found");
@@ -66,11 +68,11 @@ final class RollbackMessageHandler extends AbstractMessageHandler<Void> {
             headers[headers.length - 2] = "neo4j-cluster-affinity";
             headers[headers.length - 1] = transactionInfo.affinity();
         }
-        var builder = HttpRequest.newBuilder(uri).headers(headers).DELETE();
+        builder.uri(uri).headers(headers).DELETE();
         if (readTimeout != null) {
-            builder = builder.timeout(readTimeout);
+            builder.timeout(readTimeout);
         }
-        return builder.build();
+        return new ObservationParameters(uri, "DELETE", HttpContext.TRANSACTION_QUERY_URL_TEMPLATE, headers);
     }
 
     @Override

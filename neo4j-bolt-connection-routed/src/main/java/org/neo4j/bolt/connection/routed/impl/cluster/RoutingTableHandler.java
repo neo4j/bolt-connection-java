@@ -21,6 +21,7 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.routed.ClusterCompositionLookupResult;
 import org.neo4j.bolt.connection.routed.RoutingTable;
 
@@ -29,7 +30,8 @@ public interface RoutingTableHandler extends RoutingErrorHandler {
 
     boolean isRoutingTableAged();
 
-    CompletionStage<RoutingTable> ensureRoutingTable(RoutedBoltConnectionParameters parameters);
+    CompletionStage<RoutingTable> ensureRoutingTable(
+            RoutedBoltConnectionParameters parameters, ImmutableObservation parentObservation);
 
     CompletionStage<RoutingTable> updateRoutingTable(ClusterCompositionLookupResult compositionLookupResult);
 

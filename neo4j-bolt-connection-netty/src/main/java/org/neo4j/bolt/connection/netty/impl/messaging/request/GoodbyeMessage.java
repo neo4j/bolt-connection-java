@@ -16,10 +16,9 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
-public class GoodbyeMessage implements Message {
+public class GoodbyeMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x02;
+    private static final String NAME = "GOODBYE";
 
     public static final GoodbyeMessage GOODBYE = new GoodbyeMessage();
 
@@ -31,7 +30,12 @@ public class GoodbyeMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "GOODBYE";
+        return NAME;
     }
 }

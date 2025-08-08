@@ -47,6 +47,8 @@ import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionAcquisitionException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.routed.impl.RoutedBoltConnection;
 import org.neo4j.bolt.connection.routed.impl.cluster.RediscoveryImpl;
 import org.neo4j.bolt.connection.routed.impl.cluster.RoutingTableHandler;
@@ -78,6 +80,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     private final LoadBalancingStrategy loadBalancingStrategy;
     private final RoutingTableRegistry registry;
     private final Rediscovery rediscovery;
+    private final ObservationProvider observationProvider;
 
     private CompletableFuture<Void> closeFuture;
 
@@ -90,7 +93,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             Clock clock,
             LoggingProvider logging,
             URI uri,
-            List<Class<? extends Throwable>> discoveryAbortingErrors) {
+            List<Class<? extends Throwable>> discoveryAbortingErrors,
+            ObservationProvider observationProvider) {
         this.boltConnectionSourceFactory = Objects.requireNonNull(boltConnectionSourceFactory);
         this.log = logging.getLog(getClass());
         this.loadBalancingStrategy = new LeastConnectedLoadBalancingStrategy(this::getInUseCount, logging);
@@ -101,6 +105,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         this.registry = new RoutingTableRegistryImpl(
                 this::get, this.rediscovery, clock, logging, routingTablePurgeDelayMs, this::shutdownUnusedProviders);
         this.uri = Objects.requireNonNull(uri);
+        this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
     @Override
@@ -118,6 +123,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             registry = this.registry;
         }
 
+        var parentObservation = observationProvider.scopedObservation();
         var handlerRef = new AtomicReference<RoutingTableHandler>();
         var databaseName = parameters.databaseName();
         CompletableFuture<DatabaseName> databaseNameFuture;
@@ -131,13 +137,13 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         } else {
             databaseNameFuture = CompletableFuture.completedFuture(databaseName);
         }
-        return registry.ensureRoutingTable(databaseNameFuture, parameters)
+        return registry.ensureRoutingTable(databaseNameFuture, parameters, parentObservation)
                 .thenApply(routingTableHandler -> {
                     handlerRef.set(routingTableHandler);
                     return routingTableHandler;
                 })
-                .thenCompose(routingTableHandler ->
-                        acquire(parameters.accessMode(), routingTableHandler.routingTable(), parameters))
+                .thenCompose(routingTableHandler -> acquire(
+                        parameters.accessMode(), routingTableHandler.routingTable(), parameters, parentObservation))
                 .thenApply(boltConnection -> (BoltConnection)
                         new RoutedBoltConnection(boltConnection, handlerRef.get(), parameters.accessMode(), this))
                 .exceptionally(throwable -> {
@@ -181,6 +187,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             }
             registry = this.registry;
         }
+        var observation = observationProvider.scopedObservation();
         return supportsMultiDb()
                 .thenCompose(supports -> registry.ensureRoutingTable(
                         supports
@@ -188,7 +195,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                                 : CompletableFuture.completedFuture(DatabaseName.defaultDatabase()),
                         RoutedBoltConnectionParameters.builder()
                                 .withAccessMode(AccessMode.READ)
-                                .build()))
+                                .build(),
+                        observation))
                 .handle((ignored, error) -> {
                     if (error != null) {
                         var cause = FutureUtil.completionExceptionCause(error);
@@ -284,10 +292,13 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     }
 
     private CompletionStage<BoltConnection> acquire(
-            AccessMode mode, RoutingTable routingTable, BoltConnectionParameters parameters) {
+            AccessMode mode,
+            RoutingTable routingTable,
+            BoltConnectionParameters parameters,
+            ImmutableObservation observation) {
         var result = new CompletableFuture<BoltConnection>();
         List<Throwable> attemptExceptions = new ArrayList<>();
-        acquire(mode, routingTable, result, attemptExceptions, parameters);
+        acquire(mode, routingTable, result, attemptExceptions, parameters, observation);
         return result;
     }
 
@@ -296,7 +307,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             RoutingTable routingTable,
             CompletableFuture<BoltConnection> result,
             List<Throwable> attemptErrors,
-            BoltConnectionParameters parameters) {
+            BoltConnectionParameters parameters,
+            ImmutableObservation observation) {
         var addresses = getAddressesByMode(mode, routingTable);
         log.log(System.Logger.Level.DEBUG, "Addresses: " + addresses);
         var address = selectAddress(mode, addresses);
@@ -311,24 +323,28 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             return;
         }
 
-        get(address).getConnection(parameters).whenComplete((connection, completionError) -> {
-            var error = FutureUtil.completionExceptionCause(completionError);
-            if (error != null) {
-                if (error instanceof BoltServiceUnavailableException) {
-                    var attemptMessage = format(CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE, address);
-                    log.log(System.Logger.Level.WARNING, attemptMessage);
-                    log.log(System.Logger.Level.DEBUG, attemptMessage, error);
-                    attemptErrors.add(error);
-                    routingTable.forget(address);
-                    CompletableFuture.runAsync(() -> acquire(mode, routingTable, result, attemptErrors, parameters));
-                } else {
-                    result.completeExceptionally(error);
-                }
-            } else {
-                incrementInUseCount(address);
-                result.complete(connection);
-            }
-        });
+        var source = get(address);
+        observationProvider
+                .supplyInScope(observation, () -> source.getConnection(parameters))
+                .whenComplete((connection, completionError) -> {
+                    var error = FutureUtil.completionExceptionCause(completionError);
+                    if (error != null) {
+                        if (error instanceof BoltServiceUnavailableException) {
+                            var attemptMessage = format(CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE, address);
+                            log.log(System.Logger.Level.WARNING, attemptMessage);
+                            log.log(System.Logger.Level.DEBUG, attemptMessage, error);
+                            attemptErrors.add(error);
+                            routingTable.forget(address);
+                            CompletableFuture.runAsync(
+                                    () -> acquire(mode, routingTable, result, attemptErrors, parameters, observation));
+                        } else {
+                            result.completeExceptionally(error);
+                        }
+                    } else {
+                        incrementInUseCount(address);
+                        result.complete(connection);
+                    }
+                });
     }
 
     private BoltServerAddress selectAddress(AccessMode mode, List<BoltServerAddress> addresses) {

@@ -19,5 +19,7 @@ package org.neo4j.bolt.connection.message;
 import org.neo4j.bolt.connection.AuthToken;
 
 public sealed interface LogonMessage extends Message permits LogonMessageImpl {
+    String NAME = "LOGON";
+
     AuthToken authToken();
 }

@@ -16,4 +16,9 @@
  */
 package org.neo4j.bolt.connection.message;
 
-record LogoffMessageImpl() implements LogoffMessage {}
+record LogoffMessageImpl() implements LogoffMessage {
+    @Override
+    public String name() {
+        return NAME;
+    }
+}

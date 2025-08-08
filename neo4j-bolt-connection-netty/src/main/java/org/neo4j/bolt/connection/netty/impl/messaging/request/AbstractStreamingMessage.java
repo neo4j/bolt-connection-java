@@ -21,11 +21,10 @@ import static org.neo4j.bolt.connection.netty.impl.util.MetadataExtractor.ABSENT
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-public abstract class AbstractStreamingMessage implements Message {
+public abstract class AbstractStreamingMessage implements RequestMessage {
     private final Map<String, Value> metadata = new HashMap<>();
 
     AbstractStreamingMessage(long n, long id, ValueFactory valueFactory) {
@@ -50,8 +49,6 @@ public abstract class AbstractStreamingMessage implements Message {
         var that = (AbstractStreamingMessage) o;
         return Objects.equals(metadata, that.metadata);
     }
-
-    protected abstract String name();
 
     @Override
     public int hashCode() {

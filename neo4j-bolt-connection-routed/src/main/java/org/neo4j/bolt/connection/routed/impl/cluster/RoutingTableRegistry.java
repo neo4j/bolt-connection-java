@@ -23,6 +23,7 @@ import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 /**
  * A generic interface to access all routing tables as a whole.
@@ -35,7 +36,9 @@ public interface RoutingTableRegistry {
      * @return The future of a new routing table handler.
      */
     CompletionStage<RoutingTableHandler> ensureRoutingTable(
-            CompletableFuture<DatabaseName> databaseNameFuture, RoutedBoltConnectionParameters parameters);
+            CompletableFuture<DatabaseName> databaseNameFuture,
+            RoutedBoltConnectionParameters parameters,
+            ImmutableObservation parentObservation);
 
     /**
      * @return all servers in the registry

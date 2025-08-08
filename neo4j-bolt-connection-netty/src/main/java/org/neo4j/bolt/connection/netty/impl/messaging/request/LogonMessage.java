@@ -24,6 +24,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class LogonMessage extends MessageWithMetadata {
     public static final byte SIGNATURE = 0x6A;
+    private static final String NAME = "LOGON";
     private static final String CREDENTIALS_KEY = "credentials";
 
     private final ValueFactory valueFactory;
@@ -39,9 +40,14 @@ public class LogonMessage extends MessageWithMetadata {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
         Map<String, Value> metadataCopy = new HashMap<>(metadata());
         metadataCopy.replace(CREDENTIALS_KEY, valueFactory.value("******"));
-        return "LOGON " + metadataCopy;
+        return NAME + " " + metadataCopy;
     }
 }

@@ -16,16 +16,15 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
 /**
  * TELEMETRY message
  * Sent by the client to inform which API is used.
  *
  * @param api the API identification on the protocol level
  */
-public record TelemetryMessage(Integer api) implements Message {
+public record TelemetryMessage(Integer api) implements RequestMessage {
     public static final byte SIGNATURE = 0x54;
+    private static final String NAME = "TELEMETRY";
 
     @Override
     public byte signature() {
@@ -33,7 +32,12 @@ public record TelemetryMessage(Integer api) implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return String.format("TELEMETRY %S", api);
+        return String.format("%s %S", NAME, api);
     }
 }

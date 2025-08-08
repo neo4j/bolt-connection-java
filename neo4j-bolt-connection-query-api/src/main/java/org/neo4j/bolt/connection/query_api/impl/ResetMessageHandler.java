@@ -24,6 +24,7 @@ import java.util.function.Supplier;
 import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.summary.ResetSummary;
 
 final class ResetMessageHandler implements MessageHandler<Void> {
@@ -41,7 +42,7 @@ final class ResetMessageHandler implements MessageHandler<Void> {
     }
 
     @Override
-    public CompletionStage<Void> exchange() {
+    public CompletionStage<Void> exchange(ImmutableObservation parentObservation) {
         var result = new CompletableFuture<Void>();
         switch (stateSupplier.get()) {
             case OPEN -> {

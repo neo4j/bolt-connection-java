@@ -16,12 +16,11 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.request;
 
-import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-
-public class CommitMessage implements Message {
+public class CommitMessage implements RequestMessage {
     public static final byte SIGNATURE = 0x12;
+    private static final String NAME = "COMMIT";
 
-    public static final Message COMMIT = new CommitMessage();
+    public static final CommitMessage COMMIT = new CommitMessage();
 
     private CommitMessage() {}
 
@@ -31,7 +30,12 @@ public class CommitMessage implements Message {
     }
 
     @Override
+    public String name() {
+        return NAME;
+    }
+
+    @Override
     public String toString() {
-        return "COMMIT";
+        return NAME;
     }
 }

@@ -27,6 +27,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class HelloMessage extends MessageWithMetadata {
     public static final byte SIGNATURE = 0x01;
+    private static final String NAME = "HELLO";
 
     private static final String USER_AGENT_METADATA_KEY = "user_agent";
     private static final String BOLT_AGENT_METADATA_KEY = "bolt_agent";
@@ -66,6 +67,11 @@ public class HelloMessage extends MessageWithMetadata {
     @Override
     public byte signature() {
         return SIGNATURE;
+    }
+
+    @Override
+    public String name() {
+        return NAME;
     }
 
     @Override

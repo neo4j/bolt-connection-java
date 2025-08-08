@@ -63,13 +63,14 @@ import org.neo4j.bolt.connection.BoltConnectionState;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.ResponseHandler;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.message.Messages;
+import org.neo4j.bolt.connection.observation.Observation;
 import org.neo4j.bolt.connection.pooled.impl.PooledBoltConnection;
+import org.neo4j.bolt.connection.pooled.observation.PoolObservationProvider;
 import org.neo4j.bolt.connection.summary.ResetSummary;
 import org.neo4j.bolt.connection.values.Value;
 
@@ -86,7 +87,10 @@ class PooledBoltConnectionSourceTest {
     Clock clock;
 
     @Mock
-    MetricsListener metricsListener;
+    PoolObservationProvider observationProvider;
+
+    @Mock
+    Observation observation;
 
     @Mock
     Consumer<DatabaseName> databaseNameConsumer;
@@ -123,8 +127,15 @@ class PooledBoltConnectionSourceTest {
     void beforeEach() {
         openMocks(this);
         given(loggingProvider.getLog(any(Class.class))).willReturn(mock(System.Logger.class));
+        given(observationProvider.connectionPoolCreate(any(), any(), anyInt())).willReturn(observation);
+        given(observationProvider.pooledConnectionAcquire(any(), any())).willReturn(observation);
+        given(observationProvider.pooledConnectionCreate(any(), any())).willReturn(observation);
+        given(observationProvider.pooledConnectionInUse(any(), any(), any())).willReturn(observation);
+        given(observationProvider.pooledConnectionClose(any(), any())).willReturn(observation);
+        given(observationProvider.connectionPoolClose(any(), any())).willReturn(observation);
         given(authTokenManager.getToken()).willReturn(CompletableFuture.completedStage(authToken));
         given(securityPlanSupplier.getPlan()).willReturn(CompletableFuture.completedStage(securityPlan));
+        given(connection.close()).willReturn(CompletableFuture.completedStage(null));
         boltConnectionSource = new PooledBoltConnectionSource(
                 loggingProvider,
                 clock,
@@ -136,7 +147,7 @@ class PooledBoltConnectionSourceTest {
                 acquisitionTimeout,
                 maxLifetime,
                 idleBeforeTest,
-                metricsListener,
+                observationProvider,
                 routingContextAddress,
                 boltAgent,
                 userAgent,
@@ -151,7 +162,8 @@ class PooledBoltConnectionSourceTest {
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
-                        eq(notificationConfig)))
+                        eq(notificationConfig),
+                        any()))
                 .willReturn(CompletableFuture.completedStage(connection));
     }
 
@@ -175,7 +187,8 @@ class PooledBoltConnectionSourceTest {
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
-                        eq(notificationConfig));
+                        eq(notificationConfig),
+                        any());
         assertEquals(1, boltConnectionSource.inUse());
         assertEquals(1, boltConnectionSource.size());
     }
@@ -195,7 +208,7 @@ class PooledBoltConnectionSourceTest {
                 acquisitionTimeout,
                 maxLifetime,
                 idleBeforeTest,
-                metricsListener,
+                observationProvider,
                 routingContextAddress,
                 boltAgent,
                 userAgent,
@@ -216,7 +229,7 @@ class PooledBoltConnectionSourceTest {
     @Test
     void shouldReturnConnectionToPool() {
         // given
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -237,7 +250,7 @@ class PooledBoltConnectionSourceTest {
     @Test
     void shouldUseExistingConnection() {
         // given
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -274,7 +287,7 @@ class PooledBoltConnectionSourceTest {
     @Test
     void shouldClose() {
         // given
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -303,7 +316,7 @@ class PooledBoltConnectionSourceTest {
     @Test
     void shouldVerifyConnectivity() {
         // given
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -326,8 +339,9 @@ class PooledBoltConnectionSourceTest {
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
-                        eq(notificationConfig));
-        then(connection).should().writeAndFlush(any(), eq(Messages.reset()));
+                        eq(notificationConfig),
+                        any());
+        then(connection).should().writeAndFlush(any(), eq(Messages.reset()), any());
     }
 
     @ParameterizedTest
@@ -335,7 +349,7 @@ class PooledBoltConnectionSourceTest {
     void shouldSupportMultiDb(BoltProtocolVersion boltProtocolVersion, boolean expectedToSupport) {
         // given
         given(connection.protocolVersion()).willReturn(boltProtocolVersion);
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -360,8 +374,9 @@ class PooledBoltConnectionSourceTest {
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
-                        eq(notificationConfig));
-        then(connection).should().writeAndFlush(any(), eq(Messages.reset()));
+                        eq(notificationConfig),
+                        any());
+        then(connection).should().writeAndFlush(any(), eq(Messages.reset()), any());
     }
 
     private static Stream<Arguments> supportsMultiDbParams() {
@@ -375,7 +390,7 @@ class PooledBoltConnectionSourceTest {
     void shouldSupportsSessionAuth(BoltProtocolVersion boltProtocolVersion, boolean expectedToSupport) {
         // given
         given(connection.protocolVersion()).willReturn(boltProtocolVersion);
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -400,8 +415,9 @@ class PooledBoltConnectionSourceTest {
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
-                        eq(notificationConfig));
-        then(connection).should().writeAndFlush(any(), eq(Messages.reset()));
+                        eq(notificationConfig),
+                        any());
+        then(connection).should().writeAndFlush(any(), eq(Messages.reset()), any());
     }
 
     private static Stream<Arguments> supportsSessionAuthParams() {
@@ -415,7 +431,7 @@ class PooledBoltConnectionSourceTest {
         // given
         given(connection.protocolVersion()).willReturn(new BoltProtocolVersion(5, 0));
         given(connection.state()).willReturn(BoltConnectionState.OPEN);
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -446,7 +462,7 @@ class PooledBoltConnectionSourceTest {
         // given
         given(connection.protocolVersion()).willReturn(minVersion);
         given(connection.state()).willReturn(BoltConnectionState.OPEN);
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -463,7 +479,8 @@ class PooledBoltConnectionSourceTest {
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
-                        eq(notificationConfig)))
+                        eq(notificationConfig),
+                        any()))
                 .willReturn(CompletableFuture.completedStage(connection))
                 .willReturn(CompletableFuture.completedStage(connection2));
         boltConnectionSource
@@ -491,7 +508,7 @@ class PooledBoltConnectionSourceTest {
         // given
         given(connection.protocolVersion()).willReturn(minVersion);
         given(connection.state()).willReturn(BoltConnectionState.OPEN);
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -517,7 +534,7 @@ class PooledBoltConnectionSourceTest {
 
         // then
         assertEquals(connection, ((PooledBoltConnection) actualConnection).delegate());
-        then(connection).should(times(2)).writeAndFlush(any(), eq(Messages.reset()));
+        then(connection).should(times(2)).writeAndFlush(any(), eq(Messages.reset()), any());
     }
 
     @Test
@@ -525,7 +542,7 @@ class PooledBoltConnectionSourceTest {
         // given
         given(connection.protocolVersion()).willReturn(minVersion);
         given(connection.state()).willReturn(BoltConnectionState.OPEN);
-        given(connection.writeAndFlush(any(), eq(Messages.reset())))
+        given(connection.writeAndFlush(any(), eq(Messages.reset()), any()))
                 .willAnswer((Answer<CompletionStage<Void>>) invocationOnMock -> {
                     var handler = (ResponseHandler) invocationOnMock.getArgument(0);
                     handler.onResetSummary(mock(ResetSummary.class));
@@ -564,7 +581,7 @@ class PooledBoltConnectionSourceTest {
     @ValueSource(booleans = {true, false})
     void shouldUseSessionAuth(boolean setupAcquiredConnection) {
         // given
-        given(upstreamProvider.connect(any(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
+        given(upstreamProvider.connect(any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(mock(BoltConnection.class)));
         if (setupAcquiredConnection) {
             boltConnectionSource.getConnection().toCompletableFuture().join();
@@ -584,10 +601,10 @@ class PooledBoltConnectionSourceTest {
         var inOrder = Mockito.inOrder(upstreamProvider);
         if (setupAcquiredConnection) {
             inOrder.verify(upstreamProvider)
-                    .connect(any(), any(), any(), any(), anyInt(), any(), eq(this.authToken), any(), any());
+                    .connect(any(), any(), any(), any(), anyInt(), any(), eq(this.authToken), any(), any(), any());
         }
         inOrder.verify(upstreamProvider)
-                .connect(any(), any(), any(), any(), anyInt(), any(), eq(authToken), any(), any());
+                .connect(any(), any(), any(), any(), anyInt(), any(), eq(authToken), any(), any(), any());
         inOrder.verifyNoMoreInteractions();
     }
 }

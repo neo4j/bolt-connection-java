@@ -17,6 +17,8 @@
 package org.neo4j.bolt.connection.message;
 
 public sealed interface DiscardMessage extends Message permits DiscardMessageImpl {
+    String NAME = "DISCARD";
+
     long qid();
 
     long number();

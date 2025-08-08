@@ -24,6 +24,7 @@ import org.neo4j.bolt.connection.BoltConnectionParameters;
 import org.neo4j.bolt.connection.BoltConnectionSource;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
 
 /**
  * Provides cluster composition lookup capabilities and initial router address resolution.
@@ -32,7 +33,8 @@ public interface Rediscovery {
     CompletionStage<ClusterCompositionLookupResult> lookupClusterComposition(
             RoutingTable routingTable,
             Function<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> connectionSourceGetter,
-            RoutedBoltConnectionParameters parameters);
+            RoutedBoltConnectionParameters parameters,
+            ImmutableObservation parentObservation);
 
     List<BoltServerAddress> resolve() throws UnknownHostException;
 }

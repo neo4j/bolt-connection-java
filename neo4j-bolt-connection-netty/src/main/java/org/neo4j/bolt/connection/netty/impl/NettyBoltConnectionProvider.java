@@ -34,12 +34,13 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.MetricsListener;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
+import org.neo4j.bolt.connection.observation.ImmutableObservation;
+import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class NettyBoltConnectionProvider implements BoltConnectionProvider {
@@ -47,10 +48,10 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     private final System.Logger log;
     private final EventLoopGroup eventLoopGroup;
     private final ConnectionProvider connectionProvider;
-    private final MetricsListener metricsListener;
     private final Clock clock;
     private final ValueFactory valueFactory;
     private final boolean shutdownEventLoopGroupOnClose;
+    private final ObservationProvider observationProvider;
 
     private CompletableFuture<Void> closeFuture;
 
@@ -62,19 +63,26 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             BoltProtocolVersion maxVersion,
             LoggingProvider logging,
             ValueFactory valueFactory,
-            MetricsListener metricsListener,
-            boolean shutdownEventLoopGroupOnClose) {
+            boolean shutdownEventLoopGroupOnClose,
+            ObservationProvider observationProvider) {
         Objects.requireNonNull(eventLoopGroup);
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
         this.log = logging.getLog(getClass());
         this.eventLoopGroup = Objects.requireNonNull(eventLoopGroup);
         this.connectionProvider = ConnectionProviders.netty(
-                eventLoopGroup, clock, domainNameResolver, localAddress, maxVersion, logging, valueFactory);
+                eventLoopGroup,
+                clock,
+                domainNameResolver,
+                localAddress,
+                maxVersion,
+                logging,
+                valueFactory,
+                observationProvider);
         this.valueFactory = Objects.requireNonNull(valueFactory);
-        this.metricsListener = NoopMetricsListener.getInstance();
         InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));
         this.shutdownEventLoopGroupOnClose = shutdownEventLoopGroupOnClose;
+        this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
     @Override
@@ -87,7 +95,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             SecurityPlan securityPlan,
             AuthToken authToken,
             BoltProtocolVersion minVersion,
-            NotificationConfig notificationConfig) {
+            NotificationConfig notificationConfig,
+            ImmutableObservation parentObservation) {
         synchronized (this) {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
@@ -130,7 +139,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         connectTimeoutMillis,
                         latestAuthMillisFuture,
                         notificationConfig,
-                        metricsListener)
+                        parentObservation)
                 .thenCompose(connection -> {
                     if (minVersion != null
                             && minVersion.compareTo(connection.protocol().version()) > 0) {
@@ -159,7 +168,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                                 routingContext,
                                 clock,
                                 logging,
-                                valueFactory);
+                                valueFactory,
+                                observationProvider);
                     }
                 });
     }
