@@ -4,7 +4,7 @@
 
     <groupId>org.neo4j.bolt</groupId>
     <artifactId>neo4j-bolt-connection-parent</artifactId>
-    <version>7.0-SNAPSHOT</version>
+    <version>8.0-SNAPSHOT</version>
 
     <packaging>pom</packaging>
     <name>Neo4j Bolt Connection</name>
@@ -47,16 +47,16 @@
     <properties>
         <bouncycastle-jdk18on.version>1.81</bouncycastle-jdk18on.version>
         <build-resources.version>2024-12.1</build-resources.version>
-        <junit.version>5.13.2</junit.version>
+        <junit.version>6.0.0-RC2</junit.version>
         <maven.build.timestamp.format>'v'yyyyMMdd-HHmm</maven.build.timestamp.format>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.xlint.extras />
         <!-- Skip deployment by default for everything in this project. -->
         <maven.deploy.skip>true</maven.deploy.skip>
-        <mockito.version>5.18.0</mockito.version>
+        <mockito.version>5.19.0</mockito.version>
         <!-- To be overwritten by child projects -->
         <moduleName />
-        <netty-bom.version>4.2.2.Final</netty-bom.version>
+        <netty-bom.version>4.2.4.Final</netty-bom.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <rootDir>${project.basedir}</rootDir>

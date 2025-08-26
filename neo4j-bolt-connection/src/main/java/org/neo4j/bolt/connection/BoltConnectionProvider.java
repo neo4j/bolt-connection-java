@@ -34,19 +34,20 @@ public interface BoltConnectionProvider {
     /**
      * Connects to the given {@link URI} using the provided parameters and returns {@link BoltConnection} instance.
      *
-     * @param uri                   the connection {@link URI}
-     * @param routingContextAddress the address to be used in the 'address' field of routing context. This applies to
-     *                              URI schemes that support routing context only. When set to {@code null}, the default
-     *                              behaviour of getting the address from the URI applies. This parameter should be used
-     *                              when an explicit address that differs from the one in the URI should be used.
-     * @param boltAgent             the {@link BoltAgent}
-     * @param userAgent             the User Agent
-     * @param connectTimeoutMillis  the connection timeout
-     * @param securityPlan          the {@link SecurityPlan}
-     * @param authToken             the {@link AuthToken}
-     * @param minVersion            the minimum {@link BoltProtocolVersion}
-     * @param notificationConfig    the {@link NotificationConfig}, this usually used in the Bolt {@code HELLO} message
-     * @param parentObservation     the parent {@link ImmutableObservation} that should be used as a parent for nested observations
+     * @param uri                         the connection {@link URI}
+     * @param routingContextAddress       the address to be used in the 'address' field of routing context. This applies to
+     *                                    URI schemes that support routing context only. When set to {@code null}, the default
+     *                                    behaviour of getting the address from the URI applies. This parameter should be used
+     *                                    when an explicit address that differs from the one in the URI should be used.
+     * @param boltAgent                   the {@link BoltAgent}
+     * @param userAgent                   the User Agent
+     * @param connectTimeoutMillis        the connection timeout, {@literal 0} or negative disables timeout
+     * @param initialisationTimeoutMillis the connection initialisation timeout, includes SSL and Bolt Handshake, {@literal 0} or negative disables timeout
+     * @param securityPlan                the {@link SecurityPlan}
+     * @param authToken                   the {@link AuthToken}
+     * @param minVersion                  the minimum {@link BoltProtocolVersion}
+     * @param notificationConfig          the {@link NotificationConfig}, this usually used in the Bolt {@code HELLO} message
+     * @param parentObservation           the parent {@link ImmutableObservation} that should be used as a parent for nested observations
      * @return the {@link BoltConnection} instance
      */
     CompletionStage<BoltConnection> connect(
@@ -55,6 +56,7 @@ public interface BoltConnectionProvider {
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
+            long initialisationTimeoutMillis,
             SecurityPlan securityPlan,
             AuthToken authToken,
             BoltProtocolVersion minVersion,

@@ -72,6 +72,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
+            long initialisationTimeoutMillis,
             SecurityPlan securityPlan,
             AuthToken authToken,
             BoltProtocolVersion minVersion,

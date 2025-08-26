@@ -34,6 +34,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Clock;
+import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLContext;
@@ -103,7 +104,12 @@ class NettyChannelInitializerTest {
     void shouldIncludeSniHostName() {
         var address = new BoltServerAddress("database.neo4j.com", 8989);
         var initializer = new NettyChannelInitializer(
-                address, trustAllCertificates(false), 10000, Clock.systemUTC(), NoopLoggingProvider.INSTANCE);
+                address,
+                trustAllCertificates(false),
+                10000,
+                Clock.systemUTC(),
+                NoopLoggingProvider.INSTANCE,
+                new CompletableFuture<>());
 
         initializer.initChannel(channel);
 
@@ -148,7 +154,12 @@ class NettyChannelInitializerTest {
     private static NettyChannelInitializer newInitializer(
             SecurityPlan securityPlan, int connectTimeoutMillis, Clock clock) {
         return new NettyChannelInitializer(
-                LOCAL_DEFAULT, securityPlan, connectTimeoutMillis, clock, NoopLoggingProvider.INSTANCE);
+                LOCAL_DEFAULT,
+                securityPlan,
+                connectTimeoutMillis,
+                clock,
+                NoopLoggingProvider.INSTANCE,
+                new CompletableFuture<>());
     }
 
     private static SecurityPlan trustAllCertificates(boolean enabled) {

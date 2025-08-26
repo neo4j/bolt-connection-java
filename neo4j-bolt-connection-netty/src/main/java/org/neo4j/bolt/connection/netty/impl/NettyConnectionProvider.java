@@ -30,6 +30,7 @@ import io.netty.resolver.AddressResolverGroup;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -46,7 +47,6 @@ import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelConnectedLis
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderImpl;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyChannelInitializer;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyDomainNameResolverGroup;
-import org.neo4j.bolt.connection.netty.impl.async.inbound.ConnectTimeoutHandler;
 import org.neo4j.bolt.connection.netty.impl.messaging.BoltProtocol;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
@@ -96,16 +96,19 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
+            long initialisationTimeoutMillis,
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             ImmutableObservation parentObservation) {
+        var sslHandshakeFuture = new CompletableFuture<Duration>();
         var bootstrap = new Bootstrap();
         bootstrap
                 .group(this.eventLoopGroup)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Math.max(connectTimeoutMillis, 0))
                 .channel(localAddress != null ? LocalChannel.class : NioSocketChannel.class)
                 .resolver(addressResolverGroup)
-                .handler(new NettyChannelInitializer(address, securityPlan, connectTimeoutMillis, clock, logging));
+                .handler(new NettyChannelInitializer(
+                        address, securityPlan, initialisationTimeoutMillis, clock, logging, sslHandshakeFuture));
 
         SocketAddress socketAddress;
         if (localAddress == null) {
@@ -118,7 +121,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         } else {
             socketAddress = localAddress;
         }
-        return installChannelConnectedListeners(address, bootstrap.connect(socketAddress), connectTimeoutMillis)
+        return installChannelConnectedListener(
+                        address, bootstrap.connect(socketAddress), initialisationTimeoutMillis, sslHandshakeFuture)
                 .thenCompose(channel -> {
                     var boltProtocol = BoltProtocol.forChannel(channel);
                     var exchangeObservation = observationProvider.boltExchange(
@@ -150,27 +154,24 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                 .thenApply(channel -> new NetworkConnection(channel, logging));
     }
 
-    private CompletionStage<Channel> installChannelConnectedListeners(
-            BoltServerAddress address, ChannelFuture channelConnected, int connectTimeoutMillis) {
+    private CompletionStage<Channel> installChannelConnectedListener(
+            BoltServerAddress address,
+            ChannelFuture channelConnected,
+            long initialisationTimeoutMillis,
+            CompletableFuture<Duration> sslHandshakeFuture) {
         var pipeline = channelConnected.channel().pipeline();
-
-        // add timeout handler to the pipeline when channel is connected. it's needed to
-        // limit amount of time code
-        // spends in TLS and Bolt handshakes. prevents infinite waiting when database does
-        // not respond
-        channelConnected.addListener(future -> pipeline.addFirst(new ConnectTimeoutHandler(connectTimeoutMillis)));
 
         // add listener that sends Bolt handshake bytes when channel is connected
         var handshakeCompleted = new CompletableFuture<Channel>();
         channelConnected.addListener(new ChannelConnectedListener(
-                address, new ChannelPipelineBuilderImpl(), handshakeCompleted, maxVersion, logging, valueFactory));
-        return handshakeCompleted.whenComplete((channel, throwable) -> {
-            if (throwable == null) {
-                // remove timeout handler from the pipeline once TLS and Bolt handshakes are
-                // completed. regular protocol
-                // messages will flow next and we do not want to have read timeout for them
-                channel.pipeline().remove(ConnectTimeoutHandler.class);
-            }
-        });
+                address,
+                new ChannelPipelineBuilderImpl(),
+                handshakeCompleted,
+                maxVersion,
+                logging,
+                valueFactory,
+                initialisationTimeoutMillis,
+                sslHandshakeFuture));
+        return handshakeCompleted;
     }
 }

@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
+import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 
 class ConnectTimeoutHandlerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();
@@ -35,27 +35,27 @@ class ConnectTimeoutHandlerTest {
     @Test
     void shouldFireExceptionOnTimeout() throws Exception {
         var timeoutMillis = 100;
-        channel.pipeline().addLast(new ConnectTimeoutHandler(timeoutMillis));
+        channel.pipeline().addLast(new ConnectTimeoutHandler(timeoutMillis, timeoutMillis));
 
         // sleep for more than the timeout value
         Thread.sleep(timeoutMillis * 4);
         channel.runPendingTasks();
 
-        var error = assertThrows(BoltServiceUnavailableException.class, channel::checkException);
-        assertEquals(error.getMessage(), "Unable to establish connection in " + timeoutMillis + "ms");
+        var error = assertThrows(BoltConnectionInitialisationTimeoutException.class, channel::checkException);
+        assertEquals(error.getMessage(), "Unable to initialise connection in " + timeoutMillis + "ms");
     }
 
     @Test
     void shouldNotFireExceptionMultipleTimes() throws Exception {
         var timeoutMillis = 70;
-        channel.pipeline().addLast(new ConnectTimeoutHandler(timeoutMillis));
+        channel.pipeline().addLast(new ConnectTimeoutHandler(timeoutMillis, timeoutMillis));
 
         // sleep for more than the timeout value
         Thread.sleep(timeoutMillis * 4);
         channel.runPendingTasks();
 
-        var error = assertThrows(BoltServiceUnavailableException.class, channel::checkException);
-        assertEquals(error.getMessage(), "Unable to establish connection in " + timeoutMillis + "ms");
+        var error = assertThrows(BoltConnectionInitialisationTimeoutException.class, channel::checkException);
+        assertEquals(error.getMessage(), "Unable to initialise connection in " + timeoutMillis + "ms");
 
         // sleep even more
         Thread.sleep(timeoutMillis * 4);

@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,6 +44,7 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltTransientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
@@ -79,6 +81,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     private final AuthTokenManager authTokenManager;
     private final SecurityPlanSupplier securityPlanSupplier;
     private final NotificationConfig notificationConfig;
+    private final TimeoutPolicy timeoutPolicy;
 
     private CompletionStage<Void> closeStage;
     private long minAuthTimestamp;
@@ -99,7 +102,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
-            NotificationConfig notificationConfig) {
+            NotificationConfig notificationConfig,
+            TimeoutPolicy timeoutPolicy) {
         this.uri = Objects.requireNonNull(uri);
         this.address = switch (uri.getScheme()) {
             case "bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc" -> new BoltServerAddress(uri);
@@ -124,6 +128,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             this.authTokenManager = Objects.requireNonNull(authTokenManager);
             this.securityPlanSupplier = Objects.requireNonNull(securityPlanSupplier);
             this.notificationConfig = Objects.requireNonNull(notificationConfig);
+            this.timeoutPolicy = Objects.requireNonNull(timeoutPolicy);
         } catch (RuntimeException ex) {
             createObservation.error(ex);
             throw ex;
@@ -149,6 +154,9 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         var parentObservation = observationProvider.scopedObservation();
         var acquireObservation = observationProvider.pooledConnectionAcquire(poolId, uri);
         var acquisitionFuture = new CompletableFuture<PooledBoltConnection>();
+        var timeoutFuture = acquisitionTimeout > 0 && timeoutPolicy.equals(TimeoutPolicy.DEFAULT)
+                ? scheduleTimeout(acquisitionFuture, acquisitionTimeout)
+                : null;
         CompletionStage<AuthToken> authTokenSupplier;
         boolean overrideAuthToken;
         if (parameters.authToken() != null) {
@@ -173,6 +181,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             });
             connect(
                     acquisitionFuture,
+                    timeoutFuture,
                     authToken,
                     overrideAuthToken,
                     parameters.minVersion(),
@@ -189,6 +198,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     @SuppressWarnings({"DuplicatedCode", "ConstantValue"})
     private void connect(
             CompletableFuture<PooledBoltConnection> acquisitionFuture,
+            ScheduledFuture<?> timeoutFuture,
             AuthToken authToken,
             boolean overrideAuthToken,
             BoltProtocolVersion minVersion,
@@ -219,28 +229,21 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                     } else {
                         // fallback to queue
                         if (pendingAcquisitions.size() < 100 && !acquisitionFuture.isDone()) {
-                            if (acquisitionTimeout > 0) {
-                                pendingAcquisitions.add(acquisitionFuture);
+                            switch (timeoutPolicy) {
+                                case DEFAULT -> {
+                                    if (timeoutFuture == null || timeoutFuture.getDelay(TimeUnit.MILLISECONDS) > 0) {
+                                        pendingAcquisitions.add(acquisitionFuture);
+                                    }
+                                }
+                                case LEGACY -> {
+                                    if (acquisitionTimeout > 0) {
+                                        pendingAcquisitions.add(acquisitionFuture);
+                                        scheduleTimeout(acquisitionFuture, acquisitionTimeout);
+                                    } else {
+                                        executorService.execute(timeoutRunnable(acquisitionFuture));
+                                    }
+                                }
                             }
-                            // schedule timeout
-                            executorService.schedule(
-                                    () -> {
-                                        synchronized (this) {
-                                            pendingAcquisitions.remove(acquisitionFuture);
-                                        }
-                                        try {
-                                            acquisitionFuture.completeExceptionally(new TimeoutException(
-                                                    "Unable to acquire connection from the pool within configured maximum time of "
-                                                            + acquisitionTimeout + "ms"));
-                                        } catch (Throwable throwable) {
-                                            log.log(
-                                                    System.Logger.Level.WARNING,
-                                                    "Unexpected error occurred.",
-                                                    throwable);
-                                        }
-                                    },
-                                    acquisitionTimeout,
-                                    TimeUnit.MILLISECONDS);
                         } else {
                             pendingAcquisitionsFull =
                                     new BoltTransientException("Connection pool pending acquisition queue is full.");
@@ -278,6 +281,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                         purge(entry);
                         connect(
                                 acquisitionFuture,
+                                timeoutFuture,
                                 authToken,
                                 overrideAuthToken,
                                 minVersion,
@@ -330,6 +334,13 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                 boltAgent,
                                 userAgent,
                                 connectTimeoutMillis,
+                                switch (timeoutPolicy) {
+                                    case DEFAULT -> acquisitionTimeout; // while the acquisition timeout is implemented
+                                        // by this source, it is also used as initialisation timeout to make sure there
+                                        // is
+                                        // a limit
+                                    case LEGACY -> connectTimeoutMillis;
+                                },
                                 auth.securityPlan(),
                                 auth.authToken(),
                                 minVersion,
@@ -348,6 +359,10 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                         error = authTokenManager.handleBoltFailureException(
                                                 usedAuth.authToken(), boltFailureException);
                                     }
+                                } else if (error instanceof BoltConnectionInitialisationTimeoutException) {
+                                    error = switch (timeoutPolicy) {
+                                        case DEFAULT -> timeoutException();
+                                        case LEGACY -> error;};
                                 }
                                 createObservation.error(error);
                                 createObservation.stop();
@@ -592,6 +607,34 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         minAuthTimestamp = Math.max(minAuthTimestamp, now);
     }
 
+    private ScheduledFuture<?> scheduleTimeout(
+            CompletableFuture<PooledBoltConnection> acquisitionFuture, long acquisitionTimeout) {
+        return executorService.schedule(
+                () -> {
+                    synchronized (this) {
+                        pendingAcquisitions.remove(acquisitionFuture);
+                    }
+                    timeoutRunnable(acquisitionFuture).run();
+                },
+                acquisitionTimeout,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private Runnable timeoutRunnable(CompletableFuture<PooledBoltConnection> acquisitionFuture) {
+        return () -> {
+            try {
+                acquisitionFuture.completeExceptionally(timeoutException());
+            } catch (Throwable throwable) {
+                log.log(System.Logger.Level.WARNING, "Unexpected error occurred.", throwable);
+            }
+        };
+    }
+
+    private TimeoutException timeoutException() {
+        return new TimeoutException("Unable to acquire connection from the pool within configured maximum time of "
+                + acquisitionTimeout + "ms");
+    }
+
     private static class ConnectionEntry {
         private BoltConnection connection;
         private boolean available;
@@ -602,4 +645,15 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     private record SecurityPlanAndAuthToken(SecurityPlan securityPlan, AuthToken authToken) {}
 
     private record ConnectionEntryWithMetadata(ConnectionEntry connectionEntry, boolean reauthNeeded) {}
+
+    public enum TimeoutPolicy {
+        /**
+         * The acquisition timeout starts immediately.
+         */
+        DEFAULT,
+        /**
+         * The acquisition timeout starts when the pool is busy.
+         */
+        LEGACY
+    }
 }

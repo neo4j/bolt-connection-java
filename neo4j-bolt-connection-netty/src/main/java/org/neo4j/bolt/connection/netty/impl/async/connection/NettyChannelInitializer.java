@@ -20,6 +20,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.handler.ssl.SslHandler;
 import java.time.Clock;
+import java.time.Duration;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLEngine;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
@@ -29,28 +32,34 @@ import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatch
 public class NettyChannelInitializer extends ChannelInitializer<Channel> {
     private final BoltServerAddress address;
     private final SecurityPlan securityPlan;
-    private final int connectTimeoutMillis;
+    private final long sslHandshakeTimeoutMillis;
     private final Clock clock;
     private final LoggingProvider logging;
+    private final CompletableFuture<Duration> sslHandshakeFuture;
 
     public NettyChannelInitializer(
             BoltServerAddress address,
             SecurityPlan securityPlan,
-            int connectTimeoutMillis,
+            long sslHandshakeTimeoutMillis,
             Clock clock,
-            LoggingProvider logging) {
+            LoggingProvider logging,
+            CompletableFuture<Duration> sslHandshakeFuture) {
         this.address = address;
         this.securityPlan = securityPlan;
-        this.connectTimeoutMillis = connectTimeoutMillis;
+        this.sslHandshakeTimeoutMillis = sslHandshakeTimeoutMillis;
         this.clock = clock;
         this.logging = logging;
+        this.sslHandshakeFuture = Objects.requireNonNull(sslHandshakeFuture);
     }
 
     @Override
     protected void initChannel(Channel channel) {
         if (securityPlan != null) {
             var sslHandler = createSslHandler();
-            channel.pipeline().addFirst(sslHandler);
+            var sslHandshakeDurationHandler = new SslHandshakeDurationHandler(channel, sslHandshakeFuture);
+            channel.pipeline().addFirst(sslHandler, sslHandshakeDurationHandler);
+        } else {
+            sslHandshakeFuture.complete(Duration.ZERO);
         }
 
         updateChannelAttributes(channel);
@@ -59,7 +68,9 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
     private SslHandler createSslHandler() {
         var sslEngine = createSslEngine();
         var sslHandler = new SslHandler(sslEngine);
-        sslHandler.setHandshakeTimeoutMillis(connectTimeoutMillis);
+        if (sslHandshakeTimeoutMillis >= 0) {
+            sslHandler.setHandshakeTimeoutMillis(sslHandshakeTimeoutMillis);
+        }
         return sslHandler;
     }
 

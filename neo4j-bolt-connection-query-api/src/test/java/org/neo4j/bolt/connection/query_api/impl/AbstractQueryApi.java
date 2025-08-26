@@ -104,6 +104,7 @@ abstract class AbstractQueryApi {
                         null,
                         null,
                         0,
+                        0,
                         SecurityPlans.encryptedForSystemCASignedCertificates(),
                         AuthTokens.basic(username(), password(), "basic", valueFactory),
                         null,
