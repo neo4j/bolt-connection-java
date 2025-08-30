@@ -16,11 +16,13 @@
  */
 package org.neo4j.bolt.connection.netty;
 
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import java.net.URI;
 import java.time.Clock;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.neo4j.bolt.connection.BoltConnection;
@@ -32,8 +34,9 @@ import org.neo4j.bolt.connection.DefaultDomainNameResolver;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
-import org.neo4j.bolt.connection.netty.impl.BootstrapFactory;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
+import org.neo4j.bolt.connection.netty.impl.async.connection.EventLoopGroupFactory;
+import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
 import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -54,6 +57,29 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  *     requires more contextual awareness and fits {@link BoltConnectionSource} with
  *     {@link RoutedBoltConnectionParameters} support better.</li>
  * </ul>
+ * Supported additional parameters:
+ * <ul>
+ *     <li><b>eventLoopGroup</b> - Sets {@link EventLoopGroup} to be used instead of creating a new one. Defaults to
+ *     {@literal null}.</li>
+ *     <li><b>eventLoopThreads</b> - Sets the number of Event Loop threads. Defaults to {@literal null}. This option is
+ *     used only when eventLoopGroup is {@literal null}.</li>
+ *     <li><b>localAddress</b> - Sets {@link LocalAddress} to be used instead of {@link URI}. Defaults to
+ *     {@literal null}.</li>
+ *     <li><b>clock</b> - Sets the {@link Clock} to be used. Defaults to {@link Clock#systemUTC()}.</li>
+ *     <li><b>domainNameResolver</b> - Sets the {@link DomainNameResolver} to be used. Defaults to
+ *     {@link DefaultDomainNameResolver#getInstance()}.</li>
+ *     <li><b>maxVersion</b> - Sets the meximum {@link BoltProtocolVersion} that will be negotiated. Defaults to
+ *     {@literal null}.</li>
+ *     <li><b>nettyTransport</b> - Defines Netty transport to be used. Supported values: auto (default), nio, epoll
+ *     (requires adding epoll dependency explicitly), kqueue (requires adding kqueue dependency explicitly), local. The
+ *     default auto mode selects local when localAddress is provided, otherwise it attempts to detect if native
+ *     transport is available in runtime (the dependency needs to be added explicitly) and falls back to nio otherwise.
+ *     When eventLoopGroup is not {@literal null}, this option defaults to nio.</li>
+ *     <li> <b>enableFastOpen</b> - Enables client-side TCP Fast Open if it is available. Supported values: true and
+ *     false (default). Note that only Netty native transports support this and extra system configuration may be
+ *     needed. When either native transport or TCP Fast Open is unavaible, this option is ignored and is effectively
+ *     false.</li>
+ * </ul>
  *
  * @since 4.0.0
  */
@@ -64,7 +90,7 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
     /**
      * Creates a new instance of this factory.
      * <p>
-     * It is used by {@link java.util.ServiceLoader}.
+     * It is used by {@link ServiceLoader}.
      */
     public NettyBoltConnectionProviderFactory() {}
 
@@ -83,11 +109,29 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
 
         // get additional parameters
         var shutdownEventLoopGroupOnClose = false;
+        Class<? extends Channel> channelClass;
+        var localAddress = getConfigEntry(logger, additionalConfig, "localAddress", LocalAddress.class, () -> null);
+        var fastOpen = getConfigEntry(logger, additionalConfig, "enableFastOpen", Boolean.class, () -> false);
         var eventLoopGroup =
                 getConfigEntry(logger, additionalConfig, "eventLoopGroup", EventLoopGroup.class, () -> null);
         if (eventLoopGroup == null) {
-            eventLoopGroup = createEventLoopGroup(logger, additionalConfig);
+            var factory = createEventLoopGroupFactory(logger, localAddress, additionalConfig);
+            var size = getConfigEntry(logger, additionalConfig, "eventLoopThreads", Integer.class, () -> 0);
+            if (fastOpen && !factory.fastOpenAvailable()) {
+                logger.log(System.Logger.Level.WARNING, "Fast Open is not supported and will be ignored");
+                fastOpen = false;
+            }
+            eventLoopGroup = factory.newEventLoopGroup(size);
+            channelClass = factory.channelClass();
             shutdownEventLoopGroupOnClose = true;
+        } else {
+            var nettyTransport = determineTransportType(logger, localAddress, additionalConfig, "nio");
+            logger.log(System.Logger.Level.TRACE, "Selected nettyTransport %s", nettyTransport);
+            channelClass = nettyTransport.channelClass();
+            if (fastOpen && !nettyTransport.fastOpenAvailable()) {
+                logger.log(System.Logger.Level.WARNING, "Fast Open is not supported and will be ignored");
+                fastOpen = false;
+            }
         }
         var clock = getConfigEntry(logger, additionalConfig, "clock", Clock.class, Clock::systemUTC);
         var domainNameResolver = getConfigEntry(
@@ -96,28 +140,56 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 "domainNameResolver",
                 DomainNameResolver.class,
                 DefaultDomainNameResolver::getInstance);
-        var localAddress = getConfigEntry(logger, additionalConfig, "localAddress", LocalAddress.class, () -> null);
         var maxVersion = getConfigEntry(logger, additionalConfig, "maxVersion", BoltProtocolVersion.class, () -> null);
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
+                channelClass,
                 clock,
                 domainNameResolver,
                 localAddress,
                 maxVersion,
+                fastOpen,
                 loggingProvider,
                 valueFactory,
                 shutdownEventLoopGroupOnClose,
                 observationProvider);
     }
 
-    private EventLoopGroup createEventLoopGroup(System.Logger logger, Map<String, ?> additionalConfig) {
-        var size = getConfigEntry(logger, additionalConfig, "eventLoopThreads", Integer.class, () -> 0);
+    private EventLoopGroupFactory createEventLoopGroupFactory(
+            System.Logger logger, LocalAddress localAddress, Map<String, ?> additionalConfig) {
         var eventLoopThreadNamePrefix =
                 getConfigEntry(logger, additionalConfig, "eventLoopThreadNamePrefix", String.class, () -> null);
-        return BootstrapFactory.newBootstrap(size, eventLoopThreadNamePrefix)
-                .config()
-                .group();
+        var nettyTransport = determineTransportType(logger, localAddress, additionalConfig, "auto");
+        logger.log(System.Logger.Level.TRACE, "Selected nettyTransport %s", nettyTransport);
+        return new EventLoopGroupFactory(eventLoopThreadNamePrefix, nettyTransport);
+    }
+
+    private NettyTransport determineTransportType(
+            System.Logger logger,
+            LocalAddress localAddress,
+            Map<String, ?> additionalConfig,
+            String defaultNettyTransport) {
+        var nettyTransport =
+                getConfigEntry(logger, additionalConfig, "nettyTransport", String.class, () -> defaultNettyTransport);
+        return switch (nettyTransport) {
+            case "auto" -> {
+                if (localAddress != null) {
+                    yield NettyTransport.local();
+                } else if (NettyTransport.isEpollAvailable()) {
+                    yield NettyTransport.epoll();
+                } else if (NettyTransport.isKQueueAvailable()) {
+                    yield NettyTransport.kqueue();
+                } else {
+                    yield NettyTransport.nio();
+                }
+            }
+            case "nio" -> NettyTransport.nio();
+            case "epoll" -> NettyTransport.epoll();
+            case "kqueue" -> NettyTransport.kqueue();
+            case "local" -> NettyTransport.local();
+            default -> throw new IllegalArgumentException("Unexpected nettyTransport value: " + nettyTransport);
+        };
     }
 
     private static <T> T getConfigEntry(

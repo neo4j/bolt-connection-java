@@ -16,11 +16,12 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async.connection;
 
-import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.local.LocalEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import java.util.Objects;
@@ -37,30 +38,29 @@ public final class EventLoopGroupFactory {
     private static final boolean THREAD_IS_DAEMON = true;
 
     private final String threadNamePrefix;
+    private final NettyTransport nettyTransport;
 
-    public EventLoopGroupFactory(String threadNamePrefix) {
+    public EventLoopGroupFactory(String threadNamePrefix, NettyTransport nettyTransport) {
         this.threadNamePrefix = Objects.requireNonNullElse(threadNamePrefix, THREAD_NAME_PREFIX);
+        this.nettyTransport = Objects.requireNonNull(nettyTransport);
     }
 
-    /**
-     * Get class of {@link Channel} for {@link Bootstrap#channel(Class)} method.
-     *
-     * @return class of the channel, which should be consistent with {@link EventLoopGroup}s returned by
-     * {@link #newEventLoopGroup(int)}.
-     */
     public Class<? extends Channel> channelClass() {
-        return NioSocketChannel.class;
+        return nettyTransport.channelClass();
     }
 
-    /**
-     * Create new {@link EventLoopGroup} with specified thread count. Returned group should by given to
-     * {@link Bootstrap#group(EventLoopGroup)}.
-     *
-     * @param threadCount amount of IO threads for the new group.
-     * @return new group consistent with channel class returned by {@link #channelClass()}.
-     */
+    public boolean fastOpenAvailable() {
+        return nettyTransport.fastOpenAvailable();
+    }
+
+    @SuppressWarnings("deprecation")
     public EventLoopGroup newEventLoopGroup(int threadCount) {
-        return new DriverEventLoopGroup(threadCount);
+        return switch (nettyTransport.type()) {
+            case NIO -> new DriverEventLoopGroup(threadCount);
+            case EPOLL -> new EpollEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
+            case KQUEUE -> new KQueueEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
+            case LOCAL -> new LocalEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
+        };
     }
 
     /**

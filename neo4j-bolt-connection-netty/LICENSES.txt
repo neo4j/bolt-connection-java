@@ -12,6 +12,8 @@ Apache Software License, Version 2.0
   Netty/Resolver
   Netty/TomcatNative [OpenSSL - Classes]
   Netty/Transport
+  Netty/Transport/Classes/Epoll
+  Netty/Transport/Classes/KQueue
   Netty/Transport/Native/Unix/Common
 ------------------------------------------------------------------------------
 

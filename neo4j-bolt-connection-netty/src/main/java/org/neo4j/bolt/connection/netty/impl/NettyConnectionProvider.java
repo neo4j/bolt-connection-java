@@ -25,7 +25,6 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.resolver.AddressResolverGroup;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -57,11 +56,13 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class NettyConnectionProvider implements ConnectionProvider {
     private final EventLoopGroup eventLoopGroup;
+    private final Class<? extends Channel> channelClass;
     private final Clock clock;
     private final DomainNameResolver domainNameResolver;
     private final AddressResolverGroup<InetSocketAddress> addressResolverGroup;
     private final LocalAddress localAddress;
     private final BoltProtocolVersion maxVersion;
+    private final boolean fastOpen;
 
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
@@ -69,19 +70,23 @@ public final class NettyConnectionProvider implements ConnectionProvider {
 
     public NettyConnectionProvider(
             EventLoopGroup eventLoopGroup,
+            Class<? extends Channel> channelClass,
             Clock clock,
             DomainNameResolver domainNameResolver,
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
+            boolean fastOpen,
             LoggingProvider logging,
             ValueFactory valueFactory,
             ObservationProvider observationProvider) {
         this.eventLoopGroup = eventLoopGroup;
+        this.channelClass = Objects.requireNonNull(channelClass);
         this.clock = requireNonNull(clock);
         this.domainNameResolver = requireNonNull(domainNameResolver);
         this.addressResolverGroup = new NettyDomainNameResolverGroup(this.domainNameResolver);
         this.localAddress = localAddress;
         this.maxVersion = maxVersion;
+        this.fastOpen = fastOpen;
         this.logging = logging;
         this.valueFactory = requireNonNull(valueFactory);
         this.observationProvider = Objects.requireNonNull(observationProvider);
@@ -101,14 +106,28 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             NotificationConfig notificationConfig,
             ImmutableObservation parentObservation) {
         var sslHandshakeFuture = new CompletableFuture<Duration>();
+        var handshakeCompleted = new CompletableFuture<Channel>();
         var bootstrap = new Bootstrap();
         bootstrap
                 .group(this.eventLoopGroup)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Math.max(connectTimeoutMillis, 0))
-                .channel(localAddress != null ? LocalChannel.class : NioSocketChannel.class)
+                .option(ChannelOption.SO_KEEPALIVE, true)
+                .option(ChannelOption.SO_REUSEADDR, true)
+                .channel(localAddress != null ? LocalChannel.class : channelClass)
                 .resolver(addressResolverGroup)
                 .handler(new NettyChannelInitializer(
-                        address, securityPlan, initialisationTimeoutMillis, clock, logging, sslHandshakeFuture));
+                        address,
+                        securityPlan,
+                        initialisationTimeoutMillis,
+                        clock,
+                        logging,
+                        sslHandshakeFuture,
+                        handshakeCompleted,
+                        maxVersion,
+                        valueFactory));
+        if (fastOpen) {
+            bootstrap.option(ChannelOption.TCP_FASTOPEN_CONNECT, true);
+        }
 
         SocketAddress socketAddress;
         if (localAddress == null) {
@@ -121,8 +140,15 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         } else {
             socketAddress = localAddress;
         }
-        return installChannelConnectedListener(
-                        address, bootstrap.connect(socketAddress), initialisationTimeoutMillis, sslHandshakeFuture)
+        var appendBoltHanshake = !fastOpen || securityPlan != null;
+        installChannelConnectedListener(
+                address,
+                bootstrap.connect(socketAddress),
+                initialisationTimeoutMillis,
+                sslHandshakeFuture,
+                handshakeCompleted,
+                appendBoltHanshake);
+        return handshakeCompleted
                 .thenCompose(channel -> {
                     var boltProtocol = BoltProtocol.forChannel(channel);
                     var exchangeObservation = observationProvider.boltExchange(
@@ -154,15 +180,16 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                 .thenApply(channel -> new NetworkConnection(channel, logging));
     }
 
-    private CompletionStage<Channel> installChannelConnectedListener(
+    private void installChannelConnectedListener(
             BoltServerAddress address,
             ChannelFuture channelConnected,
             long initialisationTimeoutMillis,
-            CompletableFuture<Duration> sslHandshakeFuture) {
+            CompletableFuture<Duration> sslHandshakeFuture,
+            CompletableFuture<Channel> handshakeCompleted,
+            boolean appendBoltHanshake) {
         var pipeline = channelConnected.channel().pipeline();
 
         // add listener that sends Bolt handshake bytes when channel is connected
-        var handshakeCompleted = new CompletableFuture<Channel>();
         channelConnected.addListener(new ChannelConnectedListener(
                 address,
                 new ChannelPipelineBuilderImpl(),
@@ -171,7 +198,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                 logging,
                 valueFactory,
                 initialisationTimeoutMillis,
-                sslHandshakeFuture));
-        return handshakeCompleted;
+                sslHandshakeFuture,
+                appendBoltHanshake));
     }
 }

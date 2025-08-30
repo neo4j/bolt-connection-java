@@ -32,7 +32,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class EventLoopGroupFactoryTest {
-    private final EventLoopGroupFactory eventLoopGroupFactory = new EventLoopGroupFactory(null);
+    private final EventLoopGroupFactory eventLoopGroupFactory = new EventLoopGroupFactory(null, NettyTransport.nio());
     private EventLoopGroup eventLoopGroup;
 
     @AfterEach

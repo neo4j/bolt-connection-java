@@ -44,6 +44,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
@@ -303,7 +304,10 @@ class HandshakeHandlerTest {
         return new HandshakeHandler(
                 pipelineBuilder,
                 handshakeCompletedPromise,
+                new BoltServerAddress("127.0.0.1", 7687),
                 null,
+                false,
+                0,
                 NoopLoggingProvider.INSTANCE,
                 mock(ValueFactory.class));
     }

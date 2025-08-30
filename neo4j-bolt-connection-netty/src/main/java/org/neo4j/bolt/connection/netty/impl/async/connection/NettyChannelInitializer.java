@@ -18,16 +18,19 @@ package org.neo4j.bolt.connection.netty.impl.async.connection;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.SslHandler;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLEngine;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatcher;
+import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class NettyChannelInitializer extends ChannelInitializer<Channel> {
     private final BoltServerAddress address;
@@ -36,6 +39,9 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
     private final Clock clock;
     private final LoggingProvider logging;
     private final CompletableFuture<Duration> sslHandshakeFuture;
+    private final CompletableFuture<Channel> handshakeCompleted;
+    private final BoltProtocolVersion maxVersion;
+    private final ValueFactory valueFactory;
 
     public NettyChannelInitializer(
             BoltServerAddress address,
@@ -43,13 +49,19 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
             long sslHandshakeTimeoutMillis,
             Clock clock,
             LoggingProvider logging,
-            CompletableFuture<Duration> sslHandshakeFuture) {
+            CompletableFuture<Duration> sslHandshakeFuture,
+            CompletableFuture<Channel> handshakeCompleted,
+            BoltProtocolVersion maxVersion,
+            ValueFactory valueFactory) {
         this.address = address;
         this.securityPlan = securityPlan;
         this.sslHandshakeTimeoutMillis = sslHandshakeTimeoutMillis;
         this.clock = clock;
         this.logging = logging;
         this.sslHandshakeFuture = Objects.requireNonNull(sslHandshakeFuture);
+        this.handshakeCompleted = Objects.requireNonNull(handshakeCompleted);
+        this.maxVersion = maxVersion;
+        this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
     @Override
@@ -60,6 +72,19 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
             channel.pipeline().addFirst(sslHandler, sslHandshakeDurationHandler);
         } else {
             sslHandshakeFuture.complete(Duration.ZERO);
+            var fastOpen = Boolean.TRUE.equals(channel.config().getOption(ChannelOption.TCP_FASTOPEN_CONNECT));
+            if (fastOpen) {
+                var handshakeHandler = new HandshakeHandler(
+                        new ChannelPipelineBuilderImpl(),
+                        handshakeCompleted,
+                        address,
+                        maxVersion,
+                        true,
+                        sslHandshakeTimeoutMillis,
+                        logging,
+                        valueFactory);
+                channel.pipeline().addFirst(handshakeHandler);
+            }
         }
 
         updateChannelAttributes(channel);

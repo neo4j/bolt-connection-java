@@ -46,6 +46,7 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.SecurityPlans;
 import org.neo4j.bolt.connection.netty.impl.NoopLoggingProvider;
+import org.neo4j.bolt.connection.test.values.TestValueFactory;
 
 class NettyChannelInitializerTest {
     private final EmbeddedChannel channel = new EmbeddedChannel();
@@ -109,7 +110,10 @@ class NettyChannelInitializerTest {
                 10000,
                 Clock.systemUTC(),
                 NoopLoggingProvider.INSTANCE,
-                new CompletableFuture<>());
+                new CompletableFuture<>(),
+                new CompletableFuture<>(),
+                null,
+                TestValueFactory.INSTANCE);
 
         initializer.initChannel(channel);
 
@@ -159,7 +163,10 @@ class NettyChannelInitializerTest {
                 connectTimeoutMillis,
                 clock,
                 NoopLoggingProvider.INSTANCE,
-                new CompletableFuture<>());
+                new CompletableFuture<>(),
+                new CompletableFuture<>(),
+                null,
+                TestValueFactory.INSTANCE);
     }
 
     private static SecurityPlan trustAllCertificates(boolean enabled) {
