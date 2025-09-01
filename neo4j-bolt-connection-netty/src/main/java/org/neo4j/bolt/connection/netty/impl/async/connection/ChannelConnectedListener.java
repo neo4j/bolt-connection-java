@@ -75,7 +75,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
                     if (throwable instanceof SslHandshakeTimeoutException) {
                         throwable = new BoltConnectionInitialisationTimeoutException(
                                 "SSL handshake with %s timed out".formatted(address), throwable);
-                    } else {
+                    } else if (!(throwable instanceof SSLHandshakeException)) {
                         throwable = new BoltServiceUnavailableException(
                                 "SSL handshake with %s failed".formatted(address), throwable);
                     }
