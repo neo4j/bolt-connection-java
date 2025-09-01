@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.neo4j.bolt</groupId>
         <artifactId>neo4j-bolt-connection-parent</artifactId>
-        <version>7.0-SNAPSHOT</version>
+        <version>8.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>neo4j-bolt-connection-netty</artifactId>
@@ -74,17 +74,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.maven.surefire</groupId>
-                        <artifactId>surefire-junit-platform</artifactId>
-                        <version>${surefire.and.failsafe.version}</version>
-                    </dependency>
-                </dependencies>
             </plugin>
         </plugins>
     </build>

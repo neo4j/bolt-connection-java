@@ -92,6 +92,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
+            long initialisationTimeoutMillis,
             SecurityPlan securityPlan,
             AuthToken authToken,
             BoltProtocolVersion minVersion,
@@ -137,6 +138,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         boltAgent,
                         userAgent,
                         connectTimeoutMillis,
+                        initialisationTimeoutMillis,
                         latestAuthMillisFuture,
                         notificationConfig,
                         parentObservation)

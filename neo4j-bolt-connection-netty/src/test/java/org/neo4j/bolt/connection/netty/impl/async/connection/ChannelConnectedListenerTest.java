@@ -32,6 +32,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -116,7 +117,9 @@ class ChannelConnectedListenerTest {
                 handshakeCompletedFuture,
                 null,
                 NoopLoggingProvider.INSTANCE,
-                mock(ValueFactory.class));
+                mock(ValueFactory.class),
+                0,
+                CompletableFuture.completedFuture(Duration.ZERO));
     }
 
     private record FailedPromise(Throwable failure) implements ChannelPromise {

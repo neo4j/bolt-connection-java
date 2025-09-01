@@ -28,8 +28,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import javax.net.ssl.SSLHandshakeException;
@@ -72,8 +76,10 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     private static final String CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE =
             "Failed to obtain a connection towards address %s, will try other addresses if available. Complete failure is reported separately from this entry.";
     private final System.Logger log;
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final BoltConnectionSourceFactory boltConnectionSourceFactory;
     private final URI uri;
+    private final long acquisitionTimeout;
     private final Map<BoltServerAddress, BoltConnectionSource<BoltConnectionParameters>> addressToSource =
             new HashMap<>();
     private final Map<BoltServerAddress, Integer> addressToInUseCount = new HashMap<>();
@@ -93,6 +99,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             Clock clock,
             LoggingProvider logging,
             URI uri,
+            long acquisitionTimeout,
             List<Class<? extends Throwable>> discoveryAbortingErrors,
             ObservationProvider observationProvider) {
         this.boltConnectionSourceFactory = Objects.requireNonNull(boltConnectionSourceFactory);
@@ -105,6 +112,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         this.registry = new RoutingTableRegistryImpl(
                 this::get, this.rediscovery, clock, logging, routingTablePurgeDelayMs, this::shutdownUnusedProviders);
         this.uri = Objects.requireNonNull(uri);
+        this.acquisitionTimeout = acquisitionTimeout;
         this.observationProvider = Objects.requireNonNull(observationProvider);
     }
 
@@ -124,6 +132,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         }
 
         var parentObservation = observationProvider.scopedObservation();
+        var acquisitionFuture = new CompletableFuture<BoltConnection>();
+        var timeoutFuture = acquisitionTimeout > 0 ? scheduleTimeout(acquisitionFuture, acquisitionTimeout) : null;
         var handlerRef = new AtomicReference<RoutingTableHandler>();
         var databaseName = parameters.databaseName();
         CompletableFuture<DatabaseName> databaseNameFuture;
@@ -137,28 +147,28 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         } else {
             databaseNameFuture = CompletableFuture.completedFuture(databaseName);
         }
-        return registry.ensureRoutingTable(databaseNameFuture, parameters, parentObservation)
+        registry.ensureRoutingTable(databaseNameFuture, parameters, parentObservation)
                 .thenApply(routingTableHandler -> {
                     handlerRef.set(routingTableHandler);
                     return routingTableHandler;
                 })
-                .thenCompose(routingTableHandler -> acquire(
-                        parameters.accessMode(), routingTableHandler.routingTable(), parameters, parentObservation))
+                .thenCompose(routingTableHandler -> {
+                    if (acquisitionTimedOut(timeoutFuture)) {
+                        return CompletableFuture.failedFuture(acquisitionTimeoutException());
+                    }
+                    return acquire(
+                            parameters.accessMode(), routingTableHandler.routingTable(), parameters, parentObservation);
+                })
                 .thenApply(boltConnection -> (BoltConnection)
                         new RoutedBoltConnection(boltConnection, handlerRef.get(), parameters.accessMode(), this))
-                .exceptionally(throwable -> {
-                    throwable = FutureUtil.completionExceptionCause(throwable);
-                    if (throwable instanceof RuntimeException runtimeException) {
-                        throw runtimeException;
-                    } else {
-                        throw new CompletionException(throwable);
-                    }
-                })
                 .thenCompose(boltConnection -> {
                     if (parameters.homeDatabaseHint() != null
                             && !boltConnection.serverSideRoutingEnabled()
                             && !databaseNameFuture.isDone()) {
                         // home database was requested with hint, but the returned connection does not have SSR enabled
+                        if (acquisitionTimedOut(timeoutFuture)) {
+                            return CompletableFuture.failedFuture(acquisitionTimeoutException());
+                        }
                         var parametersWithoutHomeDatabaseHint = RoutedBoltConnectionParameters.builder()
                                 .withAuthToken(parameters.authToken())
                                 .withMinVersion(parameters.minVersion())
@@ -175,7 +185,19 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                     } else {
                         return CompletableFuture.completedStage(boltConnection);
                     }
+                })
+                .whenComplete((connection, throwable) -> {
+                    if (throwable != null) {
+                        throwable = FutureUtil.completionExceptionCause(throwable);
+                        acquisitionFuture.completeExceptionally(throwable);
+                        connection.close();
+                    } else {
+                        if (!acquisitionFuture.complete(connection)) {
+                            connection.close();
+                        }
+                    }
                 });
+        return acquisitionFuture;
     }
 
     @Override
@@ -393,7 +415,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                     futures[index++] = iterator.next().close().toCompletableFuture();
                     iterator.remove();
                 }
-                this.closeFuture = CompletableFuture.allOf(futures);
+                this.closeFuture = CompletableFuture.allOf(futures)
+                        .whenComplete((ignored, throwable) -> executorService.shutdown());
             }
             closeFuture = this.closeFuture;
         }
@@ -424,5 +447,22 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             addressToSource.put(address, provider);
         }
         return provider;
+    }
+
+    private ScheduledFuture<?> scheduleTimeout(
+            CompletableFuture<BoltConnection> acquisitionFuture, long acquisitionTimeout) {
+        return executorService.schedule(
+                () -> acquisitionFuture.completeExceptionally(acquisitionTimeoutException()),
+                acquisitionTimeout,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private TimeoutException acquisitionTimeoutException() {
+        return new TimeoutException("Unable to acquire connection from the pool within configured maximum time of "
+                + acquisitionTimeout + "ms");
+    }
+
+    private boolean acquisitionTimedOut(ScheduledFuture<?> timeoutFuture) {
+        return timeoutFuture != null && timeoutFuture.getDelay(TimeUnit.MILLISECONDS) <= 0L;
     }
 }

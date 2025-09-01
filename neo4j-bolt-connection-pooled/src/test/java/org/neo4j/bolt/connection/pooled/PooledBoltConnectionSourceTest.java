@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -152,13 +153,15 @@ class PooledBoltConnectionSourceTest {
                 boltAgent,
                 userAgent,
                 timeout,
-                notificationConfig);
+                notificationConfig,
+                PooledBoltConnectionSource.TimeoutPolicy.DEFAULT);
         given(upstreamProvider.connect(
                         eq(uri),
                         eq(routingContextAddress),
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
+                        anyLong(),
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
@@ -184,6 +187,7 @@ class PooledBoltConnectionSourceTest {
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
+                        anyLong(),
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
@@ -213,7 +217,41 @@ class PooledBoltConnectionSourceTest {
                 boltAgent,
                 userAgent,
                 timeout,
-                notificationConfig);
+                notificationConfig,
+                PooledBoltConnectionSource.TimeoutPolicy.DEFAULT);
+        boltConnectionSource.getConnection().toCompletableFuture().join();
+
+        // when
+        var connectionStage = boltConnectionSource.getConnection();
+
+        // then
+        var completionException = assertThrows(
+                CompletionException.class,
+                () -> connectionStage.toCompletableFuture().join());
+        assertInstanceOf(TimeoutException.class, completionException.getCause());
+    }
+
+    @Test
+    void shouldTimeoutImmediately() {
+        // given
+        boltConnectionSource = new PooledBoltConnectionSource(
+                loggingProvider,
+                clock,
+                uri,
+                upstreamProvider,
+                authTokenManager,
+                securityPlanSupplier,
+                1,
+                0,
+                maxLifetime,
+                idleBeforeTest,
+                observationProvider,
+                routingContextAddress,
+                boltAgent,
+                userAgent,
+                timeout,
+                notificationConfig,
+                PooledBoltConnectionSource.TimeoutPolicy.LEGACY);
         boltConnectionSource.getConnection().toCompletableFuture().join();
 
         // when
@@ -336,6 +374,7 @@ class PooledBoltConnectionSourceTest {
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
+                        anyLong(),
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
@@ -371,6 +410,7 @@ class PooledBoltConnectionSourceTest {
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
+                        anyLong(),
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
@@ -412,6 +452,7 @@ class PooledBoltConnectionSourceTest {
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
+                        anyLong(),
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
@@ -476,6 +517,7 @@ class PooledBoltConnectionSourceTest {
                         eq(boltAgent),
                         eq(userAgent),
                         eq(timeout),
+                        anyLong(),
                         eq(securityPlan),
                         eq(authToken),
                         eq(null),
@@ -581,7 +623,8 @@ class PooledBoltConnectionSourceTest {
     @ValueSource(booleans = {true, false})
     void shouldUseSessionAuth(boolean setupAcquiredConnection) {
         // given
-        given(upstreamProvider.connect(any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any()))
+        given(upstreamProvider.connect(
+                        any(), any(), any(), any(), anyInt(), anyLong(), any(), any(), any(), any(), any()))
                 .willReturn(CompletableFuture.completedStage(mock(BoltConnection.class)));
         if (setupAcquiredConnection) {
             boltConnectionSource.getConnection().toCompletableFuture().join();
@@ -601,10 +644,21 @@ class PooledBoltConnectionSourceTest {
         var inOrder = Mockito.inOrder(upstreamProvider);
         if (setupAcquiredConnection) {
             inOrder.verify(upstreamProvider)
-                    .connect(any(), any(), any(), any(), anyInt(), any(), eq(this.authToken), any(), any(), any());
+                    .connect(
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            anyInt(),
+                            anyLong(),
+                            any(),
+                            eq(this.authToken),
+                            any(),
+                            any(),
+                            any());
         }
         inOrder.verify(upstreamProvider)
-                .connect(any(), any(), any(), any(), anyInt(), any(), eq(authToken), any(), any(), any());
+                .connect(any(), any(), any(), any(), anyInt(), anyLong(), any(), eq(authToken), any(), any(), any());
         inOrder.verifyNoMoreInteractions();
     }
 }

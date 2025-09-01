@@ -37,6 +37,7 @@ public interface ConnectionProvider {
             BoltAgent boltAgent,
             String userAgent,
             int connectTimeoutMillis,
+            long initialisationTimeoutMillis,
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             ImmutableObservation parentObservation);

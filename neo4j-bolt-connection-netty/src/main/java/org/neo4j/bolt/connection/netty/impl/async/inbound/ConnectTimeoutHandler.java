@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.netty.impl.async.inbound;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import java.util.concurrent.TimeUnit;
+import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 
 /**
@@ -27,12 +28,12 @@ import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
  * Otherwise it will make long running queries fail.
  */
 public class ConnectTimeoutHandler extends ReadTimeoutHandler {
-    private final long timeoutMillis;
+    private final long overallTimeoutLimit;
     private boolean triggered;
 
-    public ConnectTimeoutHandler(long timeoutMillis) {
+    public ConnectTimeoutHandler(long timeoutMillis, long overallTimeoutLimit) {
         super(timeoutMillis, TimeUnit.MILLISECONDS);
-        this.timeoutMillis = timeoutMillis;
+        this.overallTimeoutLimit = overallTimeoutLimit;
     }
 
     @Override
@@ -44,6 +45,7 @@ public class ConnectTimeoutHandler extends ReadTimeoutHandler {
     }
 
     private BoltServiceUnavailableException unableToConnectError() {
-        return new BoltServiceUnavailableException("Unable to establish connection in " + timeoutMillis + "ms");
+        return new BoltConnectionInitialisationTimeoutException(
+                "Unable to initialise connection in " + overallTimeoutLimit + "ms");
     }
 }

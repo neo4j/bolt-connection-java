@@ -22,14 +22,19 @@ import static org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocol
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.handler.ssl.SslHandshakeTimeoutException;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
+import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
+import org.neo4j.bolt.connection.netty.impl.async.inbound.ConnectTimeoutHandler;
 import org.neo4j.bolt.connection.netty.impl.logging.ChannelActivityLogger;
+import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class ChannelConnectedListener implements ChannelFutureListener {
@@ -39,6 +44,8 @@ public class ChannelConnectedListener implements ChannelFutureListener {
     private final BoltProtocolVersion maxVersion;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
+    private final long initialisationTimeoutMillis;
+    private final CompletableFuture<Duration> sslHandshakeFuture;
 
     public ChannelConnectedListener(
             BoltServerAddress address,
@@ -46,34 +53,77 @@ public class ChannelConnectedListener implements ChannelFutureListener {
             CompletableFuture<Channel> handshakeCompletedFuture,
             BoltProtocolVersion maxVersion,
             LoggingProvider logging,
-            ValueFactory valueFactory) {
+            ValueFactory valueFactory,
+            long initialisationTimeoutMillis,
+            CompletableFuture<Duration> sslHandshakeFuture) {
         this.address = address;
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
         this.maxVersion = maxVersion;
         this.logging = logging;
         this.valueFactory = Objects.requireNonNull(valueFactory);
+        this.initialisationTimeoutMillis = initialisationTimeoutMillis;
+        this.sslHandshakeFuture = Objects.requireNonNull(sslHandshakeFuture);
     }
 
     @Override
     public void operationComplete(ChannelFuture future) {
         if (future.isSuccess()) {
-            var channel = future.channel();
-            var log = new ChannelActivityLogger(channel, logging, getClass());
-            log.log(System.Logger.Level.TRACE, "Channel %s connected, initiating bolt handshake", channel);
-
-            var pipeline = channel.pipeline();
-            pipeline.addLast(
-                    new HandshakeHandler(pipelineBuilder, handshakeCompletedFuture, maxVersion, logging, valueFactory));
-            log.log(System.Logger.Level.DEBUG, "C: [Bolt Handshake] %s", handshakeString());
-            channel.writeAndFlush(BoltProtocolUtil.handshakeBuf()).addListener(f -> {
-                if (!f.isSuccess()) {
-                    var error = f.cause();
-                    if (!(error instanceof SSLHandshakeException)) {
-                        error = new BoltServiceUnavailableException(
-                                String.format("Unable to write Bolt handshake to %s.", this.address), error);
+            sslHandshakeFuture.whenComplete((handshakeDuration, throwable) -> {
+                if (throwable != null) {
+                    throwable = FutureUtil.completionExceptionCause(throwable);
+                    if (throwable instanceof SslHandshakeTimeoutException) {
+                        throwable = new BoltConnectionInitialisationTimeoutException(
+                                "SSL handshake with %s timed out".formatted(address), throwable);
+                    } else {
+                        throwable = new BoltServiceUnavailableException(
+                                "SSL handshake with %s failed".formatted(address), throwable);
                     }
-                    this.handshakeCompletedFuture.completeExceptionally(error);
+                    handshakeCompletedFuture.completeExceptionally(throwable);
+                } else {
+                    var sslHandshakeDurationMillis = handshakeDuration.toMillis();
+                    long boltHandshakeTimeoutMillis;
+                    if (initialisationTimeoutMillis > 0) {
+                        boltHandshakeTimeoutMillis = initialisationTimeoutMillis - sslHandshakeDurationMillis;
+                        if (boltHandshakeTimeoutMillis <= 0) {
+                            handshakeCompletedFuture.completeExceptionally(
+                                    new BoltConnectionInitialisationTimeoutException(
+                                            "Initialisation of connection in " + initialisationTimeoutMillis + "ms"));
+                            return;
+                        }
+                    } else {
+                        boltHandshakeTimeoutMillis = initialisationTimeoutMillis;
+                    }
+                    var channel = future.channel();
+                    var log = new ChannelActivityLogger(channel, logging, getClass());
+                    log.log(System.Logger.Level.TRACE, "Channel %s connected, initiating bolt handshake", channel);
+
+                    var pipeline = channel.pipeline();
+                    // Add timeout handler to the pipeline when channel is connected. It's needed to
+                    // limit amount of time code spends in Bolt handshake.
+                    if (boltHandshakeTimeoutMillis > 0) {
+                        pipeline.addFirst(
+                                new ConnectTimeoutHandler(boltHandshakeTimeoutMillis, initialisationTimeoutMillis));
+                        handshakeCompletedFuture.whenComplete((ignored0, handshakeThrowable) -> {
+                            if (handshakeThrowable == null) {
+                                // Remove timeout handler from the pipeline once Bolt handshake is completed.
+                                channel.pipeline().remove(ConnectTimeoutHandler.class);
+                            }
+                        });
+                    }
+                    pipeline.addLast(new HandshakeHandler(
+                            pipelineBuilder, handshakeCompletedFuture, maxVersion, logging, valueFactory));
+                    log.log(System.Logger.Level.DEBUG, "C: [Bolt Handshake] %s", handshakeString());
+                    channel.writeAndFlush(BoltProtocolUtil.handshakeBuf()).addListener(f -> {
+                        if (!f.isSuccess()) {
+                            var error = f.cause();
+                            if (!(error instanceof SSLHandshakeException)) {
+                                error = new BoltServiceUnavailableException(
+                                        String.format("Unable to write Bolt handshake to %s.", this.address), error);
+                            }
+                            handshakeCompletedFuture.completeExceptionally(error);
+                        }
+                    });
                 }
             });
         } else {
