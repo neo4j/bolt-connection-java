@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.test.values.impl.InternalNode;
 import org.neo4j.bolt.connection.test.values.impl.InternalPath;
 import org.neo4j.bolt.connection.test.values.impl.InternalRelationship;
@@ -96,6 +97,11 @@ public class TestValueFactory implements ValueFactory {
 
     @Override
     public Value vector(Class<?> elementType, Object elements) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Value unsupportedTypeData(String name, BoltProtocolVersion minProtocolVersion, Map<String, Value> extra) {
         throw new UnsupportedOperationException();
     }
 

@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v6;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.netty.impl.messaging.v5.ValueUnpackerV5;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
@@ -85,6 +86,18 @@ final class ValueUnpackerV6 extends ValueUnpackerV5 {
         }
 
         return valueFactory.vector(elementType, array);
+    }
+
+    @Override
+    protected Value unpackUnsupported(long size) throws IOException {
+        ensureCorrectStructSize(Type.UNSUPPORTED, UNSUPPORTED_STRUCT_SIZE, size);
+        var name = unpacker.unpackString();
+        var minMajorBoltVersion = unpacker.unpackLong();
+        var minMinorBoltVersion = unpacker.unpackLong();
+        var minProtocolVersion =
+                new BoltProtocolVersion(Math.toIntExact(minMajorBoltVersion), Math.toIntExact(minMinorBoltVersion));
+        var extra = unpackMap();
+        return valueFactory.unsupportedTypeData(name, minProtocolVersion, extra);
     }
 
     private interface RawUnpacker {

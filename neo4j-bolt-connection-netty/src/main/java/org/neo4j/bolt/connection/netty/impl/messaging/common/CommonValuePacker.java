@@ -26,6 +26,7 @@ import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Map;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
@@ -142,6 +143,7 @@ public class CommonValuePacker implements ValuePacker {
                 }
             }
             case VECTOR -> packVector(value.asBoltVector());
+            case UNSUPPORTED -> throw new BoltClientException("Unsupported type must not be sent to the server");
             default -> throw new IOException(
                     "Unknown type: " + value.boltValueType().name());
         }
