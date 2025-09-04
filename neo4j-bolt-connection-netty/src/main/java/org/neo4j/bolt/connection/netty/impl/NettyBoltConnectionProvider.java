@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.netty.impl;
 
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.util.internal.logging.InternalLoggerFactory;
@@ -57,10 +58,12 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
 
     public NettyBoltConnectionProvider(
             EventLoopGroup eventLoopGroup,
+            Class<? extends Channel> channelClass,
             Clock clock,
             DomainNameResolver domainNameResolver,
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
+            boolean fastOpen,
             LoggingProvider logging,
             ValueFactory valueFactory,
             boolean shutdownEventLoopGroupOnClose,
@@ -72,10 +75,12 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.eventLoopGroup = Objects.requireNonNull(eventLoopGroup);
         this.connectionProvider = ConnectionProviders.netty(
                 eventLoopGroup,
+                channelClass,
                 clock,
                 domainNameResolver,
                 localAddress,
                 maxVersion,
+                fastOpen,
                 logging,
                 valueFactory,
                 observationProvider);

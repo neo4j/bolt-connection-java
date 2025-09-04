@@ -26,10 +26,13 @@ import io.netty.handler.codec.ReplayingDecoder;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.exception.BoltClientException;
+import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.netty.impl.logging.ChannelActivityLogger;
 import org.neo4j.bolt.connection.netty.impl.logging.ChannelErrorLogger;
@@ -42,7 +45,10 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final CompletableFuture<Channel> handshakeCompletedFuture;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
+    private final BoltServerAddress address;
     private final BoltProtocolVersion maxVersion;
+    private final boolean fastOpen;
+    private final long initialisationTimeoutMillis;
 
     private boolean failed;
     private ChannelActivityLogger log;
@@ -52,20 +58,52 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     public HandshakeHandler(
             ChannelPipelineBuilder pipelineBuilder,
             CompletableFuture<Channel> handshakeCompletedFuture,
+            BoltServerAddress address,
             BoltProtocolVersion maxVersion,
+            boolean fastOpen,
+            long initialisationTimeoutMillis,
             LoggingProvider logging,
             ValueFactory valueFactory) {
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
+        this.address = Objects.requireNonNull(address);
+        this.maxVersion = maxVersion;
+        this.fastOpen = fastOpen;
+        this.initialisationTimeoutMillis = initialisationTimeoutMillis;
         this.logging = logging;
         this.valueFactory = Objects.requireNonNull(valueFactory);
-        this.maxVersion = maxVersion;
     }
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
         log = new ChannelActivityLogger(ctx.channel(), logging, getClass());
         errorLog = new ChannelErrorLogger(ctx.channel(), logging);
+        if (fastOpen) {
+            ctx.write(BoltProtocolUtil.handshakeBuf()).addListener(future -> {
+                if (!future.isSuccess()) {
+                    var futureError = future.cause();
+                    handshakeCompletedFuture.completeExceptionally(futureError);
+                }
+            });
+            if (initialisationTimeoutMillis > 0) {
+                var timeoutFuture = ctx.executor()
+                        .schedule(
+                                () -> {
+                                    if (handshakeCompletedFuture.isDone()) {
+                                        return;
+                                    }
+                                    var exception = new BoltConnectionInitialisationTimeoutException(
+                                            "Failed to initialise connection in %d milliseconds"
+                                                    .formatted(initialisationTimeoutMillis));
+                                    if (handshakeCompletedFuture.completeExceptionally(exception)) {
+                                        ctx.close();
+                                    }
+                                },
+                                initialisationTimeoutMillis,
+                                TimeUnit.MILLISECONDS);
+                handshakeCompletedFuture.thenAccept(ignored -> timeoutFuture.cancel(false));
+            }
+        }
     }
 
     @Override

@@ -119,7 +119,8 @@ class ChannelConnectedListenerTest {
                 NoopLoggingProvider.INSTANCE,
                 mock(ValueFactory.class),
                 0,
-                CompletableFuture.completedFuture(Duration.ZERO));
+                CompletableFuture.completedFuture(Duration.ZERO),
+                true);
     }
 
     private record FailedPromise(Throwable failure) implements ChannelPromise {
