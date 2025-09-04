@@ -28,6 +28,7 @@ import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 
 public interface ValueFactory {
     Value value(Object value);
@@ -108,6 +109,16 @@ public interface ValueFactory {
         return value((Object) vector);
     }
 
+    /**
+     * Returns a new {@link Value} from {@link UnknownTypeData}.
+     * @param unknownTypeData the unknown type data
+     * @return the new value
+     * @since 9.0.0
+     */
+    default Value value(UnknownTypeData unknownTypeData) {
+        return value((Object) unknownTypeData);
+    }
+
     Node node(long id, String elementId, Collection<String> labels, Map<String, Value> properties);
 
     Relationship relationship(
@@ -131,6 +142,16 @@ public interface ValueFactory {
     Value point(int srid, double x, double y, double z);
 
     Value vector(Class<?> elementType, Object elements);
+
+    /**
+     * Returns a new instance of unknown type value.
+     * @param name the type name
+     * @param minProtocolVersion the minimum {@link BoltProtocolVersion} needed to transmit it
+     * @param extra an extra data
+     * @return the new instance of unknown type value
+     * @since 9.0.0
+     */
+    Value unknown(String name, BoltProtocolVersion minProtocolVersion, Map<String, Value> extra);
 
     Value unsupportedDateTimeValue(DateTimeException e);
 }
