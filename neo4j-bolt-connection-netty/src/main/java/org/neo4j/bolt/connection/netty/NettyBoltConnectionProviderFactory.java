@@ -70,11 +70,12 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  *     {@link DefaultDomainNameResolver#getInstance()}.</li>
  *     <li><b>maxVersion</b> - Sets the meximum {@link BoltProtocolVersion} that will be negotiated. Defaults to
  *     {@literal null}.</li>
- *     <li><b>nettyTransport</b> - Defines Netty transport to be used. Supported values: auto (default), nio, epoll
- *     (requires adding epoll dependency explicitly), kqueue (requires adding kqueue dependency explicitly), local. The
- *     default auto mode selects local when localAddress is provided, otherwise it attempts to detect if native
- *     transport is available in runtime (the dependency needs to be added explicitly) and falls back to nio otherwise.
- *     When eventLoopGroup is not {@literal null}, this option defaults to nio.</li>
+ *     <li><b>nettyTransport</b> - Defines Netty transport to be used. Supported values: auto (default), nio, io_uring
+ *     (requires adding io_uring dependency explicitly, Netty 4.2+ only), epoll (requires adding epoll dependency
+ *     explicitly), kqueue (requires adding kqueue dependency explicitly), local. The default auto mode selects local
+ *     when localAddress is provided, otherwise it attempts to detect if native transport is available in runtime (the
+ *     dependency needs to be added explicitly) and falls back to nio otherwise. When eventLoopGroup is not
+ *     {@literal null}, this option defaults to nio.</li>
  *     <li> <b>enableFastOpen</b> - Enables client-side TCP Fast Open if it is available. Supported values: true and
  *     false (default). Note that only Netty native transports support this and extra system configuration may be
  *     needed. When either native transport or TCP Fast Open is unavaible, this option is ignored and is effectively
@@ -176,6 +177,8 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
             case "auto" -> {
                 if (localAddress != null) {
                     yield NettyTransport.local();
+                } else if (NettyTransport.isIoUringAvailable()) {
+                    yield NettyTransport.ioUring();
                 } else if (NettyTransport.isEpollAvailable()) {
                     yield NettyTransport.epoll();
                 } else if (NettyTransport.isKQueueAvailable()) {
@@ -185,6 +188,7 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 }
             }
             case "nio" -> NettyTransport.nio();
+            case "io_uring" -> NettyTransport.ioUring();
             case "epoll" -> NettyTransport.epoll();
             case "kqueue" -> NettyTransport.kqueue();
             case "local" -> NettyTransport.local();

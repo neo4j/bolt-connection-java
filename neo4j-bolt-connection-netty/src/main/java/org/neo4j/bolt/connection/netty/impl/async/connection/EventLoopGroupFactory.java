@@ -18,10 +18,12 @@ package org.neo4j.bolt.connection.netty.impl.async.connection;
 
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.local.LocalEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.uring.IoUringIoHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import java.util.Objects;
@@ -58,6 +60,8 @@ public final class EventLoopGroupFactory {
         return switch (nettyTransport.type()) {
             case NIO -> new DriverEventLoopGroup(threadCount);
             case EPOLL -> new EpollEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
+            case IO_URING -> new MultiThreadIoEventLoopGroup(
+                    threadCount, new DriverThreadFactory(threadNamePrefix), IoUringIoHandler.newFactory());
             case KQUEUE -> new KQueueEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
             case LOCAL -> new LocalEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
         };

@@ -23,10 +23,13 @@ import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.uring.IoUring;
+import io.netty.channel.uring.IoUringSocketChannel;
 import java.util.Objects;
 
 public record NettyTransport(Type type, Class<? extends Channel> channelClass, boolean fastOpenAvailable) {
     private static final String EPOLL_NAME = "io.netty.channel.epoll.Epoll";
+    private static final String IO_URING_NAME = "io.netty.channel.uring.IoUring";
     private static final String KQUEUE_NAME = "io.netty.channel.kqueue.KQueue";
 
     public static boolean isEpollAvailable() {
@@ -36,6 +39,15 @@ public record NettyTransport(Type type, Class<? extends Channel> channelClass, b
             return false;
         }
         return Epoll.isAvailable();
+    }
+
+    public static boolean isIoUringAvailable() {
+        try {
+            Class.forName(IO_URING_NAME);
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+        return IoUring.isAvailable();
     }
 
     public static boolean isKQueueAvailable() {
@@ -55,6 +67,11 @@ public record NettyTransport(Type type, Class<? extends Channel> channelClass, b
         return new NettyTransport(Type.EPOLL, EpollSocketChannel.class, Epoll.isTcpFastOpenClientSideAvailable());
     }
 
+    public static NettyTransport ioUring() {
+        return new NettyTransport(
+                Type.IO_URING, IoUringSocketChannel.class, IoUring.isTcpFastOpenClientSideAvailable());
+    }
+
     public static NettyTransport kqueue() {
         return new NettyTransport(Type.KQUEUE, KQueueSocketChannel.class, KQueue.isTcpFastOpenClientSideAvailable());
     }
@@ -70,6 +87,7 @@ public record NettyTransport(Type type, Class<? extends Channel> channelClass, b
     public enum Type {
         NIO,
         EPOLL,
+        IO_URING,
         KQUEUE,
         LOCAL
     }
