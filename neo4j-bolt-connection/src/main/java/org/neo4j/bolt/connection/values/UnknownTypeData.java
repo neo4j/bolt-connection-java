@@ -16,31 +16,20 @@
  */
 package org.neo4j.bolt.connection.values;
 
-public enum Type {
-    ANY,
-    BOOLEAN,
-    BYTES,
-    STRING,
-    NUMBER,
-    INTEGER,
-    FLOAT,
-    LIST,
-    MAP,
-    NODE,
-    RELATIONSHIP,
-    PATH,
-    POINT,
-    DATE,
-    TIME,
-    LOCAL_TIME,
-    LOCAL_DATE_TIME,
-    DATE_TIME,
-    DURATION,
-    VECTOR,
-    /**
-     * An unknown type to a given Bolt Protocol version.
-     * @since 9.0.0
-     */
-    UNKNOWN,
-    NULL
+import java.util.Map;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
+
+/**
+ * An object instance of {@link Type#UNKNOWN} type.
+ * <p>
+ * This object contains information about the unknown type and the {@link #minProtocolVersion()} ()} needed to transmit it.
+ *
+ * @since 9.0.0
+ */
+public interface UnknownTypeData {
+    String name();
+
+    BoltProtocolVersion minProtocolVersion();
+
+    Map<String, Value> extra();
 }
