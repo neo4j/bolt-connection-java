@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.routed;
 
 import static java.lang.String.format;
+import static org.neo4j.bolt.connection.routed.impl.util.LockUtil.executeWithLock;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,6 +36,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.AccessMode;
@@ -76,6 +79,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     private static final String CONNECTION_ACQUISITION_ATTEMPT_FAILURE_MESSAGE =
             "Failed to obtain a connection towards address %s, will try other addresses if available. Complete failure is reported separately from this entry.";
     private final System.Logger log;
+    private final Lock lock = new ReentrantLock();
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final BoltConnectionSourceFactory boltConnectionSourceFactory;
     private final URI uri;
@@ -124,11 +128,14 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     @Override
     public CompletionStage<BoltConnection> getConnection(RoutedBoltConnectionParameters parameters) {
         RoutingTableRegistry registry;
-        synchronized (this) {
+        lock.lock();
+        try {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
             }
             registry = this.registry;
+        } finally {
+            lock.unlock();
         }
 
         var parentObservation = observationProvider.scopedObservation();
@@ -203,11 +210,14 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     @Override
     public CompletionStage<Void> verifyConnectivity() {
         RoutingTableRegistry registry;
-        synchronized (this) {
+        lock.lock();
+        try {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
             }
             registry = this.registry;
+        } finally {
+            lock.unlock();
         }
         var observation = observationProvider.scopedObservation();
         return supportsMultiDb()
@@ -247,26 +257,31 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                 (boltConnection -> new BoltProtocolVersion(5, 1).compareTo(boltConnection.protocolVersion()) <= 0));
     }
 
-    private synchronized void shutdownUnusedProviders(Set<BoltServerAddress> addressesToRetain) {
-        var iterator = addressToSource.entrySet().iterator();
-        while (iterator.hasNext()) {
-            var entry = iterator.next();
-            var address = entry.getKey();
-            if (!addressesToRetain.contains(address) && getInUseCount(address) == 0) {
-                entry.getValue().close();
-                iterator.remove();
+    private void shutdownUnusedProviders(Set<BoltServerAddress> addressesToRetain) {
+        executeWithLock(lock, () -> {
+            var iterator = addressToSource.entrySet().iterator();
+            while (iterator.hasNext()) {
+                var entry = iterator.next();
+                var address = entry.getKey();
+                if (!addressesToRetain.contains(address) && getInUseCount(address) == 0) {
+                    entry.getValue().close();
+                    iterator.remove();
+                }
             }
-        }
+        });
     }
 
     private CompletionStage<Boolean> detectFeature(
             String baseErrorMessagePrefix, Function<BoltConnection, Boolean> featureDetectionFunction) {
         Rediscovery rediscovery;
-        synchronized (this) {
+        lock.lock();
+        try {
             if (closeFuture != null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Connection provider is closed."));
             }
             rediscovery = this.rediscovery;
+        } finally {
+            lock.unlock();
         }
 
         List<BoltServerAddress> addresses;
@@ -383,29 +398,32 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
         };
     }
 
-    private synchronized int getInUseCount(BoltServerAddress address) {
-        return addressToInUseCount.getOrDefault(address, 0);
+    private int getInUseCount(BoltServerAddress address) {
+        return executeWithLock(lock, () -> addressToInUseCount.getOrDefault(address, 0));
     }
 
-    private synchronized void incrementInUseCount(BoltServerAddress address) {
-        addressToInUseCount.merge(address, 1, Integer::sum);
+    private void incrementInUseCount(BoltServerAddress address) {
+        executeWithLock(lock, () -> addressToInUseCount.merge(address, 1, Integer::sum));
     }
 
-    public synchronized void decrementInUseCount(BoltServerAddress address) {
-        addressToInUseCount.compute(address, (ignored, value) -> {
-            if (value == null) {
-                return null;
-            } else {
-                value--;
-                return value > 0 ? value : null;
-            }
-        });
+    public void decrementInUseCount(BoltServerAddress address) {
+        executeWithLock(
+                lock,
+                () -> addressToInUseCount.compute(address, (ignored, value) -> {
+                    if (value == null) {
+                        return null;
+                    } else {
+                        value--;
+                        return value > 0 ? value : null;
+                    }
+                }));
     }
 
     @Override
     public CompletionStage<Void> close() {
         CompletableFuture<Void> closeFuture;
-        synchronized (this) {
+        lock.lock();
+        try {
             if (this.closeFuture == null) {
                 @SuppressWarnings({"rawtypes", "RedundantSuppression"})
                 var futures = new CompletableFuture[addressToSource.size()];
@@ -419,34 +437,38 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                         .whenComplete((ignored, throwable) -> executorService.shutdown());
             }
             closeFuture = this.closeFuture;
+        } finally {
+            lock.unlock();
         }
         return closeFuture;
     }
 
-    private synchronized BoltConnectionSource<BoltConnectionParameters> get(BoltServerAddress address) {
-        var provider = addressToSource.get(address);
-        if (provider == null) {
-            URI uri;
-            try {
-                uri = new URI(
-                        this.uri.getScheme(),
-                        null,
-                        address.connectionHost(),
-                        address.port(),
-                        null,
-                        this.uri.getQuery(),
-                        null);
-            } catch (URISyntaxException e) {
-                throw new BoltClientException("Failed to create URI for address: " + address, e);
+    private BoltConnectionSource<BoltConnectionParameters> get(BoltServerAddress address) {
+        return executeWithLock(lock, () -> {
+            var provider = addressToSource.get(address);
+            if (provider == null) {
+                URI uri;
+                try {
+                    uri = new URI(
+                            this.uri.getScheme(),
+                            null,
+                            address.connectionHost(),
+                            address.port(),
+                            null,
+                            this.uri.getQuery(),
+                            null);
+                } catch (URISyntaxException e) {
+                    throw new BoltClientException("Failed to create URI for address: " + address, e);
+                }
+                String expectedHostname = null;
+                if (!address.host().equals(address.connectionHost())) {
+                    expectedHostname = address.host();
+                }
+                provider = boltConnectionSourceFactory.create(uri, expectedHostname);
+                addressToSource.put(address, provider);
             }
-            String expectedHostname = null;
-            if (!address.host().equals(address.connectionHost())) {
-                expectedHostname = address.host();
-            }
-            provider = boltConnectionSourceFactory.create(uri, expectedHostname);
-            addressToSource.put(address, provider);
-        }
-        return provider;
+            return provider;
+        });
     }
 
     private ScheduledFuture<?> scheduleTimeout(
