@@ -16,7 +16,6 @@
  */
 package org.neo4j.bolt.connection.netty.impl;
 
-import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.util.internal.logging.InternalLoggerFactory;
@@ -32,13 +31,12 @@ import org.neo4j.bolt.connection.BoltAgent;
 import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
-import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
-import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
+import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
 import org.neo4j.bolt.connection.observation.ImmutableObservation;
 import org.neo4j.bolt.connection.observation.ObservationProvider;
@@ -58,7 +56,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
 
     public NettyBoltConnectionProvider(
             EventLoopGroup eventLoopGroup,
-            Class<? extends Channel> channelClass,
+            NettyTransport nettyTransport,
             Clock clock,
             DomainNameResolver domainNameResolver,
             LocalAddress localAddress,
@@ -76,7 +74,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.eventLoopGroup = Objects.requireNonNull(eventLoopGroup);
         this.connectionProvider = ConnectionProviders.netty(
                 eventLoopGroup,
-                channelClass,
+                nettyTransport,
                 clock,
                 domainNameResolver,
                 localAddress,
@@ -111,18 +109,6 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             }
         }
 
-        // extract address from the URI
-        BoltServerAddress uriAddress;
-        try {
-            uriAddress = new BoltServerAddress(uri);
-        } catch (Throwable throwable) {
-            return CompletableFuture.failedStage(
-                    new BoltClientException("Failed to parse server address: " + uri, throwable));
-        }
-        var address = securityPlan != null && securityPlan.expectedHostname() != null
-                ? new BoltServerAddress(securityPlan.expectedHostname(), uriAddress.connectionHost(), uriAddress.port())
-                : uriAddress;
-
         // determine routingContext
         RoutingContext routingContext;
         try {
@@ -138,7 +124,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         var latestAuthMillisFuture = new CompletableFuture<Long>();
         return connectionProvider
                 .acquireConnection(
-                        address,
+                        uri,
                         securityPlan,
                         routingContext,
                         authToken.asMap(),
@@ -165,7 +151,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                 .handle((connection, throwable) -> {
                     if (throwable != null) {
                         throwable = FutureUtil.completionExceptionCause(throwable);
-                        log.log(System.Logger.Level.DEBUG, "Failed to establish BoltConnection " + address, throwable);
+                        log.log(System.Logger.Level.DEBUG, "Failed to establish BoltConnection " + uri, throwable);
                         throw new CompletionException(throwable);
                     } else {
                         return new BoltConnectionImpl(

@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.neo4j.bolt</groupId>
         <artifactId>neo4j-bolt-connection-parent</artifactId>
-        <version>8.3-SNAPSHOT</version>
+        <version>8.4-SNAPSHOT</version>
     </parent>
 
     <artifactId>neo4j-bolt-connection-routed</artifactId>

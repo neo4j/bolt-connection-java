@@ -80,7 +80,6 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
                 var handshakeHandler = new HandshakeHandler(
                         new ChannelPipelineBuilderImpl(),
                         handshakeCompleted,
-                        address,
                         maxVersion,
                         true,
                         sslHandshakeTimeoutMillis,

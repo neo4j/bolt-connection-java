@@ -36,6 +36,7 @@ import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
+import org.neo4j.bolt.connection.netty.impl.Scheme;
 import org.neo4j.bolt.connection.netty.impl.async.connection.EventLoopGroupFactory;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
 import org.neo4j.bolt.connection.observation.ObservationProvider;
@@ -57,6 +58,9 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  *     has server-side routing enabled</b>. However, it should <b>NOT</b> be confused with client-side routing that
  *     requires more contextual awareness and fits {@link BoltConnectionSource} with
  *     {@link RoutedBoltConnectionParameters} support better.</li>
+ *     <li><b>bolt+unix</b> - establishes a {@link BoltConnection} to a given Unix Domain Socket without routing
+ *     context. The {@link URI#getPath()} MUST be a valid path to a file (for example: bolt+unix:///var/run/neo4j.sock).
+ *     </li>
  * </ul>
  * Supported additional parameters:
  * <ul>
@@ -90,7 +94,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  */
 public final class NettyBoltConnectionProviderFactory implements BoltConnectionProviderFactory {
     private static final Set<String> SUPPORTED_SCHEMES =
-            Set.of("bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc");
+            Set.of("bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc", Scheme.BOLT_UNIX_SCHEME);
 
     /**
      * Creates a new instance of this factory.
@@ -119,20 +123,20 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
         var fastOpen = getConfigEntry(logger, additionalConfig, "enableFastOpen", Boolean.class, () -> false);
         var eventLoopGroup =
                 getConfigEntry(logger, additionalConfig, "eventLoopGroup", EventLoopGroup.class, () -> null);
+        NettyTransport nettyTransport;
         if (eventLoopGroup == null) {
             var factory = createEventLoopGroupFactory(logger, localAddress, additionalConfig);
             var size = getConfigEntry(logger, additionalConfig, "eventLoopThreads", Integer.class, () -> 0);
-            if (fastOpen && !factory.fastOpenAvailable()) {
+            nettyTransport = factory.nettyTransport();
+            if (fastOpen && !nettyTransport.fastOpenAvailable()) {
                 logger.log(System.Logger.Level.WARNING, "Fast Open is not supported and will be ignored");
                 fastOpen = false;
             }
             eventLoopGroup = factory.newEventLoopGroup(size);
-            channelClass = factory.channelClass();
             shutdownEventLoopGroupOnClose = true;
         } else {
-            var nettyTransport = determineTransportType(logger, localAddress, additionalConfig, "nio");
+            nettyTransport = determineTransportType(logger, localAddress, additionalConfig, "nio");
             logger.log(System.Logger.Level.TRACE, "Selected nettyTransport %s", nettyTransport);
-            channelClass = nettyTransport.channelClass();
             if (fastOpen && !nettyTransport.fastOpenAvailable()) {
                 logger.log(System.Logger.Level.WARNING, "Fast Open is not supported and will be ignored");
                 fastOpen = false;
@@ -153,7 +157,7 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
-                channelClass,
+                nettyTransport,
                 clock,
                 domainNameResolver,
                 localAddress,

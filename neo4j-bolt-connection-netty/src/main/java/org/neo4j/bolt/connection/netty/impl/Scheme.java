@@ -18,10 +18,11 @@ package org.neo4j.bolt.connection.netty.impl;
 
 import java.util.List;
 
-class Scheme {
+public class Scheme {
     public static final String NEO4J_URI_SCHEME = "neo4j";
     public static final String NEO4J_HIGH_TRUST_URI_SCHEME = "neo4j+s";
     public static final String NEO4J_LOW_TRUST_URI_SCHEME = "neo4j+ssc";
+    public static final String BOLT_UNIX_SCHEME = "bolt+unix";
 
     static boolean isRoutingScheme(String scheme) {
         return List.of(NEO4J_LOW_TRUST_URI_SCHEME, NEO4J_HIGH_TRUST_URI_SCHEME, NEO4J_URI_SCHEME)

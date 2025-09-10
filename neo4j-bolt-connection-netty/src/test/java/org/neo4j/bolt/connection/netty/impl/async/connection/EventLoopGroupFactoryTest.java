@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
@@ -41,8 +40,9 @@ class EventLoopGroupFactoryTest {
     }
 
     @Test
-    void shouldReturnCorrectChannelClass() {
-        assertEquals(NioSocketChannel.class, eventLoopGroupFactory.channelClass());
+    void shouldReturnNettyTransport() {
+        assertEquals(
+                NettyTransport.Type.NIO, eventLoopGroupFactory.nettyTransport().type());
     }
 
     // use NioEventLoopGroup for now to be compatible with Netty 4.1
