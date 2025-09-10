@@ -64,6 +64,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
             boolean fastOpen,
+            long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory,
             boolean shutdownEventLoopGroupOnClose,
@@ -81,6 +82,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                 localAddress,
                 maxVersion,
                 fastOpen,
+                preferredCapabilitiesMask,
                 logging,
                 valueFactory,
                 observationProvider);

@@ -113,6 +113,7 @@ class NettyChannelInitializerTest {
                 new CompletableFuture<>(),
                 new CompletableFuture<>(),
                 null,
+                0,
                 TestValueFactory.INSTANCE);
 
         initializer.initChannel(channel);
@@ -166,6 +167,7 @@ class NettyChannelInitializerTest {
                 new CompletableFuture<>(),
                 new CompletableFuture<>(),
                 null,
+                0,
                 TestValueFactory.INSTANCE);
     }
 

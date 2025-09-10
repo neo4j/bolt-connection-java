@@ -308,6 +308,7 @@ class HandshakeHandlerTest {
                 null,
                 false,
                 0,
+                0,
                 NoopLoggingProvider.INSTANCE,
                 mock(ValueFactory.class));
     }

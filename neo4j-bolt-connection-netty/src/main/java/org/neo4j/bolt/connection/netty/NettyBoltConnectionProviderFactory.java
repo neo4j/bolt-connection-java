@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Supplier;
+import org.neo4j.bolt.connection.BoltCapability;
 import org.neo4j.bolt.connection.BoltConnection;
 import org.neo4j.bolt.connection.BoltConnectionProvider;
 import org.neo4j.bolt.connection.BoltConnectionProviderFactory;
@@ -80,6 +81,9 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  *     false (default). Note that only Netty native transports support this and extra system configuration may be
  *     needed. When either native transport or TCP Fast Open is unavaible, this option is ignored and is effectively
  *     false.</li>
+ *     <li> <b>preferredCapabilities</b> - A {@link Set} of preferred {@link BoltCapability} that should be
+ *     selected when server offers support for them during Bolt handshake. This set or individual entries in the set are
+ *     ignored when no support is available or handshake does not support this feature at all.</li>
  * </ul>
  *
  * @since 4.0.0
@@ -142,6 +146,10 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 DomainNameResolver.class,
                 DefaultDomainNameResolver::getInstance);
         var maxVersion = getConfigEntry(logger, additionalConfig, "maxVersion", BoltProtocolVersion.class, () -> null);
+        @SuppressWarnings("unchecked")
+        Set<BoltCapability> preferredCapabilities =
+                getConfigEntry(logger, additionalConfig, "preferredCapabilities", Set.class, Set::of);
+        var preferredCapabilitiesMask = toBoltCapabilitiesMask(preferredCapabilities);
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
@@ -151,6 +159,7 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 localAddress,
                 maxVersion,
                 fastOpen,
+                preferredCapabilitiesMask,
                 loggingProvider,
                 valueFactory,
                 shutdownEventLoopGroupOnClose,
@@ -194,6 +203,18 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
             case "local" -> NettyTransport.local();
             default -> throw new IllegalArgumentException("Unexpected nettyTransport value: " + nettyTransport);
         };
+    }
+
+    private static long toBoltCapabilitiesMask(Set<BoltCapability> boltConnectionCapabilities) {
+        var mask = 0L;
+        for (var boltConnectionCapability : boltConnectionCapabilities) {
+            var id = boltConnectionCapability.id();
+            if (id < 1 || id > 64) {
+                throw new IllegalArgumentException("Bolt capability id must be between 1 and 64: " + id);
+            }
+            mask |= 1L << (id - 1);
+        }
+        return mask;
     }
 
     private static <T> T getConfigEntry(
