@@ -63,6 +63,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
     private final LocalAddress localAddress;
     private final BoltProtocolVersion maxVersion;
     private final boolean fastOpen;
+    private final long preferredCapabilitiesMask;
 
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
@@ -76,6 +77,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
             boolean fastOpen,
+            long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory,
             ObservationProvider observationProvider) {
@@ -87,6 +89,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         this.localAddress = localAddress;
         this.maxVersion = maxVersion;
         this.fastOpen = fastOpen;
+        this.preferredCapabilitiesMask = preferredCapabilitiesMask;
         this.logging = logging;
         this.valueFactory = requireNonNull(valueFactory);
         this.observationProvider = Objects.requireNonNull(observationProvider);
@@ -124,6 +127,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                         sslHandshakeFuture,
                         handshakeCompleted,
                         maxVersion,
+                        preferredCapabilitiesMask,
                         valueFactory));
         if (fastOpen) {
             bootstrap.option(ChannelOption.TCP_FASTOPEN_CONNECT, true);
@@ -195,6 +199,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                 new ChannelPipelineBuilderImpl(),
                 handshakeCompleted,
                 maxVersion,
+                preferredCapabilitiesMask,
                 logging,
                 valueFactory,
                 initialisationTimeoutMillis,

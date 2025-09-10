@@ -49,6 +49,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final BoltProtocolVersion maxVersion;
     private final boolean fastOpen;
     private final long initialisationTimeoutMillis;
+    private final long preferredCapabilitiesMask;
 
     private boolean failed;
     private ChannelActivityLogger log;
@@ -62,6 +63,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
             BoltProtocolVersion maxVersion,
             boolean fastOpen,
             long initialisationTimeoutMillis,
+            long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory) {
         this.pipelineBuilder = pipelineBuilder;
@@ -70,6 +72,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
         this.maxVersion = maxVersion;
         this.fastOpen = fastOpen;
         this.initialisationTimeoutMillis = initialisationTimeoutMillis;
+        this.preferredCapabilitiesMask = preferredCapabilitiesMask;
         this.logging = logging;
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
@@ -153,7 +156,7 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
 
             if (new BoltProtocolVersion(255, 1).equals(serverSuggestedVersion)) {
                 log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake Manifest] v1", serverSuggestedVersion);
-                manifestHandler = new ManifestHandlerV1(ctx.channel(), maxVersion, logging);
+                manifestHandler = new ManifestHandlerV1(ctx.channel(), maxVersion, preferredCapabilitiesMask, logging);
             } else {
                 log.log(System.Logger.Level.DEBUG, "S: [Bolt Handshake] %s", serverSuggestedVersion);
 

@@ -50,7 +50,7 @@ class ManifestHandlerV1Test {
     void beforeEach() {
         openMocks(this);
         given(loggingProvider.getLog(any(Class.class))).willReturn(mock(System.Logger.class));
-        handler = new ManifestHandlerV1(embeddedChannel, null, loggingProvider);
+        handler = new ManifestHandlerV1(embeddedChannel, null, 0, loggingProvider);
     }
 
     @Test

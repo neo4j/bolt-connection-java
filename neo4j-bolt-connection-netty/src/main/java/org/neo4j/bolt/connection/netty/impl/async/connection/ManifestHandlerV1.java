@@ -35,15 +35,20 @@ final class ManifestHandlerV1 implements ManifestHandler {
     private final ChannelActivityLogger log;
     private final Channel channel;
     private final VarLongBuilder expectedVersionRangesBuilder = new VarLongBuilder();
+    private final VarLongBuilder capabilitiesBuilder = new VarLongBuilder();
     private final BoltProtocolVersion maxVersion;
+    private final long preferredCapabilitiesMask;
 
     private long expectedVersionRanges = -1L;
     private Set<BoltProtocolMinorVersionRange> serverSupportedVersionRanges;
+    private long capabilities = -1L;
 
-    public ManifestHandlerV1(Channel channel, BoltProtocolVersion maxVersion, LoggingProvider logging) {
+    public ManifestHandlerV1(
+            Channel channel, BoltProtocolVersion maxVersion, long preferredCapabilitiesMask, LoggingProvider logging) {
         this.channel = Objects.requireNonNull(channel);
         log = new ChannelActivityLogger(channel, logging, getClass());
         this.maxVersion = maxVersion;
+        this.preferredCapabilitiesMask = preferredCapabilitiesMask;
     }
 
     @Override
@@ -52,8 +57,8 @@ final class ManifestHandlerV1 implements ManifestHandler {
             decodeExpectedVersionsSegment(byteBuf);
         } else if (expectedVersionRanges > 0) {
             decodeServerSupportedBoltVersionRange(byteBuf);
-        } else {
-            byteBuf.readByte();
+        } else if (capabilities < 0) {
+            decodeCapabilitiesSegment(byteBuf);
         }
     }
 
@@ -107,6 +112,27 @@ final class ManifestHandlerV1 implements ManifestHandler {
         }
     }
 
+    private void decodeCapabilitiesSegment(ByteBuf byteBuf) {
+        var segment = byteBuf.readByte();
+        var value = (byte) (0b01111111 & segment);
+
+        try {
+            capabilitiesBuilder.add(value);
+        } catch (IllegalStateException e) {
+            throw new BoltClientException(
+                    "Failed to handle Bolt capabilities because the server wants to send too many", e);
+        }
+
+        var finished = (segment >> 7) == 0;
+        if (finished) {
+            capabilities = capabilitiesBuilder.build();
+            log.log(
+                    System.Logger.Level.DEBUG,
+                    "S: [Bolt Handshake Manifest] [capabilities %s]",
+                    Long.toBinaryString(value));
+        }
+    }
+
     private BoltProtocol findSupportedBoltProtocol() {
         for (var entry : BoltProtocolUtil.versionToProtocol.entrySet()) {
             var version = entry.getKey();
@@ -117,7 +143,8 @@ final class ManifestHandlerV1 implements ManifestHandler {
                 if (range.contains(version)) {
                     var protocol = entry.getValue();
                     write(protocol.version().toInt());
-                    write((byte) 0);
+                    var selectedCapabilities = capabilities & preferredCapabilitiesMask;
+                    writeVarLong(selectedCapabilities);
                     return protocol;
                 }
             }
@@ -126,6 +153,17 @@ final class ManifestHandlerV1 implements ManifestHandler {
         write((byte) 0);
         channel.flush();
         throw new BoltClientException("No supported Bolt Protocol version was found");
+    }
+
+    private void writeVarLong(long value) {
+        do {
+            var next = (byte) (value & 0x7F);
+            value >>>= 7;
+            if (value != 0) {
+                next |= (byte) 0x80;
+            }
+            write(next);
+        } while (value != 0);
     }
 
     private void write(int value) {

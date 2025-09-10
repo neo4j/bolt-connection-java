@@ -42,6 +42,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
     private final ChannelPipelineBuilder pipelineBuilder;
     private final CompletableFuture<Channel> handshakeCompletedFuture;
     private final BoltProtocolVersion maxVersion;
+    private final long preferredCapabilitiesMask;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
     private final long initialisationTimeoutMillis;
@@ -53,6 +54,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
             ChannelPipelineBuilder pipelineBuilder,
             CompletableFuture<Channel> handshakeCompletedFuture,
             BoltProtocolVersion maxVersion,
+            long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory,
             long initialisationTimeoutMillis,
@@ -62,6 +64,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
         this.maxVersion = maxVersion;
+        this.preferredCapabilitiesMask = preferredCapabilitiesMask;
         this.logging = logging;
         this.valueFactory = Objects.requireNonNull(valueFactory);
         this.initialisationTimeoutMillis = initialisationTimeoutMillis;
@@ -123,6 +126,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
                                 maxVersion,
                                 false,
                                 initialisationTimeoutMillis,
+                                preferredCapabilitiesMask,
                                 logging,
                                 valueFactory));
                         log.log(System.Logger.Level.DEBUG, "C: [Bolt Handshake] %s", handshakeString());

@@ -35,6 +35,7 @@ public class ConnectionProviders {
             LocalAddress localAddress,
             BoltProtocolVersion maxVersion,
             boolean fastOpen,
+            long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory,
             ObservationProvider observationProvider) {
@@ -46,6 +47,7 @@ public class ConnectionProviders {
                 localAddress,
                 maxVersion,
                 fastOpen,
+                preferredCapabilitiesMask,
                 logging,
                 valueFactory,
                 observationProvider);

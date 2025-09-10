@@ -4,7 +4,7 @@
 
     <groupId>org.neo4j.bolt</groupId>
     <artifactId>neo4j-bolt-connection-parent</artifactId>
-    <version>8.2-SNAPSHOT</version>
+    <version>8.3-SNAPSHOT</version>
 
     <packaging>pom</packaging>
     <name>Neo4j Bolt Connection</name>

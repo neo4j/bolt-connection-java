@@ -41,6 +41,7 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
     private final CompletableFuture<Duration> sslHandshakeFuture;
     private final CompletableFuture<Channel> handshakeCompleted;
     private final BoltProtocolVersion maxVersion;
+    private final long preferredCapabilitiesMask;
     private final ValueFactory valueFactory;
 
     public NettyChannelInitializer(
@@ -52,6 +53,7 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
             CompletableFuture<Duration> sslHandshakeFuture,
             CompletableFuture<Channel> handshakeCompleted,
             BoltProtocolVersion maxVersion,
+            long preferredCapabilitiesMask,
             ValueFactory valueFactory) {
         this.address = address;
         this.securityPlan = securityPlan;
@@ -61,6 +63,7 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
         this.sslHandshakeFuture = Objects.requireNonNull(sslHandshakeFuture);
         this.handshakeCompleted = Objects.requireNonNull(handshakeCompleted);
         this.maxVersion = maxVersion;
+        this.preferredCapabilitiesMask = preferredCapabilitiesMask;
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
@@ -81,6 +84,7 @@ public class NettyChannelInitializer extends ChannelInitializer<Channel> {
                         maxVersion,
                         true,
                         sslHandshakeTimeoutMillis,
+                        preferredCapabilitiesMask,
                         logging,
                         valueFactory);
                 channel.pipeline().addFirst(handshakeHandler);
