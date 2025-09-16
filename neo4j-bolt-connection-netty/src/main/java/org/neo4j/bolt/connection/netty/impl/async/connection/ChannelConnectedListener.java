@@ -122,7 +122,6 @@ public class ChannelConnectedListener implements ChannelFutureListener {
                         pipeline.addLast(new HandshakeHandler(
                                 pipelineBuilder,
                                 handshakeCompletedFuture,
-                                address,
                                 maxVersion,
                                 false,
                                 initialisationTimeoutMillis,

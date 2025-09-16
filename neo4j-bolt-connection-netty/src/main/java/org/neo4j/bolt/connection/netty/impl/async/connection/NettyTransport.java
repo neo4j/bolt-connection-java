@@ -18,77 +18,213 @@ package org.neo4j.bolt.connection.netty.impl.async.connection;
 
 import io.netty.channel.Channel;
 import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollDomainSocketChannel;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.uring.IoUring;
+import io.netty.channel.uring.IoUringDomainSocketChannel;
 import io.netty.channel.uring.IoUringSocketChannel;
-import java.util.Objects;
+import java.net.SocketAddress;
+import java.net.UnixDomainSocketAddress;
+import org.neo4j.bolt.connection.netty.impl.Scheme;
 
-public record NettyTransport(Type type, Class<? extends Channel> channelClass, boolean fastOpenAvailable) {
-    private static final String EPOLL_NAME = "io.netty.channel.epoll.Epoll";
-    private static final String IO_URING_NAME = "io.netty.channel.uring.IoUring";
-    private static final String KQUEUE_NAME = "io.netty.channel.kqueue.KQueue";
-
-    public static boolean isEpollAvailable() {
-        try {
-            Class.forName(EPOLL_NAME);
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-        return Epoll.isAvailable();
+public interface NettyTransport {
+    static boolean isEpollAvailable() {
+        return EpollNettyTransport.isEpollAvailable();
     }
 
-    public static boolean isIoUringAvailable() {
-        try {
-            Class.forName(IO_URING_NAME);
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-        return IoUring.isAvailable();
+    static NettyTransport epoll() {
+        return new EpollNettyTransport();
     }
 
-    public static boolean isKQueueAvailable() {
-        try {
-            Class.forName(KQUEUE_NAME);
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-        return KQueue.isAvailable();
+    static boolean isIoUringAvailable() {
+        return IoUringNettyTransport.isIoUringAvailable();
     }
 
-    public static NettyTransport nio() {
-        return new NettyTransport(Type.NIO, NioSocketChannel.class, false);
+    static NettyTransport ioUring() {
+        return new IoUringNettyTransport();
     }
 
-    public static NettyTransport epoll() {
-        return new NettyTransport(Type.EPOLL, EpollSocketChannel.class, Epoll.isTcpFastOpenClientSideAvailable());
+    static boolean isKQueueAvailable() {
+        return KQueueNettyTransport.isKQueueAvailable();
     }
 
-    public static NettyTransport ioUring() {
-        return new NettyTransport(
-                Type.IO_URING, IoUringSocketChannel.class, IoUring.isTcpFastOpenClientSideAvailable());
+    static NettyTransport kqueue() {
+        return new KQueueNettyTransport();
     }
 
-    public static NettyTransport kqueue() {
-        return new NettyTransport(Type.KQUEUE, KQueueSocketChannel.class, KQueue.isTcpFastOpenClientSideAvailable());
+    static NettyTransport local() {
+        return new LocalNettyTransport();
     }
 
-    public static NettyTransport local() {
-        return new NettyTransport(Type.LOCAL, LocalChannel.class, false);
+    Type type();
+
+    Class<? extends Channel> channelClass(String scheme);
+
+    SocketAddress domainSocketAddress(String file);
+
+    boolean fastOpenAvailable();
+
+    static NettyTransport nio() {
+        return new NioNettyTransport();
     }
 
-    public NettyTransport {
-        Objects.requireNonNull(channelClass);
-    }
-
-    public enum Type {
+    enum Type {
         NIO,
         EPOLL,
         IO_URING,
         KQUEUE,
         LOCAL
+    }
+
+    record NioNettyTransport() implements NettyTransport {
+        @Override
+        public Type type() {
+            return Type.NIO;
+        }
+
+        @Override
+        public Class<? extends Channel> channelClass(String scheme) {
+            return Scheme.BOLT_UNIX_SCHEME.equals(scheme) ? NioDomainSocketChannel.class : NioSocketChannel.class;
+        }
+
+        @Override
+        public SocketAddress domainSocketAddress(String file) {
+            return UnixDomainSocketAddress.of(file);
+        }
+
+        @Override
+        public boolean fastOpenAvailable() {
+            return false;
+        }
+    }
+
+    record EpollNettyTransport() implements NettyTransport {
+        private static final String EPOLL_NAME = "io.netty.channel.epoll.Epoll";
+
+        static boolean isEpollAvailable() {
+            try {
+                Class.forName(EpollNettyTransport.EPOLL_NAME);
+            } catch (ClassNotFoundException e) {
+                return false;
+            }
+            return Epoll.isAvailable();
+        }
+
+        @Override
+        public Type type() {
+            return Type.EPOLL;
+        }
+
+        @Override
+        public Class<? extends Channel> channelClass(String scheme) {
+            return Scheme.BOLT_UNIX_SCHEME.equals(scheme) ? EpollDomainSocketChannel.class : EpollSocketChannel.class;
+        }
+
+        @Override
+        public SocketAddress domainSocketAddress(String file) {
+            return new DomainSocketAddress(file);
+        }
+
+        @Override
+        public boolean fastOpenAvailable() {
+            return Epoll.isTcpFastOpenClientSideAvailable();
+        }
+    }
+
+    record IoUringNettyTransport() implements NettyTransport {
+        private static final String IO_URING_NAME = "io.netty.channel.uring.IoUring";
+
+        static boolean isIoUringAvailable() {
+            try {
+                Class.forName(IoUringNettyTransport.IO_URING_NAME);
+            } catch (ClassNotFoundException e) {
+                return false;
+            }
+            return IoUring.isAvailable();
+        }
+
+        @Override
+        public Type type() {
+            return Type.IO_URING;
+        }
+
+        @Override
+        public Class<? extends Channel> channelClass(String scheme) {
+            return Scheme.BOLT_UNIX_SCHEME.equals(scheme)
+                    ? IoUringDomainSocketChannel.class
+                    : IoUringSocketChannel.class;
+        }
+
+        @Override
+        public SocketAddress domainSocketAddress(String file) {
+            return new DomainSocketAddress(file);
+        }
+
+        @Override
+        public boolean fastOpenAvailable() {
+            return IoUring.isTcpFastOpenClientSideAvailable();
+        }
+    }
+
+    record KQueueNettyTransport() implements NettyTransport {
+        private static final String KQUEUE_NAME = "io.netty.channel.kqueue.KQueue";
+
+        static boolean isKQueueAvailable() {
+            try {
+                Class.forName(KQueueNettyTransport.KQUEUE_NAME);
+            } catch (ClassNotFoundException e) {
+                return false;
+            }
+            return KQueue.isAvailable();
+        }
+
+        @Override
+        public Type type() {
+            return Type.KQUEUE;
+        }
+
+        @Override
+        public Class<? extends Channel> channelClass(String scheme) {
+            return Scheme.BOLT_UNIX_SCHEME.equals(scheme) ? KQueueDomainSocketChannel.class : KQueueSocketChannel.class;
+        }
+
+        @Override
+        public SocketAddress domainSocketAddress(String file) {
+            return new DomainSocketAddress(file);
+        }
+
+        @Override
+        public boolean fastOpenAvailable() {
+            return KQueue.isTcpFastOpenClientSideAvailable();
+        }
+    }
+
+    record LocalNettyTransport() implements NettyTransport {
+        @Override
+        public Type type() {
+            return Type.LOCAL;
+        }
+
+        @Override
+        public Class<? extends Channel> channelClass(String scheme) {
+            return LocalChannel.class;
+        }
+
+        @Override
+        public SocketAddress domainSocketAddress(String file) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean fastOpenAvailable() {
+            return false;
+        }
     }
 }

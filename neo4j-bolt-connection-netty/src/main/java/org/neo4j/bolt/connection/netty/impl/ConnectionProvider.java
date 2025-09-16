@@ -16,11 +16,11 @@
  */
 package org.neo4j.bolt.connection.netty.impl;
 
+import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.BoltAgent;
-import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
@@ -30,7 +30,7 @@ import org.neo4j.bolt.connection.values.Value;
 public interface ConnectionProvider {
 
     CompletionStage<Connection> acquireConnection(
-            BoltServerAddress address,
+            URI uri,
             SecurityPlan securityPlan,
             RoutingContext routingContext,
             Map<String, Value> authMap,

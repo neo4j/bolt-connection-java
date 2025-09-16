@@ -34,4 +34,5 @@ module org.neo4j.bolt.connection.netty {
     requires static io.netty.transport.classes.epoll;
     requires static io.netty.transport.classes.io_uring;
     requires static io.netty.transport.classes.kqueue;
+    requires static io.netty.transport.unix.common;
 }

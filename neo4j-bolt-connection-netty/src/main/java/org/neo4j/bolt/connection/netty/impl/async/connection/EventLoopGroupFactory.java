@@ -16,7 +16,6 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async.connection;
 
-import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
@@ -47,12 +46,8 @@ public final class EventLoopGroupFactory {
         this.nettyTransport = Objects.requireNonNull(nettyTransport);
     }
 
-    public Class<? extends Channel> channelClass() {
-        return nettyTransport.channelClass();
-    }
-
-    public boolean fastOpenAvailable() {
-        return nettyTransport.fastOpenAvailable();
+    public NettyTransport nettyTransport() {
+        return nettyTransport;
     }
 
     @SuppressWarnings("deprecation")

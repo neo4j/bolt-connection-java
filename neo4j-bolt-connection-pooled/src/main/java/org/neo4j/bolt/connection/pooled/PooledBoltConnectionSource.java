@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.pooled;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -107,6 +108,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         this.uri = Objects.requireNonNull(uri);
         this.address = switch (uri.getScheme()) {
             case "bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc" -> new BoltServerAddress(uri);
+            case "bolt+unix" -> new BoltServerAddress(Path.of(uri.getPath()));
             default -> new BoltServerAddress(uri.getHost(), 0);};
         this.poolId = poolId(address);
         this.observationProvider = Objects.requireNonNull(observationProvider);
@@ -567,7 +569,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
     }
 
     private String poolId(BoltServerAddress serverAddress) {
-        return serverAddress.port() == 0
+        return serverAddress.port() <= 0
                 ? String.format("%s-%d", serverAddress.host(), this.hashCode())
                 : String.format("%s:%d-%d", serverAddress.host(), serverAddress.port(), this.hashCode());
     }

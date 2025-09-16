@@ -29,7 +29,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
-import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
@@ -45,7 +44,6 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     private final CompletableFuture<Channel> handshakeCompletedFuture;
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
-    private final BoltServerAddress address;
     private final BoltProtocolVersion maxVersion;
     private final boolean fastOpen;
     private final long initialisationTimeoutMillis;
@@ -59,7 +57,6 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
     public HandshakeHandler(
             ChannelPipelineBuilder pipelineBuilder,
             CompletableFuture<Channel> handshakeCompletedFuture,
-            BoltServerAddress address,
             BoltProtocolVersion maxVersion,
             boolean fastOpen,
             long initialisationTimeoutMillis,
@@ -68,7 +65,6 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
             ValueFactory valueFactory) {
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
-        this.address = Objects.requireNonNull(address);
         this.maxVersion = maxVersion;
         this.fastOpen = fastOpen;
         this.initialisationTimeoutMillis = initialisationTimeoutMillis;
