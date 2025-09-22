@@ -88,6 +88,9 @@ public class CommonValueUnpacker implements ValueUnpacker {
     public static final byte VECTOR = 'V';
     public static final int VECTOR_STRUCT_SIZE = 2;
 
+    public static final byte UNSUPPORTED = '?';
+    public static final int UNSUPPORTED_STRUCT_SIZE = 4;
+
     private final boolean dateTimeUtcEnabled;
     protected final PackStream.Unpacker unpacker;
     protected final ValueFactory valueFactory;
@@ -248,6 +251,9 @@ public class CommonValueUnpacker implements ValueUnpacker {
                 } catch (UnsupportedOperationException e) {
                     throw instantiateExceptionForUnknownType(type);
                 }
+            }
+            case UNSUPPORTED -> {
+                return unpackUnsupported(size);
             }
             default -> throw instantiateExceptionForUnknownType(type);
         }
@@ -436,6 +442,10 @@ public class CommonValueUnpacker implements ValueUnpacker {
     }
 
     protected Value unpackVector(long size) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    protected Value unpackUnsupported(long size) throws IOException {
         throw new UnsupportedOperationException();
     }
 

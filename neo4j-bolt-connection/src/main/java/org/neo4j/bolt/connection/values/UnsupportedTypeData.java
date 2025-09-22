@@ -16,31 +16,21 @@
  */
 package org.neo4j.bolt.connection.values;
 
-public enum Type {
-    ANY,
-    BOOLEAN,
-    BYTES,
-    STRING,
-    NUMBER,
-    INTEGER,
-    FLOAT,
-    LIST,
-    MAP,
-    NODE,
-    RELATIONSHIP,
-    PATH,
-    POINT,
-    DATE,
-    TIME,
-    LOCAL_TIME,
-    LOCAL_DATE_TIME,
-    DATE_TIME,
-    DURATION,
-    VECTOR,
-    /**
-     * An unsupported type by a given Bolt Protocol version.
-     * @since 9.0.0
-     */
-    UNSUPPORTED,
-    NULL
+import java.util.Map;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
+
+/**
+ * An object instance of {@link Type#UNSUPPORTED} type.
+ * <p>
+ * This object contains information about the unsupported type and the {@link #minProtocolVersion()} ()} needed to
+ * support it.
+ *
+ * @since 9.0.0
+ */
+public interface UnsupportedTypeData {
+    String name();
+
+    BoltProtocolVersion minProtocolVersion();
+
+    Map<String, Value> extra();
 }
