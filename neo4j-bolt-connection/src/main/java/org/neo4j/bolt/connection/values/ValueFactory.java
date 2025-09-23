@@ -134,14 +134,14 @@ public interface ValueFactory {
     Value vector(Class<?> elementType, Object elements);
 
     /**
-     * Returns a {@link Value} for {@link UnsupportedTypeData}.
+     * Returns a {@link Value} for {@link UnsupportedType}.
      * @param name the type name
      * @param minProtocolVersion the minimum {@link BoltProtocolVersion} needed to support it
      * @param extra an extra data
      * @return the new value
-     * @since 9.0.0
+     * @since 10.0.0
      */
-    Value unsupportedTypeData(String name, BoltProtocolVersion minProtocolVersion, Map<String, Value> extra);
+    Value unsupportedType(String name, BoltProtocolVersion minProtocolVersion, Map<String, Value> extra);
 
     Value unsupportedDateTimeValue(DateTimeException e);
 }

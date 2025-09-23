@@ -101,7 +101,7 @@ public class TestValueFactory implements ValueFactory {
     }
 
     @Override
-    public Value unsupportedTypeData(String name, BoltProtocolVersion minProtocolVersion, Map<String, Value> extra) {
+    public Value unsupportedType(String name, BoltProtocolVersion minProtocolVersion, Map<String, Value> extra) {
         throw new UnsupportedOperationException();
     }
 

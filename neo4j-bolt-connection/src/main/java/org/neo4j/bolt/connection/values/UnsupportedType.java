@@ -25,9 +25,9 @@ import org.neo4j.bolt.connection.BoltProtocolVersion;
  * This object contains information about the unsupported type and the {@link #minProtocolVersion()} ()} needed to
  * support it.
  *
- * @since 9.0.0
+ * @since 10.0.0
  */
-public interface UnsupportedTypeData {
+public interface UnsupportedType {
     String name();
 
     BoltProtocolVersion minProtocolVersion();
