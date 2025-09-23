@@ -97,7 +97,7 @@ final class ValueUnpackerV6 extends ValueUnpackerV5 {
         var minProtocolVersion =
                 new BoltProtocolVersion(Math.toIntExact(minMajorBoltVersion), Math.toIntExact(minMinorBoltVersion));
         var extra = unpackMap();
-        return valueFactory.unsupportedTypeData(name, minProtocolVersion, extra);
+        return valueFactory.unsupportedType(name, minProtocolVersion, extra);
     }
 
     private interface RawUnpacker {
