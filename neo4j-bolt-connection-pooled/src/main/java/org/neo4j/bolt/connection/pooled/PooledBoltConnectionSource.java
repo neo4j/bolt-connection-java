@@ -45,6 +45,7 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltTransientException;
@@ -242,7 +243,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                         pendingAcquisitions.add(acquisitionFuture);
                                         scheduleTimeout(acquisitionFuture, acquisitionTimeout);
                                     } else {
-                                        executorService.execute(timeoutRunnable(acquisitionFuture));
+                                        executorService.execute(timeoutRunnable(acquisitionFuture, false));
                                     }
                                 }
                             }
@@ -548,7 +549,12 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                         .thenCompose(ignored -> boltConnectionProvider.close())
                         .exceptionally(throwable -> null)
                         .whenComplete((ignored, throwable) -> {
-                            executorService.shutdown();
+                            executorService.shutdownNow().forEach(runnable -> {
+                                try {
+                                    runnable.run();
+                                } catch (Exception ignoredException) {
+                                }
+                            });
                             closeObservation.stop();
                         });
             }
@@ -613,19 +619,25 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             CompletableFuture<PooledBoltConnection> acquisitionFuture, long acquisitionTimeout) {
         return executorService.schedule(
                 () -> {
+                    boolean closeInitiated;
                     synchronized (this) {
+                        closeInitiated = closeStage != null;
                         pendingAcquisitions.remove(acquisitionFuture);
                     }
-                    timeoutRunnable(acquisitionFuture).run();
+                    timeoutRunnable(acquisitionFuture, closeInitiated).run();
                 },
                 acquisitionTimeout,
                 TimeUnit.MILLISECONDS);
     }
 
-    private Runnable timeoutRunnable(CompletableFuture<PooledBoltConnection> acquisitionFuture) {
+    private Runnable timeoutRunnable(
+            CompletableFuture<PooledBoltConnection> acquisitionFuture, boolean closeInitiated) {
         return () -> {
             try {
-                acquisitionFuture.completeExceptionally(timeoutException());
+                acquisitionFuture.completeExceptionally(
+                        closeInitiated
+                                ? new BoltClientException("The connection source is closing or is already closed")
+                                : timeoutException());
             } catch (Throwable throwable) {
                 log.log(System.Logger.Level.WARNING, "Unexpected error occurred.", throwable);
             }
