@@ -47,7 +47,7 @@
     <properties>
         <bouncycastle-jdk18on.version>1.82</bouncycastle-jdk18on.version>
         <build-resources.version>2024-12.1</build-resources.version>
-        <junit.version>6.0.0-RC3</junit.version>
+        <junit.version>6.0.0</junit.version>
         <maven.build.timestamp.format>'v'yyyyMMdd-HHmm</maven.build.timestamp.format>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.xlint.extras />
