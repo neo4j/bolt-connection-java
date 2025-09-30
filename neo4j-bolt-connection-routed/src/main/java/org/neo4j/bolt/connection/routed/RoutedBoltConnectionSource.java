@@ -64,6 +64,7 @@ import org.neo4j.bolt.connection.routed.impl.cluster.RoutingTableRegistryImpl;
 import org.neo4j.bolt.connection.routed.impl.cluster.loadbalancing.LeastConnectedLoadBalancingStrategy;
 import org.neo4j.bolt.connection.routed.impl.cluster.loadbalancing.LoadBalancingStrategy;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
+import org.neo4j.bolt.connection.routed.impl.util.LockUtil;
 
 /**
  * A routed {@link BoltConnectionSource} implementation that implements Neo4j client-side routing that is typically
@@ -433,8 +434,14 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                     futures[index++] = iterator.next().close().toCompletableFuture();
                     iterator.remove();
                 }
-                this.closeFuture = CompletableFuture.allOf(futures)
-                        .whenComplete((ignored, throwable) -> executorService.shutdown());
+                this.closeFuture = CompletableFuture.allOf(futures).whenComplete((ignored, throwable) -> executorService
+                        .shutdownNow()
+                        .forEach(runnable -> {
+                            try {
+                                runnable.run();
+                            } catch (Exception ignoredException) {
+                            }
+                        }));
             }
             closeFuture = this.closeFuture;
         } finally {
@@ -474,7 +481,13 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     private ScheduledFuture<?> scheduleTimeout(
             CompletableFuture<BoltConnection> acquisitionFuture, long acquisitionTimeout) {
         return executorService.schedule(
-                () -> acquisitionFuture.completeExceptionally(acquisitionTimeoutException()),
+                () -> {
+                    boolean closeInitiated = LockUtil.executeWithLock(lock, () -> closeFuture != null);
+                    acquisitionFuture.completeExceptionally(
+                            closeInitiated
+                                    ? new BoltClientException("The connection source is closing or is already closed")
+                                    : acquisitionTimeoutException());
+                },
                 acquisitionTimeout,
                 TimeUnit.MILLISECONDS);
     }
