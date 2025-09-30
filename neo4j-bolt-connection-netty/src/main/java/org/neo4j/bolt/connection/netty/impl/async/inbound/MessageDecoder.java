@@ -60,10 +60,11 @@ public class MessageDecoder extends ByteToMessageDecoder {
     }
 
     private static Cumulator determineDefaultCumulator() {
-        var value = System.getProperty("messageDecoderCumulator", "");
-        if ("merge".equals(value)) {
-            return MERGE_CUMULATOR;
+        var value = "";
+        try {
+            value = System.getProperty("messageDecoderCumulator", value);
+        } catch (SecurityException ignored) {
         }
-        return COMPOSITE_CUMULATOR;
+        return "merge".equals(value) ? MERGE_CUMULATOR : COMPOSITE_CUMULATOR;
     }
 }
