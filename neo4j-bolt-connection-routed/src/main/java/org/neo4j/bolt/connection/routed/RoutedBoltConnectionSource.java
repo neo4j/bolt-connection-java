@@ -64,7 +64,6 @@ import org.neo4j.bolt.connection.routed.impl.cluster.RoutingTableRegistryImpl;
 import org.neo4j.bolt.connection.routed.impl.cluster.loadbalancing.LeastConnectedLoadBalancingStrategy;
 import org.neo4j.bolt.connection.routed.impl.cluster.loadbalancing.LoadBalancingStrategy;
 import org.neo4j.bolt.connection.routed.impl.util.FutureUtil;
-import org.neo4j.bolt.connection.routed.impl.util.LockUtil;
 
 /**
  * A routed {@link BoltConnectionSource} implementation that implements Neo4j client-side routing that is typically
@@ -81,7 +80,11 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
             "Failed to obtain a connection towards address %s, will try other addresses if available. Complete failure is reported separately from this entry.";
     private final System.Logger log;
     private final Lock lock = new ReentrantLock();
-    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        var thread = new Thread(runnable);
+        thread.setDaemon(true);
+        return thread;
+    });
     private final BoltConnectionSourceFactory boltConnectionSourceFactory;
     private final URI uri;
     private final long acquisitionTimeout;
@@ -434,14 +437,8 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
                     futures[index++] = iterator.next().close().toCompletableFuture();
                     iterator.remove();
                 }
-                this.closeFuture = CompletableFuture.allOf(futures).whenComplete((ignored, throwable) -> executorService
-                        .shutdownNow()
-                        .forEach(runnable -> {
-                            try {
-                                runnable.run();
-                            } catch (Exception ignoredException) {
-                            }
-                        }));
+                this.closeFuture = CompletableFuture.allOf(futures)
+                        .whenComplete((ignored, throwable) -> executorService.shutdown());
             }
             closeFuture = this.closeFuture;
         } finally {
@@ -481,13 +478,7 @@ public class RoutedBoltConnectionSource implements BoltConnectionSource<RoutedBo
     private ScheduledFuture<?> scheduleTimeout(
             CompletableFuture<BoltConnection> acquisitionFuture, long acquisitionTimeout) {
         return executorService.schedule(
-                () -> {
-                    boolean closeInitiated = LockUtil.executeWithLock(lock, () -> closeFuture != null);
-                    acquisitionFuture.completeExceptionally(
-                            closeInitiated
-                                    ? new BoltClientException("The connection source is closing or is already closed")
-                                    : acquisitionTimeoutException());
-                },
+                () -> acquisitionFuture.completeExceptionally(acquisitionTimeoutException()),
                 acquisitionTimeout,
                 TimeUnit.MILLISECONDS);
     }
