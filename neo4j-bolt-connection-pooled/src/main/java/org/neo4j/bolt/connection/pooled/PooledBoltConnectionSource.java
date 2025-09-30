@@ -45,7 +45,6 @@ import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
-import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltFailureException;
 import org.neo4j.bolt.connection.exception.BoltTransientException;
@@ -63,7 +62,11 @@ import org.neo4j.bolt.connection.pooled.observation.PoolObservationProvider;
  */
 public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConnectionParameters> {
     private final System.Logger log;
-    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        var thread = new Thread(runnable);
+        thread.setDaemon(true);
+        return thread;
+    });
     private final BoltConnectionProvider boltConnectionProvider;
     private final List<ConnectionEntry> pooledConnectionEntries;
     private final Queue<CompletableFuture<PooledBoltConnection>> pendingAcquisitions;
@@ -243,7 +246,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                         pendingAcquisitions.add(acquisitionFuture);
                                         scheduleTimeout(acquisitionFuture, acquisitionTimeout);
                                     } else {
-                                        executorService.execute(timeoutRunnable(acquisitionFuture, false));
+                                        executorService.execute(timeoutRunnable(acquisitionFuture));
                                     }
                                 }
                             }
@@ -549,12 +552,7 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                         .thenCompose(ignored -> boltConnectionProvider.close())
                         .exceptionally(throwable -> null)
                         .whenComplete((ignored, throwable) -> {
-                            executorService.shutdownNow().forEach(runnable -> {
-                                try {
-                                    runnable.run();
-                                } catch (Exception ignoredException) {
-                                }
-                            });
+                            executorService.shutdown();
                             closeObservation.stop();
                         });
             }
@@ -619,25 +617,19 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
             CompletableFuture<PooledBoltConnection> acquisitionFuture, long acquisitionTimeout) {
         return executorService.schedule(
                 () -> {
-                    boolean closeInitiated;
                     synchronized (this) {
-                        closeInitiated = closeStage != null;
                         pendingAcquisitions.remove(acquisitionFuture);
                     }
-                    timeoutRunnable(acquisitionFuture, closeInitiated).run();
+                    timeoutRunnable(acquisitionFuture).run();
                 },
                 acquisitionTimeout,
                 TimeUnit.MILLISECONDS);
     }
 
-    private Runnable timeoutRunnable(
-            CompletableFuture<PooledBoltConnection> acquisitionFuture, boolean closeInitiated) {
+    private Runnable timeoutRunnable(CompletableFuture<PooledBoltConnection> acquisitionFuture) {
         return () -> {
             try {
-                acquisitionFuture.completeExceptionally(
-                        closeInitiated
-                                ? new BoltClientException("The connection source is closing or is already closed")
-                                : timeoutException());
+                acquisitionFuture.completeExceptionally(timeoutException());
             } catch (Throwable throwable) {
                 log.log(System.Logger.Level.WARNING, "Unexpected error occurred.", throwable);
             }
