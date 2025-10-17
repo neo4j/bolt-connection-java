@@ -476,11 +476,22 @@ public final class QueryApiBoltConnection implements BoltConnection {
 
     private synchronized void updateAuthHeader(AuthToken authToken) {
         var authMap = authToken.asMap();
-        var username = authMap.get("principal").asString();
-        var password = authMap.get("credentials").asString();
-        this.authHeader = "Basic "
-                + Base64.getEncoder()
-                        .encodeToString("%s:%s".formatted(username, password).getBytes());
+        var scheme = authMap.get("scheme").asString();
+        this.authHeader = switch (scheme) {
+            case "basic" -> {
+                var username = authMap.get("principal").asString();
+                var password = authMap.get("credentials").asString();
+                yield "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString(
+                                        "%s:%s".formatted(username, password).getBytes());
+            }
+            case "bearer" -> {
+                var token = authMap.get("credentials").asString();
+                yield "Bearer " + token;
+            }
+            case "none" -> null;
+            default -> throw new BoltClientException("Unsupported auth token: { scheme='" + scheme + "' }");};
         this.authInfoFuture = CompletableFuture.completedFuture(new AuthInfoImpl(authToken, clock.millis()));
     }
 

@@ -59,7 +59,11 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
         this.logging = Objects.requireNonNull(logging);
         this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
-        this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), runnable -> {
+            var thread = new Thread(runnable);
+            thread.setDaemon(true);
+            return thread;
+        });
         this.clock = Objects.requireNonNull(clock);
         this.observationProvider = Objects.requireNonNull(observationProvider);
     }
@@ -110,27 +114,26 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
                 .sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
+                        DiscoveryResponse discoveryResponse;
                         try {
-                            DiscoveryResponse discoveryResponse =
-                                    JSON.std.beanFrom(DiscoveryResponse.class, response.body());
-
-                            var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
-                            var httpClient = newHttpClientBuilder(securityPlan).build();
-                            return new QueryApiBoltConnection(
-                                    valueFactory,
-                                    httpClient,
-                                    uri,
-                                    authToken,
-                                    userAgent,
-                                    serverAgent,
-                                    BOLT_PROTOCOL_VERSION,
-                                    clock,
-                                    logging,
-                                    observationProvider);
+                            discoveryResponse = JSON.std.beanFrom(DiscoveryResponse.class, response.body());
                         } catch (IOException e) {
                             throw new BoltClientException(
                                     "Cannot parse %s to DiscoveryResponse".formatted(response.body()), e);
                         }
+                        var serverAgent = "Neo4j/%s".formatted(discoveryResponse.neo4j_version());
+                        var httpClient = newHttpClientBuilder(securityPlan).build();
+                        return new QueryApiBoltConnection(
+                                valueFactory,
+                                httpClient,
+                                uri,
+                                authToken,
+                                userAgent,
+                                serverAgent,
+                                BOLT_PROTOCOL_VERSION,
+                                clock,
+                                logging,
+                                observationProvider);
                     } else {
                         throw new BoltClientException("Unexpected response code: " + response.statusCode());
                     }

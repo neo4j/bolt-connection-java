@@ -4,7 +4,7 @@
 
     <groupId>org.neo4j.bolt</groupId>
     <artifactId>neo4j-bolt-connection-parent</artifactId>
-    <version>10.0-SNAPSHOT</version>
+    <version>10.1-SNAPSHOT</version>
 
     <packaging>pom</packaging>
     <name>Neo4j Bolt Connection</name>
@@ -56,7 +56,7 @@
         <mockito.version>5.20.0</mockito.version>
         <!-- To be overwritten by child projects -->
         <moduleName />
-        <netty-bom.version>4.2.6.Final</netty-bom.version>
+        <netty-bom.version>4.2.7.Final</netty-bom.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <rootDir>${project.basedir}</rootDir>

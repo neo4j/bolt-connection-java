@@ -75,16 +75,26 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String 
     }
 
     private static String[] headers(String authHeader, String userAgent) {
-        var headers = new String[userAgent != null ? 8 : 6];
+        var size = 4;
+        if (authHeader != null) {
+            size += 2;
+        }
+        if (userAgent != null) {
+            size += 2;
+        }
+        var headers = new String[size];
         headers[0] = "Content-Type";
         headers[1] = "application/vnd.neo4j.query";
         headers[2] = "Accept";
         headers[3] = "application/vnd.neo4j.query";
-        headers[4] = "Authorization";
-        headers[5] = Objects.requireNonNull(authHeader);
+        var index = 4;
+        if (authHeader != null) {
+            headers[index++] = "Authorization";
+            headers[index++] = Objects.requireNonNull(authHeader);
+        }
         if (userAgent != null) {
-            headers[6] = "User-Agent";
-            headers[7] = userAgent;
+            headers[index++] = "User-Agent";
+            headers[index] = userAgent;
         }
         return headers;
     }
