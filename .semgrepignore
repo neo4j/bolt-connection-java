@@ -1,0 +1,8 @@
+:include .gitignore
+
+.git
+
+src/test
+
+neo4j-bolt-connection-test-values
+
