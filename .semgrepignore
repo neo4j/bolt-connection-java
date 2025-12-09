@@ -1,8 +1,8 @@
 :include .gitignore
 
-.git
+/.git/
 
-src/test
+**/src/test/
 
-neo4j-bolt-connection-test-values
+/neo4j-bolt-connection-test-values/
 
