@@ -28,6 +28,7 @@ import com.fasterxml.jackson.jr.ob.api.ValueWriter;
 import com.fasterxml.jackson.jr.ob.impl.JSONReader;
 import com.fasterxml.jackson.jr.ob.impl.JSONWriter;
 import java.io.IOException;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -69,12 +70,25 @@ class DriverValueProvider extends ReaderWriterProvider {
 
         @Override
         public void writeValue(JSONWriter context, JsonGenerator g, Object value) throws IOException {
-            CypherTypes cypherType = CypherTypes.typeFromValue((Value) value);
+            var theValue = (Value) value;
+            var cypherType = CypherTypes.typeFromValue(theValue);
             g.writeStartObject();
             g.writeFieldName(Fieldnames.CYPHER_TYPE);
-            context.writeValue(cypherType.name());
+            var actualName =
+                    switch (cypherType) {
+                        case OffsetDateTime -> "OffsetDateTime";
+                        case ZonedDateTime -> "ZonedDateTime";
+                        case DateTime -> {
+                            var zoneDateTime = theValue.asZonedDateTime();
+                            yield (zoneDateTime.getZone().normalized() instanceof ZoneOffset)
+                                    ? "OffsetDateTime"
+                                    : "ZonedDateTime";
+                        }
+                        default -> cypherType.name();
+                    };
+            context.writeValue(actualName);
             g.writeFieldName(Fieldnames.CYPHER_VALUE);
-            context.writeValue(fromValue(cypherType, (Value) value));
+            context.writeValue(fromValue(cypherType, theValue));
             g.writeEndObject();
         }
 
