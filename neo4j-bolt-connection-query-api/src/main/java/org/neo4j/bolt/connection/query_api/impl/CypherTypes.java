@@ -18,9 +18,7 @@ package org.neo4j.bolt.connection.query_api.impl;
 
 import java.time.LocalDate;
 import java.time.OffsetTime;
-import java.time.Period;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -30,6 +28,7 @@ import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
+import org.neo4j.bolt.connection.values.ValueUtils;
 
 enum CypherTypes {
     // spotless:off
@@ -124,8 +123,8 @@ enum CypherTypes {
 
     Duration(
         Type.DURATION,
-        CypherTypes::parseDuration,
-        (v) -> v.asBoltIsoDuration().toString()
+        ValueUtils::parseDuration,
+        (v) -> ValueUtils.renderDuration(v.asBoltIsoDuration())
     ),
 
     Point(
@@ -236,45 +235,5 @@ enum CypherTypes {
 
     private static Object unsupportedVector(Value value) {
         throw new BoltUnsupportedFeatureException("Vector type is not supported");
-    }
-
-    private static Value parseDuration(ValueFactory valueFactory, String input) {
-        var parts = input.split("T", 2);
-
-        var months = 0L;
-        var days = 0L;
-        var seconds = 0L;
-        var nanos = 0;
-
-        if (parts.length == 2) {
-            try {
-                var period = Period.parse(parts[0]);
-                months = period.getMonths();
-                days = period.getDays();
-            } catch (DateTimeParseException ignored) {
-            }
-
-            try {
-                var duration = java.time.Duration.parse("PT" + parts[1]);
-                seconds = duration.getSeconds();
-                nanos = duration.getNano();
-            } catch (DateTimeParseException ignored) {
-            }
-
-        } else if (parts.length == 1) {
-            if (input.startsWith("P") && !input.contains("T")) {
-                try {
-                    var period = Period.parse(parts[0]);
-                    var yearsInMonths = period.getYears() * 12;
-                    months = period.getMonths() + yearsInMonths;
-                    days = period.getDays();
-                } catch (DateTimeParseException e) {
-                    var duration = java.time.Duration.parse(parts[0]);
-                    seconds = duration.getSeconds();
-                    nanos = duration.getNano();
-                }
-            }
-        }
-        return valueFactory.isoDuration(months, days, seconds, nanos);
     }
 }
