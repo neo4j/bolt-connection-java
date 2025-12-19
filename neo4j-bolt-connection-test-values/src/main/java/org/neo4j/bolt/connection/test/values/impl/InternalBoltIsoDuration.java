@@ -16,21 +16,13 @@
  */
 package org.neo4j.bolt.connection.test.values.impl;
 
-import static java.time.temporal.ChronoUnit.DAYS;
-import static java.time.temporal.ChronoUnit.MONTHS;
-import static java.time.temporal.ChronoUnit.NANOS;
-import static java.time.temporal.ChronoUnit.SECONDS;
-
 import java.time.Duration;
 import java.time.Period;
-import java.time.temporal.TemporalUnit;
-import java.util.List;
 import java.util.Objects;
 import org.neo4j.bolt.connection.values.IsoDuration;
+import org.neo4j.bolt.connection.values.ValueUtils;
 
 public class InternalBoltIsoDuration implements IsoDuration {
-    private static final long NANOS_PER_SECOND = 1_000_000_000;
-    private static final List<TemporalUnit> SUPPORTED_UNITS = List.of(MONTHS, DAYS, SECONDS, NANOS);
 
     private final long months;
     private final long days;
@@ -95,31 +87,6 @@ public class InternalBoltIsoDuration implements IsoDuration {
 
     @Override
     public String toString() {
-        var sb = new StringBuilder();
-        sb.append('P');
-        sb.append(months).append('M');
-        sb.append(days).append('D');
-        sb.append('T');
-        if (seconds < 0 && nanoseconds > 0) {
-            if (seconds == -1) {
-                sb.append("-0");
-            } else {
-                sb.append(seconds + 1);
-            }
-        } else {
-            sb.append(seconds);
-        }
-        if (nanoseconds > 0) {
-            var pos = sb.length();
-            // append nanoseconds as a 10-digit string with leading '1' that is later replaced by a '.'
-            if (seconds < 0) {
-                sb.append(2 * NANOS_PER_SECOND - nanoseconds);
-            } else {
-                sb.append(NANOS_PER_SECOND + nanoseconds);
-            }
-            sb.setCharAt(pos, '.'); // replace '1' with '.'
-        }
-        sb.append('S');
-        return sb.toString();
+        return ValueUtils.renderDuration(this);
     }
 }
