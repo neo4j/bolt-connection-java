@@ -45,25 +45,25 @@
     </scm>
 
     <properties>
-        <bouncycastle-jdk18on.version>1.82</bouncycastle-jdk18on.version>
-        <build-resources.version>2024-12.1</build-resources.version>
-        <junit.version>6.0.0</junit.version>
+        <bouncycastle-jdk18on.version>1.83</bouncycastle-jdk18on.version>
+        <build-resources.version>2026.02.3</build-resources.version>
+        <junit.version>6.0.3</junit.version>
         <maven.build.timestamp.format>'v'yyyyMMdd-HHmm</maven.build.timestamp.format>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.xlint.extras />
         <!-- Skip deployment by default for everything in this project. -->
         <maven.deploy.skip>true</maven.deploy.skip>
-        <mockito.version>5.20.0</mockito.version>
+        <mockito.version>5.21.0</mockito.version>
         <!-- To be overwritten by child projects -->
         <moduleName />
-        <netty-bom.version>4.2.7.Final</netty-bom.version>
+        <netty-bom.version>4.2.10.Final</netty-bom.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <rootDir>${project.basedir}</rootDir>
         <sortpom-maven-plugin.version>4.0.0</sortpom-maven-plugin.version>
         <surefire.and.failsafe.version>3.5.4</surefire.and.failsafe.version>
         <surefire.jpms.args />
-        <testcontainers.version>1.21.3</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencyManagement>
