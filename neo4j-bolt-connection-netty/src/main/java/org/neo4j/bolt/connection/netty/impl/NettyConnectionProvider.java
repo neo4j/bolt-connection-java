@@ -46,7 +46,7 @@ import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.netty.impl.async.NetworkConnection;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelConnectedListener;
-import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderImpl;
+import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyChannelInitializer;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyDomainNameResolverGroup;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
@@ -72,6 +72,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
     private final LoggingProvider logging;
     private final ValueFactory valueFactory;
     private final ObservationProvider observationProvider;
+    private final ChannelPipelineBuilderProvider channelPipelineBuilderProvider;
 
     public NettyConnectionProvider(
             EventLoopGroup eventLoopGroup,
@@ -84,7 +85,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory,
-            ObservationProvider observationProvider) {
+            ObservationProvider observationProvider,
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider) {
         this.eventLoopGroup = eventLoopGroup;
         this.nettyTransport = Objects.requireNonNull(nettyTransport);
         this.clock = requireNonNull(clock);
@@ -97,6 +99,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         this.logging = logging;
         this.valueFactory = requireNonNull(valueFactory);
         this.observationProvider = Objects.requireNonNull(observationProvider);
+        this.channelPipelineBuilderProvider = Objects.requireNonNull(channelPipelineBuilderProvider);
     }
 
     @Override
@@ -111,7 +114,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             long initialisationTimeoutMillis,
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
-            ImmutableObservation parentObservation) {
+            ImmutableObservation parentObservation,
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider) {
         // extract address from the URI
         BoltServerAddress uriAddress;
         var boltUnixScheme = Scheme.BOLT_UNIX_SCHEME.equals(uri.getScheme());
@@ -225,7 +229,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
         // add listener that sends Bolt handshake bytes when channel is connected
         channelConnected.addListener(new ChannelConnectedListener(
                 address,
-                new ChannelPipelineBuilderImpl(),
+                channelPipelineBuilderProvider.channelPipeline(),
                 handshakeCompleted,
                 maxVersion,
                 preferredCapabilitiesMask,

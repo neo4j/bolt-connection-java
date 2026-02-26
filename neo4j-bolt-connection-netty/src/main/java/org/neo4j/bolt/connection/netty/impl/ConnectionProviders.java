@@ -22,6 +22,7 @@ import java.time.Clock;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.DomainNameResolver;
 import org.neo4j.bolt.connection.LoggingProvider;
+import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
 import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -38,7 +39,8 @@ public class ConnectionProviders {
             long preferredCapabilitiesMask,
             LoggingProvider logging,
             ValueFactory valueFactory,
-            ObservationProvider observationProvider) {
+            ObservationProvider observationProvider,
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider) {
         return new NettyConnectionProvider(
                 group,
                 nettyTransport,
@@ -50,6 +52,7 @@ public class ConnectionProviders {
                 preferredCapabilitiesMask,
                 logging,
                 valueFactory,
-                observationProvider);
+                observationProvider,
+                channelPipelineBuilderProvider);
     }
 }
