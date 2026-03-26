@@ -548,13 +548,10 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                     }
                     iterator.remove();
                 }
-                this.closeStage = this.closeStage
-                        .thenCompose(ignored -> boltConnectionProvider.close())
-                        .exceptionally(throwable -> null)
-                        .whenComplete((ignored, throwable) -> {
-                            executorService.shutdown();
-                            closeObservation.stop();
-                        });
+                this.closeStage = this.closeStage.whenComplete((ignored, throwable) -> {
+                    executorService.shutdown();
+                    closeObservation.stop();
+                });
             }
             closeStage = this.closeStage;
         }
