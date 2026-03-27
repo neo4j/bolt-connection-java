@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.MockitoAnnotations.openMocks;
 
@@ -348,7 +349,7 @@ class PooledBoltConnectionSourceTest {
 
         // then
         then(connection).should().close();
-        then(upstreamProvider).should().close();
+        then(upstreamProvider).should(never()).close();
     }
 
     @Test
