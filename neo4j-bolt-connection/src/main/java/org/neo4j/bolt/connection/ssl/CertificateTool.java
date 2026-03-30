@@ -19,7 +19,9 @@ package org.neo4j.bolt.connection.ssl;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -43,7 +45,7 @@ final class CertificateTool {
             throws GeneralSecurityException, IOException {
         var certCount = 0; // The files might contain multiple certs
         for (var certFile : certFiles) {
-            try (var inputStream = new BufferedInputStream(new FileInputStream(certFile))) {
+            try (var inputStream = new BufferedInputStream(stripCarriageReturns(new FileInputStream(certFile)))) {
                 var certFactory = CertificateFactory.getInstance("X.509");
 
                 while (inputStream.available() > 0) {
@@ -76,6 +78,44 @@ final class CertificateTool {
 
     private static void loadX509Cert(Certificate cert, String certAlias, KeyStore keyStore) throws KeyStoreException {
         keyStore.setCertificateEntry(certAlias, cert);
+    }
+
+    /**
+     * Wraps an InputStream to strip carriage return ({@code \r}) characters.
+     * <p>
+     * PEM files created on Windows use {@code \r\n} line endings. Some security providers
+     * (notably Bouncy Castle FIPS) do not tolerate {@code \r} characters in PEM streams
+     * and throw {@link CertificateException} with "Unexpected data detected in stream".
+     * The standard JDK CertificateFactory handles {@code \r\n} without issue, but this
+     * normalization ensures compatibility across all providers.
+     */
+    private static InputStream stripCarriageReturns(InputStream inputStream) {
+        return new FilterInputStream(inputStream) {
+            @Override
+            public int read() throws IOException {
+                int b;
+                do {
+                    b = super.read();
+                } while (b == '\r');
+                return b;
+            }
+
+            @Override
+            public int read(byte[] buf, int off, int len) throws IOException {
+                var bytesRead = super.read(buf, off, len);
+                if (bytesRead <= 0) {
+                    return bytesRead;
+                }
+                var writePos = off;
+                for (var i = off; i < off + bytesRead; i++) {
+                    if (buf[i] != '\r') {
+                        buf[writePos++] = buf[i];
+                    }
+                }
+                var filtered = writePos - off;
+                return filtered > 0 ? filtered : read(buf, off, len);
+            }
+        };
     }
 
     private CertificateTool() {}

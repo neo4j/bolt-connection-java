@@ -72,6 +72,56 @@ class CertificateToolTest {
     }
 
     @Test
+    void shouldLoadCertWithWindowsLineEndings() throws Throwable {
+        // Given - a cert file with \r\n (Windows) line endings
+        var certFile = File.createTempFile("windows-line-endings", ".cer");
+        certFile.deleteOnExit();
+
+        var cert = generateSelfSignedCertificate();
+
+        // Write the cert with \r\n line endings to simulate a Windows-created PEM
+        saveX509CertWithWindowsLineEndings(cert, certFile);
+
+        var keyStore = KeyStore.getInstance("JKS");
+        keyStore.load(null, null);
+
+        // When
+        CertificateTool.loadX509Cert(Collections.singletonList(certFile), keyStore);
+
+        // Then
+        var aliases = keyStore.aliases();
+        assertTrue(aliases.hasMoreElements());
+        assertTrue(aliases.nextElement().startsWith("neo4j.javadriver.trustedcert"));
+        assertFalse(aliases.hasMoreElements());
+    }
+
+    @Test
+    void shouldLoadMultipleCertsWithWindowsLineEndings() throws Throwable {
+        // Given - multiple certs in a single file with \r\n line endings
+        var certFile = File.createTempFile("windows-multi-cert", ".cer");
+        certFile.deleteOnExit();
+
+        var cert1 = generateSelfSignedCertificate();
+        var cert2 = generateSelfSignedCertificate();
+
+        saveX509CertWithWindowsLineEndings(new Certificate[] {cert1, cert2}, certFile);
+
+        var keyStore = KeyStore.getInstance("JKS");
+        keyStore.load(null, null);
+
+        // When
+        CertificateTool.loadX509Cert(Collections.singletonList(certFile), keyStore);
+
+        // Then
+        var aliases = keyStore.aliases();
+        assertTrue(aliases.hasMoreElements());
+        assertTrue(aliases.nextElement().startsWith("neo4j.javadriver.trustedcert"));
+        assertTrue(aliases.hasMoreElements());
+        assertTrue(aliases.nextElement().startsWith("neo4j.javadriver.trustedcert"));
+        assertFalse(aliases.hasMoreElements());
+    }
+
+    @Test
     void shouldLoadMultipleCertsIntoKeyStore() throws Throwable {
         // Given
         var certFile = File.createTempFile("3random", ".cer");
@@ -162,6 +212,25 @@ class CertificateToolTest {
 
                 writer.write(END_CERT);
                 writer.newLine();
+            }
+        }
+    }
+
+    private static void saveX509CertWithWindowsLineEndings(Certificate cert, File certFile)
+            throws GeneralSecurityException, IOException {
+        saveX509CertWithWindowsLineEndings(new Certificate[] {cert}, certFile);
+    }
+
+    private static void saveX509CertWithWindowsLineEndings(Certificate[] certs, File certFile)
+            throws GeneralSecurityException, IOException {
+        try (var stream = new java.io.FileOutputStream(certFile)) {
+            for (var cert : certs) {
+                var certStr =
+                        Base64.getEncoder().encodeToString(cert.getEncoded()).replaceAll("(.{64})", "$1\r\n");
+
+                stream.write((BEGIN_CERT + "\r\n").getBytes());
+                stream.write((certStr + "\r\n").getBytes());
+                stream.write((END_CERT + "\r\n").getBytes());
             }
         }
     }
