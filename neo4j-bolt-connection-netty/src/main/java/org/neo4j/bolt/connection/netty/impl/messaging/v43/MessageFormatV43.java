@@ -16,10 +16,9 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.v43;
 
+import org.neo4j.bolt.connection.codec.network.ValueDecoderFactory;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonMessageReader;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 /**
@@ -29,13 +28,14 @@ public class MessageFormatV43 implements MessageFormat {
     private boolean dateTimeUtcEnabled;
 
     @Override
-    public Writer newWriter(PackOutput output, ValueFactory valueFactory) {
-        return new MessageWriterV43(output, dateTimeUtcEnabled, valueFactory);
+    public Writer newWriter(ValueFactory valueFactory) {
+        return new MessageWriterV43(dateTimeUtcEnabled, valueFactory);
     }
 
     @Override
-    public Reader newReader(PackInput input, ValueFactory valueFactory) {
-        return new CommonMessageReader(input, dateTimeUtcEnabled, valueFactory);
+    public Reader newReader(ValueFactory valueFactory) {
+        return new CommonMessageReader(
+                ValueDecoderFactory.create(BoltProtocolV43.VERSION, valueFactory, dateTimeUtcEnabled), valueFactory);
     }
 
     @Override

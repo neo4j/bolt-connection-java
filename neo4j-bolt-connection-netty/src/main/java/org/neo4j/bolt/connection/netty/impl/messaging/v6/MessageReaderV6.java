@@ -18,19 +18,19 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v6;
 
 import java.util.Map;
 import org.neo4j.bolt.connection.GqlError;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
+import org.neo4j.bolt.connection.codec.network.ValueDecoder;
+import org.neo4j.bolt.connection.codec.network.ValueDecoderFactory;
 import org.neo4j.bolt.connection.netty.impl.messaging.v57.MessageReaderV57;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class MessageReaderV6 extends MessageReaderV57 {
-    public MessageReaderV6(PackInput input, ValueFactory valueFactory) {
-        super(new ValueUnpackerV6(input, valueFactory), valueFactory);
+    public MessageReaderV6(ValueFactory valueFactory) {
+        super(ValueDecoderFactory.create(BoltProtocolV6.VERSION, valueFactory), valueFactory);
     }
 
-    public MessageReaderV6(ValueUnpacker unpacker, ValueFactory valueFactory) {
-        super(unpacker, valueFactory);
+    public MessageReaderV6(ValueDecoder reader, ValueFactory valueFactory) {
+        super(reader, valueFactory);
     }
 
     @Override

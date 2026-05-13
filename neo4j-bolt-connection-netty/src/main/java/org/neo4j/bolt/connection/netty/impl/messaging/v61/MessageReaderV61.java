@@ -16,12 +16,12 @@
  */
 package org.neo4j.bolt.connection.netty.impl.messaging.v61;
 
+import org.neo4j.bolt.connection.codec.network.ValueDecoderFactory;
 import org.neo4j.bolt.connection.netty.impl.messaging.v6.MessageReaderV6;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class MessageReaderV61 extends MessageReaderV6 {
-    public MessageReaderV61(PackInput input, ValueFactory valueFactory) {
-        super(new ValueUnpackerV61(input, valueFactory), valueFactory);
+    public MessageReaderV61(ValueFactory valueFactory) {
+        super(ValueDecoderFactory.create(BoltProtocolV61.VERSION, valueFactory), valueFactory);
     }
 }

@@ -19,9 +19,9 @@ package org.neo4j.bolt.connection.netty.impl.async.inbound;
 import static java.util.Objects.requireNonNull;
 
 import io.netty.buffer.ByteBuf;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.codec.ReadInput;
 
-public class ByteBufInput implements PackInput {
+public class ByteBufInput implements ReadInput {
     private ByteBuf buf;
 
     public void start(ByteBuf newBuf) {

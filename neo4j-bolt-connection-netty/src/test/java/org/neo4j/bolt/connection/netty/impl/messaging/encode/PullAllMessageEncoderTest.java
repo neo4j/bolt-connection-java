@@ -21,20 +21,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.PullAllMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.PullMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class PullAllMessageEncoderTest {
     private final PullAllMessageEncoder encoder = new PullAllMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodePullAllMessage() throws Exception {
-        encoder.encode(PullAllMessage.PULL_ALL, packer, mock(ValueFactory.class));
+        var output = mock(WriteOutput.class);
+        encoder.encode(PullAllMessage.PULL_ALL, valueEncoder, output, mock(ValueFactory.class));
 
-        verify(packer).packStructHeader(0, PullAllMessage.SIGNATURE);
+        verify(valueEncoder).encodeStructHeader(0, PullAllMessage.SIGNATURE, output);
     }
 
     @Test
@@ -42,6 +44,9 @@ class PullAllMessageEncoderTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> encoder.encode(
-                        new PullMessage(100, 200, mock(ValueFactory.class)), packer, mock(ValueFactory.class)));
+                        new PullMessage(100, 200, mock(ValueFactory.class)),
+                        valueEncoder,
+                        mock(WriteOutput.class),
+                        mock(ValueFactory.class)));
     }
 }

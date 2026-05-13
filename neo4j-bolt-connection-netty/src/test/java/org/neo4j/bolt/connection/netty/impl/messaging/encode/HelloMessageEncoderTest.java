@@ -24,8 +24,9 @@ import static org.neo4j.bolt.connection.netty.impl.messaging.request.PullAllMess
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.BoltAgentUtil;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.HelloMessage;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
@@ -34,7 +35,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 class HelloMessageEncoderTest {
     private static final ValueFactory valueFactory = TestValueFactory.INSTANCE;
     private final HelloMessageEncoder encoder = new HelloMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodeHelloMessage() throws Exception {
@@ -42,18 +43,20 @@ class HelloMessageEncoderTest {
         authToken.put("username", valueFactory.value("bob"));
         authToken.put("password", valueFactory.value("secret"));
 
+        var output = mock(WriteOutput.class);
         encoder.encode(
                 new HelloMessage("MyDriver", BoltAgentUtil.VALUE, authToken, null, false, null, false, valueFactory),
-                packer,
+                valueEncoder,
+                output,
                 valueFactory);
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(1, HelloMessage.SIGNATURE);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(1, HelloMessage.SIGNATURE, output);
 
         Map<String, Value> expectedMetadata = new HashMap<>(authToken);
         expectedMetadata.put("user_agent", valueFactory.value("MyDriver"));
         expectedMetadata.put("bolt_agent", valueFactory.value(Map.of("product", BoltAgentUtil.VALUE.product())));
-        order.verify(packer).pack(expectedMetadata);
+        order.verify(valueEncoder).encode(expectedMetadata, output);
     }
 
     @Test
@@ -65,24 +68,28 @@ class HelloMessageEncoderTest {
         Map<String, String> routingContext = new HashMap<>();
         routingContext.put("policy", "eu-fast");
 
+        var output = mock(WriteOutput.class);
         encoder.encode(
                 new HelloMessage(
                         "MyDriver", BoltAgentUtil.VALUE, authToken, routingContext, false, null, false, valueFactory),
-                packer,
+                valueEncoder,
+                output,
                 valueFactory);
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(1, HelloMessage.SIGNATURE);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(1, HelloMessage.SIGNATURE, output);
 
         Map<String, Value> expectedMetadata = new HashMap<>(authToken);
         expectedMetadata.put("user_agent", valueFactory.value("MyDriver"));
         expectedMetadata.put("bolt_agent", valueFactory.value(Map.of("product", BoltAgentUtil.VALUE.product())));
         expectedMetadata.put("routing", valueFactory.value(routingContext));
-        order.verify(packer).pack(expectedMetadata);
+        order.verify(valueEncoder).encode(expectedMetadata, output);
     }
 
     @Test
     void shouldFailToEncodeWrongMessage() {
-        assertThrows(IllegalArgumentException.class, () -> encoder.encode(PULL_ALL, packer, valueFactory));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> encoder.encode(PULL_ALL, valueEncoder, mock(WriteOutput.class), valueFactory));
     }
 }

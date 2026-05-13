@@ -23,24 +23,27 @@ import static org.neo4j.bolt.connection.netty.impl.messaging.request.CommitMessa
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardAllMessage.DISCARD_ALL;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.CommitMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class CommitMessageEncoderTest {
     private final CommitMessageEncoder encoder = new CommitMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodeCommitMessage() throws Exception {
-        encoder.encode(COMMIT, packer, mock(ValueFactory.class));
+        var output = mock(WriteOutput.class);
+        encoder.encode(COMMIT, valueEncoder, output, mock(ValueFactory.class));
 
-        verify(packer).packStructHeader(0, CommitMessage.SIGNATURE);
+        verify(valueEncoder).encodeStructHeader(0, CommitMessage.SIGNATURE, output);
     }
 
     @Test
     void shouldFailToEncodeWrongMessage() {
         assertThrows(
-                IllegalArgumentException.class, () -> encoder.encode(DISCARD_ALL, packer, mock(ValueFactory.class)));
+                IllegalArgumentException.class,
+                () -> encoder.encode(DISCARD_ALL, valueEncoder, mock(WriteOutput.class), mock(ValueFactory.class)));
     }
 }

@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.bolt.connection.TelemetryApi;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.TelemetryMessage;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
@@ -35,15 +36,16 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 class TelemetryMessageEncoderTest {
     private static final ValueFactory valueFactory = TestValueFactory.INSTANCE;
     private final TelemetryMessageEncoder encoder = new TelemetryMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @ParameterizedTest
     @MethodSource("validApis")
     void shouldEncodeTelemetryMessage(int api) throws Exception {
-        encoder.encode(new TelemetryMessage(api), packer, valueFactory);
+        var output = mock(WriteOutput.class);
+        encoder.encode(new TelemetryMessage(api), valueEncoder, output, valueFactory);
 
-        verify(packer).packStructHeader(1, TelemetryMessage.SIGNATURE);
-        verify(packer).pack(valueFactory.value(api));
+        verify(valueEncoder).encodeStructHeader(1, TelemetryMessage.SIGNATURE, output);
+        verify(valueEncoder).encode(valueFactory.value(api), output);
     }
 
     @Test
@@ -52,7 +54,8 @@ class TelemetryMessageEncoderTest {
                 IllegalArgumentException.class,
                 () -> encoder.encode(
                         RunWithMetadataMessage.unmanagedTxRunMessage("RETURN 2", Collections.emptyMap()),
-                        packer,
+                        valueEncoder,
+                        mock(WriteOutput.class),
                         valueFactory));
     }
 

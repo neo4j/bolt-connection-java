@@ -21,20 +21,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardAllMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class DiscardAllMessageEncoderTest {
     private final DiscardAllMessageEncoder encoder = new DiscardAllMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodeDiscardAllMessage() throws Exception {
-        encoder.encode(DiscardAllMessage.DISCARD_ALL, packer, mock(ValueFactory.class));
+        var output = mock(WriteOutput.class);
+        encoder.encode(DiscardAllMessage.DISCARD_ALL, valueEncoder, output, mock(ValueFactory.class));
 
-        verify(packer).packStructHeader(0, DiscardAllMessage.SIGNATURE);
+        verify(valueEncoder).encodeStructHeader(0, DiscardAllMessage.SIGNATURE, output);
     }
 
     @Test
@@ -42,6 +44,9 @@ class DiscardAllMessageEncoderTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> encoder.encode(
-                        new DiscardMessage(100, 200, mock(ValueFactory.class)), packer, mock(ValueFactory.class)));
+                        new DiscardMessage(100, 200, mock(ValueFactory.class)),
+                        valueEncoder,
+                        mock(WriteOutput.class),
+                        mock(ValueFactory.class)));
     }
 }

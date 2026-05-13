@@ -23,24 +23,27 @@ import static org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardAllM
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.GoodbyeMessage.GOODBYE;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.GoodbyeMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class GoodbyeMessageEncoderTest {
     private final GoodbyeMessageEncoder encoder = new GoodbyeMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodeGoodbyeMessage() throws Exception {
-        encoder.encode(GOODBYE, packer, mock(ValueFactory.class));
+        var output = mock(WriteOutput.class);
+        encoder.encode(GOODBYE, valueEncoder, output, mock(ValueFactory.class));
 
-        verify(packer).packStructHeader(0, GoodbyeMessage.SIGNATURE);
+        verify(valueEncoder).encodeStructHeader(0, GoodbyeMessage.SIGNATURE, output);
     }
 
     @Test
     void shouldFailToEncodeWrongMessage() {
         assertThrows(
-                IllegalArgumentException.class, () -> encoder.encode(DISCARD_ALL, packer, mock(ValueFactory.class)));
+                IllegalArgumentException.class,
+                () -> encoder.encode(DISCARD_ALL, valueEncoder, mock(WriteOutput.class), mock(ValueFactory.class)));
     }
 }

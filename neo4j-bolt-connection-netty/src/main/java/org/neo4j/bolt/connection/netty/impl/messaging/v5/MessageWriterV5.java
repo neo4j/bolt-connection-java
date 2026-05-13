@@ -17,9 +17,9 @@
 package org.neo4j.bolt.connection.netty.impl.messaging.v5;
 
 import java.util.Map;
+import org.neo4j.bolt.connection.codec.network.ValueEncoderFactory;
 import org.neo4j.bolt.connection.netty.impl.messaging.AbstractMessageWriter;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.BeginMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.CommitMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.DiscardMessageEncoder;
@@ -40,12 +40,11 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.ResetMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class MessageWriterV5 extends AbstractMessageWriter {
-    public MessageWriterV5(PackOutput output, ValueFactory valueFactory) {
-        super(new CommonValuePacker(output, true), buildEncoders(), valueFactory);
+    public MessageWriterV5(ValueFactory valueFactory) {
+        super(ValueEncoderFactory.create(BoltProtocolV5.VERSION), buildEncoders(), valueFactory);
     }
 
     private static Map<Byte, MessageEncoder> buildEncoders() {

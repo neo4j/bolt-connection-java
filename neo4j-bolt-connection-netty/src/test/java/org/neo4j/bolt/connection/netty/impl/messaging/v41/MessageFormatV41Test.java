@@ -24,8 +24,6 @@ import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonMessageReader;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.messaging.v4.MessageWriterV4;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 /**
@@ -38,14 +36,14 @@ class MessageFormatV41Test {
 
     @Test
     void shouldCreateCorrectWriter() {
-        var writer = format.newWriter(mock(PackOutput.class), mock(ValueFactory.class));
+        var writer = format.newWriter(mock(ValueFactory.class));
 
         assertInstanceOf(MessageWriterV4.class, writer);
     }
 
     @Test
     void shouldCreateCorrectReader() {
-        var reader = format.newReader(mock(PackInput.class), mock(ValueFactory.class));
+        var reader = format.newReader(mock(ValueFactory.class));
 
         assertInstanceOf(CommonMessageReader.class, reader);
     }

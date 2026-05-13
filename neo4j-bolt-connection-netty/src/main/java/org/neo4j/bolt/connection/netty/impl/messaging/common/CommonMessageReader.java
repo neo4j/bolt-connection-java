@@ -21,49 +21,45 @@ import java.util.Map;
 import java.util.Objects;
 import org.neo4j.bolt.connection.GqlError;
 import org.neo4j.bolt.connection.GqlStatusError;
+import org.neo4j.bolt.connection.codec.ReadInput;
+import org.neo4j.bolt.connection.codec.network.ValueDecoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.ResponseMessageHandler;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class CommonMessageReader implements MessageFormat.Reader {
-    protected final ValueUnpacker unpacker;
+    protected final ValueDecoder reader;
     protected final ValueFactory valueFactory;
 
-    public CommonMessageReader(PackInput input, boolean dateTimeUtcEnabled, ValueFactory valueFactory) {
-        this(new CommonValueUnpacker(input, dateTimeUtcEnabled, valueFactory), valueFactory);
-    }
-
-    protected CommonMessageReader(ValueUnpacker unpacker, ValueFactory valueFactory) {
-        this.unpacker = unpacker;
+    public CommonMessageReader(ValueDecoder reader, ValueFactory valueFactory) {
+        this.reader = reader;
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
     @Override
-    public void read(ResponseMessageHandler handler) throws IOException {
-        unpacker.unpackStructHeader();
-        var type = unpacker.unpackStructSignature();
+    public void read(ResponseMessageHandler handler, ReadInput input) throws IOException {
+        reader.unpackStructHeader(input);
+        var type = reader.unpackStructSignature(input);
         switch (type) {
-            case SuccessMessage.SIGNATURE -> unpackSuccessMessage(handler);
-            case FailureMessage.SIGNATURE -> unpackFailureMessage(handler);
+            case SuccessMessage.SIGNATURE -> unpackSuccessMessage(handler, input);
+            case FailureMessage.SIGNATURE -> unpackFailureMessage(handler, input);
             case IgnoredMessage.SIGNATURE -> unpackIgnoredMessage(handler);
-            case RecordMessage.SIGNATURE -> unpackRecordMessage(handler);
+            case RecordMessage.SIGNATURE -> unpackRecordMessage(handler, input);
             default -> throw new IOException("Unknown message type: " + type);
         }
     }
 
-    private void unpackSuccessMessage(ResponseMessageHandler output) throws IOException {
-        var map = unpacker.unpackMap();
+    private void unpackSuccessMessage(ResponseMessageHandler output, ReadInput input) throws IOException {
+        var map = reader.unpackMap(input);
         output.handleSuccessMessage(map);
     }
 
-    protected void unpackFailureMessage(ResponseMessageHandler output) throws IOException {
-        var params = unpacker.unpackMap();
+    protected void unpackFailureMessage(ResponseMessageHandler output, ReadInput input) throws IOException {
+        var params = reader.unpackMap(input);
         var code = params.get("code").asString();
         var message = params.get("message").asString();
         var diagnosticRecord = Map.ofEntries(
@@ -84,8 +80,8 @@ public class CommonMessageReader implements MessageFormat.Reader {
         output.handleIgnoredMessage();
     }
 
-    private void unpackRecordMessage(ResponseMessageHandler output) throws IOException {
-        var fields = unpacker.unpackList();
+    private void unpackRecordMessage(ResponseMessageHandler output, ReadInput input) throws IOException {
+        var fields = reader.unpackList(input);
         output.handleRecordMessage(fields);
     }
 }

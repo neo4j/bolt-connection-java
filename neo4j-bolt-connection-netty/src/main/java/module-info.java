@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * The Neo4j Bolt Connection Netty implementation module.
  */
@@ -24,7 +25,8 @@ module org.neo4j.bolt.connection.netty {
 
     exports org.neo4j.bolt.connection.netty;
 
-    requires org.neo4j.bolt.connection;
+    requires transitive org.neo4j.bolt.connection;
+    requires org.neo4j.bolt.connection.codec;
     requires io.netty.common;
     requires io.netty.handler;
     requires io.netty.transport;

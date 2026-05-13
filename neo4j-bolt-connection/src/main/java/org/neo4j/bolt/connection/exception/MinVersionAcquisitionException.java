@@ -23,6 +23,7 @@ public class MinVersionAcquisitionException extends BoltException {
     @Serial
     private static final long serialVersionUID = 2620821821322630443L;
 
+    @SuppressWarnings("serial")
     private final BoltProtocolVersion version;
 
     public MinVersionAcquisitionException(String message, BoltProtocolVersion version) {

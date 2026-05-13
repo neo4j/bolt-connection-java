@@ -29,8 +29,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
@@ -38,7 +39,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 
 class RouteMessageEncoderTest {
     private static final ValueFactory valueFactory = TestValueFactory.INSTANCE;
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
     private final RouteMessageEncoder encoder = new RouteMessageEncoder();
 
     @ParameterizedTest
@@ -47,17 +48,19 @@ class RouteMessageEncoderTest {
     void shouldEncodeRouteMessage(String databaseName) throws IOException {
         var routingContext = getRoutingContext();
 
+        var output = mock(WriteOutput.class);
         encoder.encode(
                 new RouteMessage(getRoutingContext(), Collections.emptySet(), databaseName, null),
-                packer,
+                valueEncoder,
+                output,
                 valueFactory);
 
-        var inOrder = inOrder(packer);
+        var inOrder = inOrder(valueEncoder);
 
-        inOrder.verify(packer).packStructHeader(3, (byte) 0x66);
-        inOrder.verify(packer).pack(routingContext);
-        inOrder.verify(packer).pack(valueFactory.value(emptyList()));
-        inOrder.verify(packer).pack(databaseName);
+        inOrder.verify(valueEncoder).encodeStructHeader(3, (byte) 0x66, output);
+        inOrder.verify(valueEncoder).encode(routingContext, output);
+        inOrder.verify(valueEncoder).encode(valueFactory.value(emptyList()), output);
+        inOrder.verify(valueEncoder).encode(databaseName, output);
     }
 
     @ParameterizedTest
@@ -67,24 +70,29 @@ class RouteMessageEncoderTest {
         var routingContext = getRoutingContext();
         var bookmark = "somebookmark";
 
+        var output = mock(WriteOutput.class);
         encoder.encode(
                 new RouteMessage(getRoutingContext(), Collections.singleton(bookmark), databaseName, null),
-                packer,
+                valueEncoder,
+                output,
                 valueFactory);
 
-        var inOrder = inOrder(packer);
+        var inOrder = inOrder(valueEncoder);
 
-        inOrder.verify(packer).packStructHeader(3, (byte) 0x66);
-        inOrder.verify(packer).pack(routingContext);
-        inOrder.verify(packer).pack(valueFactory.value(Collections.singleton(valueFactory.value(bookmark))));
-        inOrder.verify(packer).pack(databaseName);
+        inOrder.verify(valueEncoder).encodeStructHeader(3, (byte) 0x66, output);
+        inOrder.verify(valueEncoder).encode(routingContext, output);
+        inOrder.verify(valueEncoder)
+                .encode(valueFactory.value(Collections.singleton(valueFactory.value(bookmark))), output);
+        inOrder.verify(valueEncoder).encode(databaseName, output);
     }
 
     @Test
     void shouldThrowIllegalArgumentIfMessageIsNotRouteMessage() {
         var message = mock(Message.class);
 
-        assertThrows(IllegalArgumentException.class, () -> encoder.encode(message, packer, valueFactory));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> encoder.encode(message, valueEncoder, mock(WriteOutput.class), valueFactory));
     }
 
     private Map<String, Value> getRoutingContext() {

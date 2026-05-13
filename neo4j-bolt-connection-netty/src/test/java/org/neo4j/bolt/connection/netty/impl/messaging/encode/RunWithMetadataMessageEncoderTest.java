@@ -36,7 +36,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
@@ -45,7 +46,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 class RunWithMetadataMessageEncoderTest {
     private static final ValueFactory valueFactory = TestValueFactory.INSTANCE;
     private final RunWithMetadataMessageEncoder encoder = new RunWithMetadataMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @ParameterizedTest
     @EnumSource(AccessMode.class)
@@ -61,6 +62,7 @@ class RunWithMetadataMessageEncoderTest {
 
         var txTimeout = Duration.ofMillis(42);
 
+        var output = mock(WriteOutput.class);
         encoder.encode(
                 autoCommitTxRunMessage(
                         "RETURN $answer",
@@ -85,13 +87,14 @@ class RunWithMetadataMessageEncoderTest {
                             }
                         },
                         valueFactory),
-                packer,
+                valueEncoder,
+                output,
                 valueFactory);
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(3, RunWithMetadataMessage.SIGNATURE);
-        order.verify(packer).pack("RETURN $answer");
-        order.verify(packer).pack(params);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(3, RunWithMetadataMessage.SIGNATURE, output);
+        order.verify(valueEncoder).encode("RETURN $answer", output);
+        order.verify(valueEncoder).encode(params, output);
 
         Map<String, Value> expectedMetadata = new HashMap<>();
         expectedMetadata.put(
@@ -103,11 +106,13 @@ class RunWithMetadataMessageEncoderTest {
             expectedMetadata.put("mode", valueFactory.value("r"));
         }
 
-        order.verify(packer).pack(expectedMetadata);
+        order.verify(valueEncoder).encode(expectedMetadata, output);
     }
 
     @Test
     void shouldFailToEncodeWrongMessage() {
-        assertThrows(IllegalArgumentException.class, () -> encoder.encode(DISCARD_ALL, packer, valueFactory));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> encoder.encode(DISCARD_ALL, valueEncoder, mock(WriteOutput.class), valueFactory));
     }
 }

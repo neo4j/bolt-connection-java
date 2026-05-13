@@ -36,7 +36,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.neo4j.bolt.connection.AccessMode;
 import org.neo4j.bolt.connection.DatabaseName;
 import org.neo4j.bolt.connection.LoggingProvider;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.BeginMessage;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
@@ -45,7 +46,7 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 class BeginMessageEncoderTest {
     private static final ValueFactory valueFactory = TestValueFactory.INSTANCE;
     private final BeginMessageEncoder encoder = new BeginMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @ParameterizedTest
     @MethodSource("arguments")
@@ -70,6 +71,7 @@ class BeginMessageEncoderTest {
             }
         };
 
+        var output = mock(WriteOutput.class);
         encoder.encode(
                 new BeginMessage(
                         bookmarks,
@@ -83,11 +85,12 @@ class BeginMessageEncoderTest {
                         false,
                         loggingProvider,
                         valueFactory),
-                packer,
+                valueEncoder,
+                output,
                 valueFactory);
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(1, BeginMessage.SIGNATURE);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(1, BeginMessage.SIGNATURE, output);
 
         Map<String, Value> expectedMetadata = new HashMap<>();
         expectedMetadata.put(
@@ -105,7 +108,7 @@ class BeginMessageEncoderTest {
             expectedMetadata.put("tx_type", valueFactory.value(txType));
         }
 
-        order.verify(packer).pack(expectedMetadata);
+        order.verify(valueEncoder).encode(expectedMetadata, output);
     }
 
     private static Stream<Arguments> arguments() {
@@ -116,6 +119,8 @@ class BeginMessageEncoderTest {
 
     @Test
     void shouldFailToEncodeWrongMessage() {
-        assertThrows(IllegalArgumentException.class, () -> encoder.encode(RESET, packer, valueFactory));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> encoder.encode(RESET, valueEncoder, mock(WriteOutput.class), valueFactory));
     }
 }

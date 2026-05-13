@@ -46,7 +46,7 @@ public class OutboundMessageHandler extends MessageToMessageEncoder<Message> imp
         this.output = new ChunkAwareByteBufOutput();
         this.messageFormat = messageFormat;
         this.logging = logging;
-        this.writer = messageFormat.newWriter(output, valueFactory);
+        this.writer = messageFormat.newWriter(valueFactory);
         this.valueFactory = Objects.requireNonNull(valueFactory);
     }
 
@@ -67,7 +67,7 @@ public class OutboundMessageHandler extends MessageToMessageEncoder<Message> imp
         var messageBuf = ctx.alloc().ioBuffer();
         output.start(messageBuf);
         try {
-            writer.write(msg);
+            writer.write(msg, output);
             output.stop();
         } catch (Throwable error) {
             output.stop();
@@ -88,7 +88,7 @@ public class OutboundMessageHandler extends MessageToMessageEncoder<Message> imp
     public void handle(Set<String> patches) {
         if (patches.contains(DATE_TIME_UTC_PATCH)) {
             messageFormat.enableDateTimeUtc();
-            writer = messageFormat.newWriter(output, valueFactory);
+            writer = messageFormat.newWriter(valueFactory);
         }
     }
 }
