@@ -32,6 +32,7 @@
         <module>neo4j-bolt-connection-bom</module>
         <module>neo4j-bolt-connection</module>
         <module>neo4j-bolt-connection-test-values</module>
+        <module>neo4j-bolt-connection-packstream</module>
         <module>neo4j-bolt-connection-netty</module>
         <module>neo4j-bolt-connection-pooled</module>
         <module>neo4j-bolt-connection-routed</module>

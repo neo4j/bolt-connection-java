@@ -45,7 +45,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.TelemetryMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.value.ValuePackerV6;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 final class MessageWriterV6 extends AbstractMessageWriter {

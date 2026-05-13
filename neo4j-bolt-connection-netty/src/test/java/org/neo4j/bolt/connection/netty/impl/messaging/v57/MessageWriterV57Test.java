@@ -54,8 +54,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.HelloMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.PullMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.TelemetryMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageWriterTestBase;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.Value;
 
 public class MessageWriterV57Test extends AbstractMessageWriterTestBase {

@@ -17,7 +17,7 @@
 package org.neo4j.bolt.connection.netty.impl.util.io;
 
 import io.netty.buffer.ByteBuf;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 
 public class ByteBufOutput implements PackOutput {
     private final ByteBuf buf;

@@ -23,8 +23,8 @@ import static org.neo4j.bolt.connection.netty.impl.messaging.request.CommitMessa
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardAllMessage.DISCARD_ALL;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.CommitMessage;
+import org.neo4j.bolt.connection.packstream.value.ValuePacker;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class CommitMessageEncoderTest {

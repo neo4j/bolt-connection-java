@@ -22,8 +22,8 @@ import static org.mockito.Mockito.mock;
 import org.junit.jupiter.api.Test;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.v5.MessageReaderV5;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class MessageFormatV54Test {

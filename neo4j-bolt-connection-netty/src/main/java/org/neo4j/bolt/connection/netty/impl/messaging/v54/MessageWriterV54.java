@@ -19,7 +19,6 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v54;
 import java.util.Map;
 import org.neo4j.bolt.connection.netty.impl.messaging.AbstractMessageWriter;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.BeginMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.CommitMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.DiscardMessageEncoder;
@@ -46,7 +45,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.TelemetryMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.value.CommonValuePacker;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class MessageWriterV54 extends AbstractMessageWriter {

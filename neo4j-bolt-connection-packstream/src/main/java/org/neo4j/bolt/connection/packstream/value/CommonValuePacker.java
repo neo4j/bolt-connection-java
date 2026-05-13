@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.common;
+package org.neo4j.bolt.connection.packstream.value;
 
 import static java.time.ZoneOffset.UTC;
 
@@ -28,9 +28,8 @@ import java.time.ZonedDateTime;
 import java.util.Map;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
+import org.neo4j.bolt.connection.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackStream;
 import org.neo4j.bolt.connection.values.IsoDuration;
 import org.neo4j.bolt.connection.values.Point;
 import org.neo4j.bolt.connection.values.Value;

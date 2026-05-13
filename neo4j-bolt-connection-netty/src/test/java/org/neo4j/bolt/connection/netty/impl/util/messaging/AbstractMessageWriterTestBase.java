@@ -30,9 +30,9 @@ import org.junit.jupiter.api.TestFactory;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.ByteBufInput;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
 import org.neo4j.bolt.connection.netty.impl.util.io.ByteBufOutput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackStream;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.ValueFactory;
 

@@ -38,16 +38,15 @@ import org.neo4j.bolt.connection.netty.impl.NoopLoggingProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderImpl;
 import org.neo4j.bolt.connection.netty.impl.async.outbound.ChunkAwareByteBufOutput;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.MessageFormatV3;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
 import org.neo4j.bolt.connection.netty.impl.spi.ResponseHandler;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.KnowledgeableMessageFormat;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.MemorizingInboundMessageDispatcher;
+import org.neo4j.bolt.connection.packstream.PackStream;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
 
@@ -94,7 +93,7 @@ class MessageFormatTest {
 
         packer.packStructHeader(1, RecordMessage.SIGNATURE);
         packer.packListHeader(1);
-        packer.packStructHeader(0, CommonValueUnpacker.NODE);
+        packer.packStructHeader(0, (byte) 'N');
 
         output.stop();
         BoltProtocolUtil.writeMessageBoundary(buf);

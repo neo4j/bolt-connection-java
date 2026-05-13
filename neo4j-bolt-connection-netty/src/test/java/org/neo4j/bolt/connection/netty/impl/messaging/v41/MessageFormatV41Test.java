@@ -24,8 +24,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonMessageReader;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.messaging.v4.MessageWriterV4;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 /**

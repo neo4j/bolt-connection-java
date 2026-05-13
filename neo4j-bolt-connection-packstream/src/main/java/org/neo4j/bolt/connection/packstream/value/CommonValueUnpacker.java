@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.common;
+package org.neo4j.bolt.connection.packstream.value;
 
 import static java.time.ZoneOffset.UTC;
 
@@ -38,9 +38,8 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackStream;
 import org.neo4j.bolt.connection.values.Node;
 import org.neo4j.bolt.connection.values.Path;
 import org.neo4j.bolt.connection.values.Relationship;
@@ -135,7 +134,7 @@ public class CommonValueUnpacker implements ValueUnpacker {
         return Arrays.asList(values);
     }
 
-    protected Value unpack() throws IOException {
+    public Value unpack() throws IOException {
         var type = unpacker.peekNextType();
         switch (type) {
             case NULL -> {

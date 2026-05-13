@@ -48,8 +48,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.BeginMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.HelloMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageWriterTestBase;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 
 /**
  * The MessageWriter under tests is the one provided by the {@link BoltProtocolV3} and not an specific class

@@ -22,9 +22,9 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.ResetMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
+import org.neo4j.bolt.connection.packstream.value.ValuePacker;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class ResetMessageEncoderTest {

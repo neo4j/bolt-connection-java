@@ -23,12 +23,13 @@ import org.neo4j.bolt.connection.GqlError;
 import org.neo4j.bolt.connection.GqlStatusError;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.ResponseMessageHandler;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.value.CommonValueUnpacker;
+import org.neo4j.bolt.connection.packstream.value.ValueUnpacker;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class CommonMessageReader implements MessageFormat.Reader {
