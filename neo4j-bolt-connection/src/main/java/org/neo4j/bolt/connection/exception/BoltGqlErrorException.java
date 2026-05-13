@@ -28,6 +28,8 @@ public class BoltGqlErrorException extends BoltException {
 
     private final String gqlStatus;
     private final String statusDescription;
+
+    @SuppressWarnings("serial")
     private final Map<String, Value> diagnosticRecord;
 
     public BoltGqlErrorException(

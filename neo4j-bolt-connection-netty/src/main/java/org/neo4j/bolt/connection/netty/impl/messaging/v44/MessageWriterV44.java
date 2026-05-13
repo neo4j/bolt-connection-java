@@ -17,9 +17,9 @@
 package org.neo4j.bolt.connection.netty.impl.messaging.v44;
 
 import java.util.Map;
+import org.neo4j.bolt.connection.codec.network.ValueEncoderFactory;
 import org.neo4j.bolt.connection.netty.impl.messaging.AbstractMessageWriter;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.BeginMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.CommitMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.DiscardMessageEncoder;
@@ -40,15 +40,14 @@ import org.neo4j.bolt.connection.netty.impl.messaging.request.ResetMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 /**
  * Bolt message writer v4.4
  */
 public class MessageWriterV44 extends AbstractMessageWriter {
-    public MessageWriterV44(PackOutput output, boolean dateTimeUtcEnabled, ValueFactory valueFactory) {
-        super(new CommonValuePacker(output, dateTimeUtcEnabled), buildEncoders(), valueFactory);
+    public MessageWriterV44(boolean dateTimeUtcEnabled, ValueFactory valueFactory) {
+        super(ValueEncoderFactory.create(BoltProtocolV44.VERSION, dateTimeUtcEnabled), buildEncoders(), valueFactory);
     }
 
     private static Map<Byte, MessageEncoder> buildEncoders() {

@@ -22,20 +22,22 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.ResetMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class ResetMessageEncoderTest {
     private final ResetMessageEncoder encoder = new ResetMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodeResetMessage() throws Exception {
-        encoder.encode(ResetMessage.RESET, packer, mock(ValueFactory.class));
+        var output = mock(WriteOutput.class);
+        encoder.encode(ResetMessage.RESET, valueEncoder, output, mock(ValueFactory.class));
 
-        verify(packer).packStructHeader(0, ResetMessage.SIGNATURE);
+        verify(valueEncoder).encodeStructHeader(0, ResetMessage.SIGNATURE, output);
     }
 
     @Test
@@ -44,7 +46,8 @@ class ResetMessageEncoderTest {
                 IllegalArgumentException.class,
                 () -> encoder.encode(
                         RunWithMetadataMessage.unmanagedTxRunMessage("RETURN 2", Collections.emptyMap()),
-                        packer,
+                        valueEncoder,
+                        mock(WriteOutput.class),
                         mock(ValueFactory.class)));
     }
 }

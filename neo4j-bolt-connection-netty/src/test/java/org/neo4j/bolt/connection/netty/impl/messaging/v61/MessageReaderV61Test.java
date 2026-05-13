@@ -21,7 +21,6 @@ import static java.util.Calendar.APRIL;
 import static java.util.Calendar.AUGUST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.mock;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,7 +39,6 @@ import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v57.BoltProtocolV57;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageReaderTestBase;
 import org.neo4j.bolt.connection.values.Value;
 
@@ -84,13 +82,13 @@ class MessageReaderV61Test extends AbstractMessageReaderTestBase {
     }
 
     @Override
-    protected MessageFormat.Reader newReader(PackInput input) {
-        return BoltProtocolV57.INSTANCE.createMessageFormat().newReader(input, valueFactory);
+    protected MessageFormat.Reader newReader() {
+        return BoltProtocolV57.INSTANCE.createMessageFormat().newReader(valueFactory);
     }
 
     @Test
     void shouldInitGqlError() {
-        var messageReader = new MessageReaderV61(mock(PackInput.class), valueFactory);
+        var messageReader = new MessageReaderV61(valueFactory);
         var gqlStatus = valueFactory.value("gql_status");
         var description = valueFactory.value("description");
         var message = valueFactory.value("message");
@@ -111,7 +109,7 @@ class MessageReaderV61Test extends AbstractMessageReaderTestBase {
 
     @Test
     void shouldInitGqlErrorWithMap() {
-        var messageReader = new MessageReaderV61(mock(PackInput.class), valueFactory);
+        var messageReader = new MessageReaderV61(valueFactory);
         var gqlStatus = valueFactory.value("gql_status");
         var description = valueFactory.value("description");
         var message = valueFactory.value("message");

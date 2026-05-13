@@ -19,10 +19,10 @@ package org.neo4j.bolt.connection.netty.impl.async.outbound;
 import static java.util.Objects.requireNonNull;
 
 import io.netty.buffer.ByteBuf;
+import org.neo4j.bolt.connection.codec.WriteOutput;
 import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 
-public class ChunkAwareByteBufOutput implements PackOutput {
+public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
     private final int maxChunkSize;
 
     private ByteBuf buf;
@@ -51,15 +51,14 @@ public class ChunkAwareByteBufOutput implements PackOutput {
     }
 
     @Override
-    public PackOutput writeByte(byte value) {
+    public void writeByte(byte value) {
         ensureCanFitInCurrentChunk(1);
         buf.writeByte(value);
         currentChunkSize += 1;
-        return this;
     }
 
     @Override
-    public PackOutput writeBytes(byte[] data) {
+    public void writeBytes(byte[] data) {
         var offset = 0;
         var length = data.length;
         while (offset < length) {
@@ -73,47 +72,46 @@ public class ChunkAwareByteBufOutput implements PackOutput {
             currentChunkSize += amountToWrite;
             offset += amountToWrite;
         }
-        return this;
     }
 
     @Override
-    public PackOutput writeShort(short value) {
+    public void writeShort(short value) {
         ensureCanFitInCurrentChunk(2);
         buf.writeShort(value);
         currentChunkSize += 2;
-        return this;
     }
 
     @Override
-    public PackOutput writeInt(int value) {
+    public void writeInt(int value) {
         ensureCanFitInCurrentChunk(4);
         buf.writeInt(value);
         currentChunkSize += 4;
-        return this;
     }
 
     @Override
-    public PackOutput writeLong(long value) {
+    public void writeLong(long value) {
         ensureCanFitInCurrentChunk(8);
         buf.writeLong(value);
         currentChunkSize += 8;
-        return this;
     }
 
     @Override
-    public PackOutput writeDouble(double value) {
+    public void writeDouble(double value) {
         ensureCanFitInCurrentChunk(8);
         buf.writeDouble(value);
         currentChunkSize += 8;
-        return this;
     }
 
     @Override
-    public PackOutput writeFloat(float value) {
+    public void writeFloat(float value) {
         ensureCanFitInCurrentChunk(4);
         buf.writeFloat(value);
         currentChunkSize += 4;
-        return this;
+    }
+
+    @Override
+    public Void output() {
+        return null;
     }
 
     private void ensureCanFitInCurrentChunk(int numberOfBytes) {

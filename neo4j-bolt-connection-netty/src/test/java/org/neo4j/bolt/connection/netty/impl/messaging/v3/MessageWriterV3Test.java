@@ -42,13 +42,14 @@ import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.neo4j.bolt.connection.codec.network.ValueDecoder;
+import org.neo4j.bolt.connection.codec.network.ValueDecoderFactory;
 import org.neo4j.bolt.connection.netty.impl.BoltAgentUtil;
 import org.neo4j.bolt.connection.netty.impl.NoopLoggingProvider;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.BeginMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.HelloMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageWriterTestBase;
 
 /**
@@ -59,8 +60,13 @@ import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageWriter
  */
 class MessageWriterV3Test extends AbstractMessageWriterTestBase {
     @Override
-    protected MessageFormat.Writer newWriter(PackOutput output) {
-        return BoltProtocolV3.INSTANCE.createMessageFormat().newWriter(output, valueFactory);
+    protected MessageFormat.Writer newWriter() {
+        return BoltProtocolV3.INSTANCE.createMessageFormat().newWriter(valueFactory);
+    }
+
+    @Override
+    protected ValueDecoder newDecoder() {
+        return ValueDecoderFactory.create(BoltProtocolV3.VERSION, valueFactory);
     }
 
     @Override

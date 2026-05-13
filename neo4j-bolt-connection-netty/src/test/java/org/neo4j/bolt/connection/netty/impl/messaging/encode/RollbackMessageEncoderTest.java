@@ -23,23 +23,27 @@ import static org.neo4j.bolt.connection.netty.impl.messaging.request.ResetMessag
 import static org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage.ROLLBACK;
 
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class RollbackMessageEncoderTest {
     private final RollbackMessageEncoder encoder = new RollbackMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldEncodeRollbackMessage() throws Exception {
-        encoder.encode(ROLLBACK, packer, mock(ValueFactory.class));
+        var output = mock(WriteOutput.class);
+        encoder.encode(ROLLBACK, valueEncoder, output, mock(ValueFactory.class));
 
-        verify(packer).packStructHeader(0, RollbackMessage.SIGNATURE);
+        verify(valueEncoder).encodeStructHeader(0, RollbackMessage.SIGNATURE, output);
     }
 
     @Test
     void shouldFailToEncodeWrongMessage() {
-        assertThrows(IllegalArgumentException.class, () -> encoder.encode(RESET, packer, mock(ValueFactory.class)));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> encoder.encode(RESET, valueEncoder, mock(WriteOutput.class), mock(ValueFactory.class)));
     }
 }

@@ -45,7 +45,7 @@ public class InboundMessageHandler extends SimpleChannelInboundHandler<ByteBuf> 
         this.input = new ByteBufInput();
         this.messageFormat = messageFormat;
         this.logging = logging;
-        this.reader = messageFormat.newReader(input, valueFactory);
+        this.reader = messageFormat.newReader(valueFactory);
         this.valueFactory = requireNonNull(valueFactory);
     }
 
@@ -78,7 +78,7 @@ public class InboundMessageHandler extends SimpleChannelInboundHandler<ByteBuf> 
 
         input.start(msg);
         try {
-            reader.read(messageDispatcher);
+            reader.read(messageDispatcher, input);
         } catch (Throwable error) {
             throw new DecoderException("Failed to read inbound message:\n" + hexDump(msg) + "\n", error);
         } finally {
@@ -90,7 +90,7 @@ public class InboundMessageHandler extends SimpleChannelInboundHandler<ByteBuf> 
     public void handle(Set<String> patches) {
         if (patches.contains(DATE_TIME_UTC_PATCH)) {
             messageFormat.enableDateTimeUtc();
-            reader = messageFormat.newReader(input, valueFactory);
+            reader = messageFormat.newReader(valueFactory);
         }
     }
 }

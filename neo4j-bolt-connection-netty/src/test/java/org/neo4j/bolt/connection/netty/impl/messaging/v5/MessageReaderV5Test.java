@@ -37,7 +37,6 @@ import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageReaderTestBase;
 import org.neo4j.bolt.connection.values.Value;
 
@@ -94,8 +93,8 @@ public class MessageReaderV5Test extends AbstractMessageReaderTestBase {
     }
 
     @Override
-    protected MessageFormat.Reader newReader(PackInput input) {
-        return BoltProtocolV5.INSTANCE.createMessageFormat().newReader(input, valueFactory);
+    protected MessageFormat.Reader newReader() {
+        return BoltProtocolV5.INSTANCE.createMessageFormat().newReader(valueFactory);
     }
 
     private Message record(Value value) {

@@ -17,27 +17,27 @@
 package org.neo4j.bolt.connection.netty.impl.messaging;
 
 import java.io.IOException;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.codec.ReadInput;
+import org.neo4j.bolt.connection.codec.WriteOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public interface MessageFormat {
     interface Writer {
-        void write(Message msg) throws IOException;
+        void write(Message msg, WriteOutput<?> output) throws IOException;
     }
 
     interface Reader {
-        void read(ResponseMessageHandler handler) throws IOException;
+        void read(ResponseMessageHandler handler, ReadInput input) throws IOException;
     }
 
-    Writer newWriter(PackOutput output, ValueFactory valueFactory);
+    Writer newWriter(ValueFactory valueFactory);
 
-    Reader newReader(PackInput input, ValueFactory valueFactory);
+    Reader newReader(ValueFactory valueFactory);
 
     /**
      * Enables datetime in UTC if supported by the given message format. This is only for use with formats that support multiple modes.
      * <p>
-     * This only takes effect on subsequent writer and reader creation via {@link #newWriter(PackOutput, ValueFactory)} and {@link #newReader(PackInput, ValueFactory)}.
+     * This only takes effect on subsequent writer and reader creation via {@link #newWriter(ValueFactory)} and {@link #newReader(ValueFactory)}.
      */
     default void enableDateTimeUtc() {}
 }

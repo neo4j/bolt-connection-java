@@ -19,18 +19,20 @@ package org.neo4j.bolt.connection.netty.impl.messaging.encode;
 import static org.neo4j.bolt.connection.netty.impl.util.Preconditions.checkArgument;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.LogonMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class LogonMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder writer, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         checkArgument(message, LogonMessage.class);
         var logonMessage = (LogonMessage) message;
-        packer.packStructHeader(1, logonMessage.signature());
-        packer.pack(logonMessage.metadata());
+        writer.encodeStructHeader(1, logonMessage.signature(), output);
+        writer.encode(logonMessage.metadata(), output);
     }
 }

@@ -19,18 +19,20 @@ package org.neo4j.bolt.connection.netty.impl.messaging.encode;
 import static org.neo4j.bolt.connection.netty.impl.util.Preconditions.checkArgument;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.TelemetryMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class TelemetryMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder writer, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         checkArgument(message, TelemetryMessage.class);
         var telemetryMessage = (TelemetryMessage) message;
-        packer.packStructHeader(1, TelemetryMessage.SIGNATURE);
-        packer.pack(valueFactory.value(telemetryMessage.api()));
+        writer.encodeStructHeader(1, TelemetryMessage.SIGNATURE, output);
+        writer.encode(valueFactory.value(telemetryMessage.api()), output);
     }
 }

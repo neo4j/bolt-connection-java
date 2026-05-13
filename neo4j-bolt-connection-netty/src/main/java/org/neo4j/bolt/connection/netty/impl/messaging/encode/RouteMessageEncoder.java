@@ -19,9 +19,10 @@ package org.neo4j.bolt.connection.netty.impl.messaging.encode;
 import static org.neo4j.bolt.connection.netty.impl.util.Preconditions.checkArgument;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RouteMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
@@ -30,12 +31,13 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  */
 public class RouteMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder writer, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         checkArgument(message, RouteMessage.class);
         var routeMessage = (RouteMessage) message;
-        packer.packStructHeader(3, message.signature());
-        packer.pack(routeMessage.routingContext());
-        packer.pack(valueFactory.value(routeMessage.bookmarks()));
-        packer.pack(routeMessage.databaseName());
+        writer.encodeStructHeader(3, message.signature(), output);
+        writer.encode(routeMessage.routingContext(), output);
+        writer.encode(valueFactory.value(routeMessage.bookmarks()), output);
+        writer.encode(routeMessage.databaseName(), output);
     }
 }

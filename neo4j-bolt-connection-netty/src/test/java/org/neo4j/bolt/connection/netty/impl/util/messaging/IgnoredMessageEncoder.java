@@ -17,15 +17,17 @@
 package org.neo4j.bolt.connection.netty.impl.util.messaging;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class IgnoredMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
-        packer.packStructHeader(0, IgnoredMessage.SIGNATURE);
+    public void encode(Message message, ValueEncoder valueEncoder, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
+        valueEncoder.encodeStructHeader(0, IgnoredMessage.SIGNATURE, output);
     }
 }

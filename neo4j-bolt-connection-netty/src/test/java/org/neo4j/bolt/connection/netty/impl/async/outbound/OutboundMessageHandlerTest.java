@@ -33,6 +33,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.neo4j.bolt.connection.codec.WriteOutput;
 import org.neo4j.bolt.connection.netty.impl.NoopLoggingProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatcher;
@@ -40,7 +41,6 @@ import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.MessageFormatV3;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -102,26 +102,23 @@ class OutboundMessageHandlerTest {
             @SuppressWarnings("SameParameterValue") final int... bytesToWrite) {
         var messageFormat = mock(MessageFormat.class);
 
-        when(messageFormat.newWriter(any(PackOutput.class), any())).then(invocation -> {
-            PackOutput output = invocation.getArgument(0);
-            return mockWriter(output, bytesToWrite);
-        });
+        when(messageFormat.newWriter(any())).then(invocation -> mockWriter(bytesToWrite));
 
         return messageFormat;
     }
 
-    private static MessageFormat.Writer mockWriter(final PackOutput output, final int... bytesToWrite)
-            throws IOException {
+    private static MessageFormat.Writer mockWriter(final int... bytesToWrite) throws IOException {
         var writer = mock(MessageFormat.Writer.class);
 
         doAnswer(invocation -> {
+                    WriteOutput<?> output = invocation.getArgument(1);
                     for (var b : bytesToWrite) {
                         output.writeByte((byte) b);
                     }
                     return writer;
                 })
                 .when(writer)
-                .write(any(Message.class));
+                .write(any(Message.class), any());
 
         return writer;
     }

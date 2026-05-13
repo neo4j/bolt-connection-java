@@ -1,0 +1,40 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [https://neo4j.com]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * The Neo4j Bolt Connection Codec module.
+ * @since 12.1.0
+ */
+module org.neo4j.bolt.connection.codec {
+    provides org.neo4j.bolt.connection.codec.packstream.PackStreamEncoderFactory with
+            org.neo4j.bolt.connection.codec.impl.packstream.PackStreamEncoderFactoryImpl;
+    provides org.neo4j.bolt.connection.codec.packstream.PackStreamDecoderFactory with
+            org.neo4j.bolt.connection.codec.impl.packstream.PackStreamDecoderFactoryImpl;
+    provides org.neo4j.bolt.connection.codec.value_encoding.ValueEncoderFactory with
+            org.neo4j.bolt.connection.codec.impl.value_encoding.ValueEncoderFactoryImpl;
+    provides org.neo4j.bolt.connection.codec.value_encoding.ValueDecoderFactory with
+            org.neo4j.bolt.connection.codec.impl.value_encoding.ValueDecoderFactoryImpl;
+
+    requires transitive org.neo4j.bolt.connection;
+
+    exports org.neo4j.bolt.connection.codec;
+    exports org.neo4j.bolt.connection.codec.packstream;
+    exports org.neo4j.bolt.connection.codec.packstream.struct;
+    exports org.neo4j.bolt.connection.codec.value_encoding;
+    exports org.neo4j.bolt.connection.codec.network to
+            org.neo4j.bolt.connection.netty;
+}

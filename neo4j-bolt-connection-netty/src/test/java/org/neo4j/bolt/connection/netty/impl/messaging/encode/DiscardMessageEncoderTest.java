@@ -23,7 +23,8 @@ import static org.mockito.Mockito.mock;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardAllMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.DiscardMessage;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
@@ -33,49 +34,53 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 class DiscardMessageEncoderTest {
     private static final ValueFactory valueFactory = TestValueFactory.INSTANCE;
     private final DiscardMessageEncoder encoder = new DiscardMessageEncoder();
-    private final ValuePacker packer = mock(ValuePacker.class);
+    private final ValueEncoder valueEncoder = mock(ValueEncoder.class);
 
     @Test
     void shouldDiscardAllCorrectly() throws Throwable {
-        encoder.encode(new DiscardMessage(-1, -1, valueFactory), packer, valueFactory);
+        var output = mock(WriteOutput.class);
+        encoder.encode(new DiscardMessage(-1, -1, valueFactory), valueEncoder, output, valueFactory);
 
         Map<String, Value> meta = new HashMap<>();
         meta.put("n", valueFactory.value(-1));
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(1, DiscardMessage.SIGNATURE);
-        order.verify(packer).pack(meta);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(1, DiscardMessage.SIGNATURE, output);
+        order.verify(valueEncoder).encode(meta, output);
     }
 
     @Test
     void shouldEncodeDiscardMessage() throws Exception {
-        encoder.encode(new DiscardMessage(100, 200, valueFactory), packer, valueFactory);
+        var output = mock(WriteOutput.class);
+        encoder.encode(new DiscardMessage(100, 200, valueFactory), valueEncoder, output, valueFactory);
 
         Map<String, Value> meta = new HashMap<>();
         meta.put("n", valueFactory.value(100));
         meta.put("qid", valueFactory.value(200));
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(1, DiscardMessage.SIGNATURE);
-        order.verify(packer).pack(meta);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(1, DiscardMessage.SIGNATURE, output);
+        order.verify(valueEncoder).encode(meta, output);
     }
 
     @Test
     void shouldAvoidQueryId() throws Throwable {
-        encoder.encode(new DiscardMessage(100, -1, valueFactory), packer, valueFactory);
+        var output = mock(WriteOutput.class);
+        encoder.encode(new DiscardMessage(100, -1, valueFactory), valueEncoder, output, valueFactory);
 
         Map<String, Value> meta = new HashMap<>();
         meta.put("n", valueFactory.value(100));
 
-        var order = inOrder(packer);
-        order.verify(packer).packStructHeader(1, DiscardMessage.SIGNATURE);
-        order.verify(packer).pack(meta);
+        var order = inOrder(valueEncoder);
+        order.verify(valueEncoder).encodeStructHeader(1, DiscardMessage.SIGNATURE, output);
+        order.verify(valueEncoder).encode(meta, output);
     }
 
     @Test
     void shouldFailToEncodeWrongMessage() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> encoder.encode(DiscardAllMessage.DISCARD_ALL, packer, valueFactory));
+                () -> encoder.encode(
+                        DiscardAllMessage.DISCARD_ALL, valueEncoder, mock(WriteOutput.class), valueFactory));
     }
 }

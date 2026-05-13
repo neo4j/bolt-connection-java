@@ -18,18 +18,16 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v57;
 
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.v54.MessageWriterV54;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class MessageFormatV57 implements MessageFormat {
     @Override
-    public MessageFormat.Writer newWriter(PackOutput output, ValueFactory valueFactory) {
-        return new MessageWriterV54(output, valueFactory);
+    public MessageFormat.Writer newWriter(ValueFactory valueFactory) {
+        return new MessageWriterV54(valueFactory);
     }
 
     @Override
-    public Reader newReader(PackInput input, ValueFactory valueFactory) {
-        return new MessageReaderV57(input, valueFactory);
+    public Reader newReader(ValueFactory valueFactory) {
+        return new MessageReaderV57(valueFactory);
     }
 }

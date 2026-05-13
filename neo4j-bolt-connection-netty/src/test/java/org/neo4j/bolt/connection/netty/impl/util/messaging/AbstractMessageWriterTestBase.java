@@ -22,16 +22,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 import static org.mockito.Mockito.mock;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.TestFactory;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueDecoder;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.ByteBufInput;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
 import org.neo4j.bolt.connection.netty.impl.util.io.ByteBufOutput;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -51,7 +52,9 @@ public abstract class AbstractMessageWriterTestBase {
                 .map(message -> dynamicTest(message.toString(), () -> testUnsupportedMessageWriting(message)));
     }
 
-    protected abstract MessageFormat.Writer newWriter(PackOutput output);
+    protected abstract MessageFormat.Writer newWriter();
+
+    protected abstract ValueDecoder newDecoder();
 
     protected abstract Stream<Message> supportedMessages();
 
@@ -59,24 +62,24 @@ public abstract class AbstractMessageWriterTestBase {
 
     private void testSupportedMessageWriting(Message message) throws IOException {
         var buffer = Unpooled.buffer();
-        PackOutput output = new ByteBufOutput(buffer);
+        WriteOutput<ByteBuf> output = new ByteBufOutput(buffer);
 
-        var writer = newWriter(output);
-        writer.write(message);
+        var writer = newWriter();
+        writer.write(message, output);
 
         var input = new ByteBufInput();
         input.start(buffer);
-        var unpacker = new PackStream.Unpacker(input);
+        var unpacker = newDecoder();
 
-        var structHeader = unpacker.unpackStructHeader();
+        var structHeader = unpacker.unpackStructHeader(input);
         assertTrue(structHeader >= 0L);
 
-        var structSignature = unpacker.unpackStructSignature();
+        var structSignature = unpacker.unpackStructSignature(input);
         assertEquals(message.signature(), structSignature);
     }
 
     private void testUnsupportedMessageWriting(Message message) {
-        var writer = newWriter(mock(PackOutput.class));
-        assertThrows(Exception.class, () -> writer.write(message));
+        var writer = newWriter();
+        assertThrows(Exception.class, () -> writer.write(message, mock(WriteOutput.class)));
     }
 }

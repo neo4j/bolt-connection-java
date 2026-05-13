@@ -127,8 +127,8 @@ class InboundMessageHandlerTest {
         var messageFormat = mock(MessageFormat.class);
         var reader = mock(MessageFormat.Reader.class);
         var error = new RuntimeException("Unable to decode!");
-        doThrow(error).when(reader).read(any());
-        when(messageFormat.newReader(any(), any())).thenReturn(reader);
+        doThrow(error).when(reader).read(any(), any());
+        when(messageFormat.newReader(any())).thenReturn(reader);
 
         var handler = new InboundMessageHandler(messageFormat, NoopLoggingProvider.INSTANCE, valueFactory);
 

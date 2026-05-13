@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.TestFactory;
+import org.neo4j.bolt.connection.codec.ReadInput;
 import org.neo4j.bolt.connection.netty.impl.GqlErrorUtil;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.ByteBufInput;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
@@ -36,7 +37,6 @@ import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.netty.impl.util.io.ByteBufOutput;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 
@@ -80,27 +80,27 @@ public abstract class AbstractMessageReaderTestBase {
 
     protected abstract Stream<Message> unsupportedMessages();
 
-    protected abstract MessageFormat.Reader newReader(PackInput input);
+    protected abstract MessageFormat.Reader newReader();
 
     protected ResponseMessageHandler testMessageReading(Message message) throws IOException {
         var input = newInputWith(message);
-        var reader = newReader(input);
+        var reader = newReader();
 
         var handler = mock(ResponseMessageHandler.class);
-        reader.read(handler);
+        reader.read(handler, input);
 
         return handler;
     }
 
-    private PackInput newInputWith(Message message) throws IOException {
+    private ReadInput newInputWith(Message message) throws IOException {
         var buffer = Unpooled.buffer();
 
         MessageFormat messageFormat = new KnowledgeableMessageFormat(isElementIdEnabled());
         if (isDateTimeUtcEnabled()) {
             messageFormat.enableDateTimeUtc();
         }
-        var writer = messageFormat.newWriter(new ByteBufOutput(buffer), TestValueFactory.INSTANCE);
-        writer.write(message);
+        var writer = messageFormat.newWriter(TestValueFactory.INSTANCE);
+        writer.write(message, new ByteBufOutput(buffer));
 
         var input = new ByteBufInput();
         input.start(buffer);

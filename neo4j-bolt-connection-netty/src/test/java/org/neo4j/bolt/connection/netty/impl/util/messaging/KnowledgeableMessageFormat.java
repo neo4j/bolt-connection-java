@@ -20,11 +20,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.StreamSupport;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
+import org.neo4j.bolt.connection.codec.network.ValueEncoderFactory;
 import org.neo4j.bolt.connection.netty.impl.messaging.AbstractMessageWriter;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValuePacker;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.DiscardAllMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.PullAllMessageEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.encode.ResetMessageEncoder;
@@ -36,7 +36,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.MessageFormatV3;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.netty.impl.messaging.v44.BoltProtocolV44;
 import org.neo4j.bolt.connection.test.values.TestNode;
 import org.neo4j.bolt.connection.test.values.TestPath;
 import org.neo4j.bolt.connection.test.values.TestRelationship;
@@ -59,9 +59,8 @@ public class KnowledgeableMessageFormat extends MessageFormatV3 {
     }
 
     @Override
-    public Writer newWriter(PackOutput output, ValueFactory valueFactory) {
-        return new KnowledgeableMessageWriter(
-                output, elementIdEnabled, dateTimeUtcEnabled, (TestValueFactory) valueFactory);
+    public Writer newWriter(ValueFactory valueFactory) {
+        return new KnowledgeableMessageWriter(elementIdEnabled, dateTimeUtcEnabled, (TestValueFactory) valueFactory);
     }
 
     @Override
@@ -70,12 +69,8 @@ public class KnowledgeableMessageFormat extends MessageFormatV3 {
     }
 
     private static class KnowledgeableMessageWriter extends AbstractMessageWriter {
-        KnowledgeableMessageWriter(
-                PackOutput output, boolean enableElementId, boolean dateTimeUtcEnabled, TestValueFactory valueFactory) {
-            super(
-                    new KnowledgeableValuePacker(output, enableElementId, dateTimeUtcEnabled),
-                    buildEncoders(),
-                    valueFactory);
+        KnowledgeableMessageWriter(boolean enableElementId, boolean dateTimeUtcEnabled, TestValueFactory valueFactory) {
+            super(new KnowledgeableValueEncoder(enableElementId, dateTimeUtcEnabled), buildEncoders(), valueFactory);
         }
 
         static Map<Byte, MessageEncoder> buildEncoders() {
@@ -93,35 +88,101 @@ public class KnowledgeableMessageFormat extends MessageFormatV3 {
         }
     }
 
-    private static class KnowledgeableValuePacker extends CommonValuePacker {
+    private static class KnowledgeableValueEncoder implements ValueEncoder {
+        private final ValueEncoder delegate;
         private final boolean elementIdEnabled;
 
-        KnowledgeableValuePacker(PackOutput output, boolean elementIdEnabled, boolean dateTimeUtcEnabled) {
-            super(output, dateTimeUtcEnabled);
+        KnowledgeableValueEncoder(boolean elementIdEnabled, boolean dateTimeUtcEnabled) {
             this.elementIdEnabled = elementIdEnabled;
+            this.delegate = ValueEncoderFactory.create(BoltProtocolV44.VERSION, dateTimeUtcEnabled);
         }
 
         @Override
-        protected void packInternalValue(Value value) throws IOException {
+        public void encodeStructHeader(int size, byte signature, WriteOutput<?> output) throws IOException {
+            delegate.encodeStructHeader(size, signature, output);
+        }
+
+        @Override
+        public void packListHeader(int size, WriteOutput<?> output) throws IOException {
+            delegate.packListHeader(size, output);
+        }
+
+        @Override
+        public void encode(String string, WriteOutput<?> output) throws IOException {
+            delegate.encode(string, output);
+        }
+
+        @Override
+        public void encode(Value value, WriteOutput<?> output) throws IOException {
             switch (value.boltValueType()) {
+                case LIST -> {
+                    delegate.packListHeader(value.size(), output);
+                    for (var item : value.boltValues()) {
+                        encode(item, output);
+                    }
+                }
                 case NODE -> {
                     var node = ((TestValue) value).asNode();
-                    packNode(node);
+                    packNode(node, output);
                 }
                 case RELATIONSHIP -> {
                     var rel = ((TestValue) value).asRelationship();
-                    packRelationship(rel);
+                    packRelationship(rel, output);
                 }
                 case PATH -> {
                     var path = ((TestValue) value).asPath();
-                    packPath(path);
+                    packPath(path, output);
                 }
-                default -> super.packInternalValue(value);
+                default -> delegate.encode(value, output);
             }
         }
 
-        private void packPath(TestPath path) throws IOException {
-            packer.packStructHeader(3, CommonValueUnpacker.PATH);
+        @Override
+        public void encode(Map<String, Value> map, WriteOutput<?> output) throws IOException {
+            delegate.encode(map, output);
+        }
+
+        private void packRelationship(TestRelationship rel, WriteOutput<?> output) throws IOException {
+            var valueFactory = TestValueFactory.INSTANCE;
+            delegate.encodeStructHeader(elementIdEnabled ? 8 : 5, (byte) 'R', output);
+            delegate.encode(valueFactory.value(rel.id()), output);
+            delegate.encode(valueFactory.value(rel.startNodeId()), output);
+            delegate.encode(valueFactory.value(rel.endNodeId()), output);
+
+            delegate.encode(rel.typeString(), output);
+
+            packProperties(rel, output);
+
+            if (elementIdEnabled) {
+                delegate.encode(rel.elementId(), output);
+                delegate.encode(rel.startNodeElementId(), output);
+                delegate.encode(rel.endNodeElementId(), output);
+            }
+        }
+
+        private void packNode(TestNode node, WriteOutput<?> output) throws IOException {
+            var valueFactory = TestValueFactory.INSTANCE;
+            delegate.encodeStructHeader(elementIdEnabled ? 4 : 3, (byte) 'N', output);
+            delegate.encode(valueFactory.value(node.id()), output);
+
+            var labels = node.labels();
+            delegate.encode(valueFactory.value(labels), output);
+
+            packProperties(node, output);
+
+            if (elementIdEnabled) {
+                delegate.encode(node.elementId(), output);
+            }
+        }
+
+        private void packProperties(Entity entity, WriteOutput<?> output) throws IOException {
+            var valueFactory = TestValueFactory.INSTANCE;
+            delegate.encode(valueFactory.value(entity.asMap(valueFactory::value)), output);
+        }
+
+        private void packPath(TestPath path, WriteOutput<?> output) throws IOException {
+            var valueFactory = TestValueFactory.INSTANCE;
+            delegate.encodeStructHeader(3, (byte) 'P', output);
 
             // Unique nodes
             Map<TestNode, Integer> nodeIdx = new LinkedHashMap<>(path.length() + 1);
@@ -130,9 +191,9 @@ public class KnowledgeableMessageFormat extends MessageFormatV3 {
                     nodeIdx.put(node, nodeIdx.size());
                 }
             }
-            packer.packListHeader(nodeIdx.size());
+            delegate.packListHeader(nodeIdx.size(), output);
             for (var node : nodeIdx.keySet()) {
-                packNode(node);
+                packNode(node, output);
             }
 
             // Unique rels
@@ -142,70 +203,26 @@ public class KnowledgeableMessageFormat extends MessageFormatV3 {
                     relIdx.put(rel, relIdx.size() + 1);
                 }
             }
-            packer.packListHeader(relIdx.size());
+            delegate.packListHeader(relIdx.size(), output);
             for (var rel : relIdx.keySet()) {
-                packer.packStructHeader(elementIdEnabled ? 4 : 3, CommonValueUnpacker.UNBOUND_RELATIONSHIP);
-                packer.pack(rel.id());
-                packer.pack(rel.typeString());
-                packProperties(rel);
+                delegate.encodeStructHeader(elementIdEnabled ? 4 : 3, (byte) 'r', output);
+                delegate.encode(valueFactory.value(rel.id()), output);
+                delegate.encode(rel.typeString(), output);
+                packProperties(rel, output);
                 if (elementIdEnabled) {
-                    packer.pack(rel.elementId());
+                    delegate.encode(rel.elementId(), output);
                 }
             }
 
             // Sequence
-            packer.packListHeader(path.length() * 2);
+            delegate.packListHeader(path.length() * 2, output);
             for (var seg : path) {
                 var rel = seg.relationship();
                 var relEndId = rel.endNodeId();
                 var segEndId = seg.end().id();
                 var size = relEndId == segEndId ? relIdx.get(rel) : -relIdx.get(rel);
-                packer.pack(size);
-                packer.pack(nodeIdx.get(seg.end()));
-            }
-        }
-
-        private void packRelationship(TestRelationship rel) throws IOException {
-            packer.packStructHeader(elementIdEnabled ? 8 : 5, CommonValueUnpacker.RELATIONSHIP);
-            packer.pack(rel.id());
-            packer.pack(rel.startNodeId());
-            packer.pack(rel.endNodeId());
-
-            packer.pack(rel.typeString());
-
-            packProperties(rel);
-
-            if (elementIdEnabled) {
-                packer.pack(rel.elementId());
-                packer.pack(rel.startNodeElementId());
-                packer.pack(rel.endNodeElementId());
-            }
-        }
-
-        private void packNode(TestNode node) throws IOException {
-            packer.packStructHeader(elementIdEnabled ? 4 : 3, CommonValueUnpacker.NODE);
-            packer.pack(node.id());
-
-            var labels = node.labels();
-            packer.packListHeader(
-                    (int) StreamSupport.stream(labels.spliterator(), false).count());
-            for (var label : labels) {
-                packer.pack(label);
-            }
-
-            packProperties(node);
-
-            if (elementIdEnabled) {
-                packer.pack(node.elementId());
-            }
-        }
-
-        private void packProperties(Entity entity) throws IOException {
-            var keys = entity.keys();
-            packer.packMapHeader(entity.size());
-            for (var propKey : keys) {
-                packer.pack(propKey);
-                packInternalValue(entity.get(propKey));
+                delegate.encode(valueFactory.value(size), output);
+                delegate.encode(valueFactory.value(nodeIdx.get(seg.end())), output);
             }
         }
     }

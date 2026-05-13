@@ -17,18 +17,20 @@
 package org.neo4j.bolt.connection.netty.impl.util.messaging;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class RecordMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder valueEncoder, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         var recordMessage = (RecordMessage) message;
         var fields = recordMessage.fields();
-        packer.packStructHeader(1, recordMessage.signature());
-        packer.pack(valueFactory.value(fields)); // pack list of fields
+        valueEncoder.encodeStructHeader(1, recordMessage.signature(), output);
+        valueEncoder.encode(valueFactory.value(fields), output); // pack list of fields
     }
 }

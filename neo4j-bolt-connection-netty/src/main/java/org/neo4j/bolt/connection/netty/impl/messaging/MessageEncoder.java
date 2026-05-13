@@ -17,8 +17,11 @@
 package org.neo4j.bolt.connection.netty.impl.messaging;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public interface MessageEncoder {
-    void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException;
+    void encode(Message message, ValueEncoder writer, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException;
 }

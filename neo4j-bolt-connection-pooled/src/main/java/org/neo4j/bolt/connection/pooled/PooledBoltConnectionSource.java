@@ -60,7 +60,7 @@ import org.neo4j.bolt.connection.pooled.observation.PoolObservationProvider;
  *
  * @since 4.0.0
  */
-public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConnectionParameters> {
+public final class PooledBoltConnectionSource implements BoltConnectionSource<BoltConnectionParameters> {
     private final System.Logger log;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
         var thread = new Thread(runnable);

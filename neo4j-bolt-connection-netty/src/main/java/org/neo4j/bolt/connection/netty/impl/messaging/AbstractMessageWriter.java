@@ -20,27 +20,29 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
 import java.util.Map;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public abstract class AbstractMessageWriter implements MessageFormat.Writer {
-    private final ValuePacker packer;
+    private final ValueEncoder writer;
     private final Map<Byte, MessageEncoder> encodersByMessageSignature;
     private final ValueFactory valueFactory;
 
     protected AbstractMessageWriter(
-            ValuePacker packer, Map<Byte, MessageEncoder> encodersByMessageSignature, ValueFactory valueFactory) {
-        this.packer = requireNonNull(packer);
+            ValueEncoder writer, Map<Byte, MessageEncoder> encodersByMessageSignature, ValueFactory valueFactory) {
+        this.writer = requireNonNull(writer);
         this.encodersByMessageSignature = requireNonNull(encodersByMessageSignature);
         this.valueFactory = requireNonNull(valueFactory);
     }
 
     @Override
-    public final void write(Message msg) throws IOException {
+    public final void write(Message msg, WriteOutput<?> output) throws IOException {
         var signature = msg.signature();
         var encoder = encodersByMessageSignature.get(signature);
         if (encoder == null) {
             throw new IOException("No encoder found for message " + msg + " with signature " + signature);
         }
-        encoder.encode(msg, packer, valueFactory);
+        encoder.encode(msg, writer, output, valueFactory);
     }
 }

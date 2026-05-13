@@ -19,21 +19,23 @@ package org.neo4j.bolt.connection.netty.impl.util.messaging;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class FailureMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder valueEncoder, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         var failureMessage = (FailureMessage) message;
-        packer.packStructHeader(1, failureMessage.signature());
+        valueEncoder.encodeStructHeader(1, failureMessage.signature(), output);
         Map<String, Value> body = new HashMap<>();
         body.put("code", valueFactory.value(failureMessage.code()));
         body.put("message", valueFactory.value(failureMessage.message()));
-        packer.pack(body);
+        valueEncoder.encode(body, output);
     }
 }

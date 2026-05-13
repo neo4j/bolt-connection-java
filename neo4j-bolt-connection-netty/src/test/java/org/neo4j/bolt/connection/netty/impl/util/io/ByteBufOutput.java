@@ -17,9 +17,9 @@
 package org.neo4j.bolt.connection.netty.impl.util.io;
 
 import io.netty.buffer.ByteBuf;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.codec.WriteOutput;
 
-public class ByteBufOutput implements PackOutput {
+public class ByteBufOutput implements WriteOutput<ByteBuf> {
     private final ByteBuf buf;
 
     public ByteBufOutput(ByteBuf buf) {
@@ -27,44 +27,42 @@ public class ByteBufOutput implements PackOutput {
     }
 
     @Override
-    public PackOutput writeByte(byte value) {
+    public void writeByte(byte value) {
         buf.writeByte(value);
-        return this;
     }
 
     @Override
-    public PackOutput writeBytes(byte[] data) {
+    public void writeBytes(byte[] data) {
         buf.writeBytes(data);
-        return this;
     }
 
     @Override
-    public PackOutput writeShort(short value) {
+    public void writeShort(short value) {
         buf.writeShort(value);
-        return this;
     }
 
     @Override
-    public PackOutput writeInt(int value) {
+    public void writeInt(int value) {
         buf.writeInt(value);
-        return this;
     }
 
     @Override
-    public PackOutput writeLong(long value) {
+    public void writeLong(long value) {
         buf.writeLong(value);
-        return this;
     }
 
     @Override
-    public PackOutput writeDouble(double value) {
+    public void writeDouble(double value) {
         buf.writeDouble(value);
-        return this;
     }
 
     @Override
-    public PackOutput writeFloat(float value) {
+    public void writeFloat(float value) {
         buf.writeFloat(value);
-        return this;
+    }
+
+    @Override
+    public ByteBuf output() {
+        return buf;
     }
 }

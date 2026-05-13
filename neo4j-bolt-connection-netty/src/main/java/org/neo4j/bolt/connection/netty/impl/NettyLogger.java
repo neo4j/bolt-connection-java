@@ -26,7 +26,9 @@ public class NettyLogger extends AbstractInternalLogger {
     @Serial
     private static final long serialVersionUID = -1466889786216191159L;
 
+    @SuppressWarnings("serial")
     private final System.Logger log;
+
     private static final Pattern PLACE_HOLDER_PATTERN = Pattern.compile("\\{}");
 
     public NettyLogger(String name, System.Logger log) {

@@ -34,7 +34,7 @@ public class MessageToByteBufWriter {
         try {
             var buf = Unpooled.buffer();
             var output = new ByteBufOutput(buf);
-            messageFormat.newWriter(output, TestValueFactory.INSTANCE).write(message);
+            messageFormat.newWriter(TestValueFactory.INSTANCE).write(message, output);
             return buf;
         } catch (IOException e) {
             throw new RuntimeException(e);

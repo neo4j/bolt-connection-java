@@ -19,20 +19,22 @@ package org.neo4j.bolt.connection.netty.impl.messaging.encode;
 import static org.neo4j.bolt.connection.netty.impl.util.Preconditions.checkArgument;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class RunWithMetadataMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder writer, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         checkArgument(message, RunWithMetadataMessage.class);
         var runMessage = (RunWithMetadataMessage) message;
-        packer.packStructHeader(3, runMessage.signature());
-        packer.pack(runMessage.query());
-        packer.pack(runMessage.parameters());
-        packer.pack(runMessage.metadata());
+        writer.encodeStructHeader(3, runMessage.signature(), output);
+        writer.encode(runMessage.query(), output);
+        writer.encode(runMessage.parameters(), output);
+        writer.encode(runMessage.metadata(), output);
     }
 }

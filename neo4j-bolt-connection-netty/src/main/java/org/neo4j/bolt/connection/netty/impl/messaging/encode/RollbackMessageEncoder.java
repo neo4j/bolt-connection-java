@@ -19,16 +19,18 @@ package org.neo4j.bolt.connection.netty.impl.messaging.encode;
 import static org.neo4j.bolt.connection.netty.impl.util.Preconditions.checkArgument;
 
 import java.io.IOException;
+import org.neo4j.bolt.connection.codec.WriteOutput;
+import org.neo4j.bolt.connection.codec.network.ValueEncoder;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.RollbackMessage;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class RollbackMessageEncoder implements MessageEncoder {
     @Override
-    public void encode(Message message, ValuePacker packer, ValueFactory valueFactory) throws IOException {
+    public void encode(Message message, ValueEncoder writer, WriteOutput<?> output, ValueFactory valueFactory)
+            throws IOException {
         checkArgument(message, RollbackMessage.class);
-        packer.packStructHeader(0, RollbackMessage.SIGNATURE);
+        writer.encodeStructHeader(0, RollbackMessage.SIGNATURE, output);
     }
 }

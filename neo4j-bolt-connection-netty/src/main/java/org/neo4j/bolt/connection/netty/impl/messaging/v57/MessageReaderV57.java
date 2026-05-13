@@ -21,27 +21,28 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.neo4j.bolt.connection.GqlError;
+import org.neo4j.bolt.connection.codec.ReadInput;
+import org.neo4j.bolt.connection.codec.network.ValueDecoder;
+import org.neo4j.bolt.connection.codec.network.ValueDecoderFactory;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
 import org.neo4j.bolt.connection.netty.impl.messaging.ResponseMessageHandler;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.v5.MessageReaderV5;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class MessageReaderV57 extends MessageReaderV5 {
-    public MessageReaderV57(PackInput input, ValueFactory valueFactory) {
-        super(input, valueFactory);
+    public MessageReaderV57(ValueFactory valueFactory) {
+        super(ValueDecoderFactory.create(BoltProtocolV57.VERSION, valueFactory), valueFactory);
     }
 
-    protected MessageReaderV57(ValueUnpacker unpacker, ValueFactory valueFactory) {
-        super(unpacker, valueFactory);
+    protected MessageReaderV57(ValueDecoder reader, ValueFactory valueFactory) {
+        super(reader, valueFactory);
     }
 
     @Override
-    protected void unpackFailureMessage(ResponseMessageHandler output) throws IOException {
-        var params = unpacker.unpackMap();
+    protected void unpackFailureMessage(ResponseMessageHandler output, ReadInput input) throws IOException {
+        var params = reader.unpackMap(input);
         var gqlError = unpackGqlError(params);
         output.handleFailureMessage(gqlError);
     }
