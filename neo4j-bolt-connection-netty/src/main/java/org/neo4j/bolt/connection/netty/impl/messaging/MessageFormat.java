@@ -17,8 +17,8 @@
 package org.neo4j.bolt.connection.netty.impl.messaging;
 
 import java.io.IOException;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public interface MessageFormat {

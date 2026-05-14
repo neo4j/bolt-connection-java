@@ -40,7 +40,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.MessageFormatV3;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;

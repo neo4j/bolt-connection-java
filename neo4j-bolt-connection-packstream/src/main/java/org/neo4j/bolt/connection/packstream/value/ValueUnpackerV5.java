@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.v5;
+package org.neo4j.bolt.connection.packstream.value;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,8 +22,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.neo4j.bolt.connection.netty.impl.messaging.common.CommonValueUnpacker;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackInput;
 import org.neo4j.bolt.connection.values.Node;
 import org.neo4j.bolt.connection.values.Path;
 import org.neo4j.bolt.connection.values.Relationship;

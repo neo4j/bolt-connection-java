@@ -14,20 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.v6;
+package org.neo4j.bolt.connection.packstream.value;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.exception.BoltProtocolException;
-import org.neo4j.bolt.connection.netty.impl.messaging.v5.ValueUnpackerV5;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackStream;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-final class ValueUnpackerV6 extends ValueUnpackerV5 {
+public final class ValueUnpackerV6 extends ValueUnpackerV5 {
     public ValueUnpackerV6(PackInput input, ValueFactory valueFactory) {
         super(input, valueFactory);
     }

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.packstream;
+package org.neo4j.bolt.connection.packstream;
 
 import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -35,8 +35,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
-import org.neo4j.bolt.connection.netty.impl.util.io.BufferedChannelInput;
-import org.neo4j.bolt.connection.netty.impl.util.io.ChannelOutput;
 
 public class PackStreamTest {
     public static Map<String, Object> asMap(Object... keysAndValues) {

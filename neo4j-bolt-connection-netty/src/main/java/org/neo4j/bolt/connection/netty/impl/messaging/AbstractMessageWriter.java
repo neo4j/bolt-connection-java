@@ -20,6 +20,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
 import java.util.Map;
+import org.neo4j.bolt.connection.packstream.value.ValuePacker;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public abstract class AbstractMessageWriter implements MessageFormat.Writer {

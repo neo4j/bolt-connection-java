@@ -19,8 +19,8 @@ package org.neo4j.bolt.connection.netty.impl.util.messaging;
 import java.io.IOException;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageEncoder;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
+import org.neo4j.bolt.connection.packstream.value.ValuePacker;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class SuccessMessageEncoder implements MessageEncoder {

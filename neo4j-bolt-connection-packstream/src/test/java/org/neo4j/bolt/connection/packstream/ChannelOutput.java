@@ -14,12 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.util.io;
+package org.neo4j.bolt.connection.packstream;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 
 public class ChannelOutput implements PackOutput {
     private final WritableByteChannel channel;

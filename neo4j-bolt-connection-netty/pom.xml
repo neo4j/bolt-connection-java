@@ -62,6 +62,10 @@
             <artifactId>neo4j-bolt-connection</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.neo4j.bolt</groupId>
+            <artifactId>neo4j-bolt-connection-packstream</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

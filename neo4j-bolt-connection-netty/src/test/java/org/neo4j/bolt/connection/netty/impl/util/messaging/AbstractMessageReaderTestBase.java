@@ -36,8 +36,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.response.FailureMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.netty.impl.util.io.ByteBufOutput;
+import org.neo4j.bolt.connection.packstream.PackInput;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
 
 public abstract class AbstractMessageReaderTestBase {

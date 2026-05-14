@@ -14,18 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging;
+package org.neo4j.bolt.connection.packstream;
 
-import java.io.IOException;
-import java.util.Map;
-import org.neo4j.bolt.connection.values.Value;
-
-public interface ValuePacker {
-    void packStructHeader(int size, byte signature) throws IOException;
-
-    void pack(String string) throws IOException;
-
-    void pack(Value value) throws IOException;
-
-    void pack(Map<String, Value> map) throws IOException;
+public enum PackType {
+    NULL,
+    BOOLEAN,
+    INTEGER,
+    FLOAT,
+    BYTES,
+    STRING,
+    LIST,
+    MAP,
+    STRUCT
 }

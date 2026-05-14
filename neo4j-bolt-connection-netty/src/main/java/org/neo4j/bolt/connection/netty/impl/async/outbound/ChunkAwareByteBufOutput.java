@@ -20,7 +20,7 @@ import static java.util.Objects.requireNonNull;
 
 import io.netty.buffer.ByteBuf;
 import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+import org.neo4j.bolt.connection.packstream.PackOutput;
 
 public class ChunkAwareByteBufOutput implements PackOutput {
     private final int maxChunkSize;

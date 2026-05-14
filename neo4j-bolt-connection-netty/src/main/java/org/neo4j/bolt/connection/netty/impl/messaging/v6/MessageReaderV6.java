@@ -19,7 +19,8 @@ package org.neo4j.bolt.connection.netty.impl.messaging.v6;
 import java.util.Map;
 import org.neo4j.bolt.connection.GqlError;
 import org.neo4j.bolt.connection.netty.impl.messaging.v57.MessageReaderV57;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.PackInput;
+import org.neo4j.bolt.connection.packstream.value.ValueUnpackerV6;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 

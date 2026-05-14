@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging;
+package org.neo4j.bolt.connection.packstream.value;
 
 import java.io.IOException;
 import java.util.List;

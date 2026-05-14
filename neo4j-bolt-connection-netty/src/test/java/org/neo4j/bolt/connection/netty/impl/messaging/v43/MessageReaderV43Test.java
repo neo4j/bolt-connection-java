@@ -38,8 +38,8 @@ import org.neo4j.bolt.connection.netty.impl.messaging.response.IgnoredMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.RecordMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.response.SuccessMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v42.BoltProtocolV42;
-import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
 import org.neo4j.bolt.connection.netty.impl.util.messaging.AbstractMessageReaderTestBase;
+import org.neo4j.bolt.connection.packstream.PackInput;
 import org.neo4j.bolt.connection.values.Value;
 
 /**

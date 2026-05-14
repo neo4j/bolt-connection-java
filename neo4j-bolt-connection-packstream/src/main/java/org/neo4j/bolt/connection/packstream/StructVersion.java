@@ -14,16 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.packstream;
+package org.neo4j.bolt.connection.packstream;
 
-public enum PackType {
-    NULL,
-    BOOLEAN,
-    INTEGER,
-    FLOAT,
-    BYTES,
-    STRING,
-    LIST,
-    MAP,
-    STRUCT
+public enum StructVersion {
+    COMMON,
+    V43,
+    V44,
+    V5,
+    V6
 }
