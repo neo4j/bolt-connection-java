@@ -37,6 +37,7 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
 import org.neo4j.bolt.connection.netty.impl.Scheme;
+import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.DefaultChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.EventLoopGroupFactory;
@@ -162,6 +163,12 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 "channelPipelineBuilderProvider",
                 ChannelPipelineBuilderProvider.class,
                 DefaultChannelPipelineBuilderProvider::new);
+        var preselectedVersion = getConfigEntry(
+                logger,
+                additionalConfig,
+                "boltProtocolVersion",
+                BoltProtocolVersion.class,
+                () -> BoltProtocolUtil.NO_PROTOCOL_VERSION);
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
@@ -176,7 +183,8 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 valueFactory,
                 shutdownEventLoopGroupOnClose,
                 observationProvider,
-                channelPipelineBuilderProvider);
+                channelPipelineBuilderProvider,
+                preselectedVersion);
     }
 
     private EventLoopGroupFactory createEventLoopGroupFactory(

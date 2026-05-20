@@ -53,6 +53,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     private final boolean shutdownEventLoopGroupOnClose;
     private final ObservationProvider observationProvider;
     private final ChannelPipelineBuilderProvider channelPipelineBuilderProvider;
+    private final BoltProtocolVersion preselectedVersion;
 
     private CompletableFuture<Void> closeFuture;
 
@@ -69,7 +70,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             ValueFactory valueFactory,
             boolean shutdownEventLoopGroupOnClose,
             ObservationProvider observationProvider,
-            ChannelPipelineBuilderProvider channelPipelineBuilderProvider) {
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider,
+            BoltProtocolVersion preselectedVersion) {
         Objects.requireNonNull(eventLoopGroup);
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
@@ -93,6 +95,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
         this.shutdownEventLoopGroupOnClose = shutdownEventLoopGroupOnClose;
         this.observationProvider = Objects.requireNonNull(observationProvider);
         this.channelPipelineBuilderProvider = Objects.requireNonNull(channelPipelineBuilderProvider);
+        this.preselectedVersion = Objects.requireNonNull(preselectedVersion);
     }
 
     @Override
@@ -140,7 +143,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         latestAuthMillisFuture,
                         notificationConfig,
                         parentObservation,
-                        channelPipelineBuilderProvider)
+                        channelPipelineBuilderProvider,
+                        preselectedVersion)
                 .thenCompose(connection -> {
                     if (minVersion != null
                             && minVersion.compareTo(connection.protocol().version()) > 0) {

@@ -121,7 +121,8 @@ class ChannelConnectedListenerTest {
                 mock(ValueFactory.class),
                 0,
                 CompletableFuture.completedFuture(Duration.ZERO),
-                true);
+                true,
+                BoltProtocolUtil.NO_PROTOCOL_VERSION);
     }
 
     private record FailedPromise(Throwable failure) implements ChannelPromise {

@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.neo4j.bolt.connection.BoltAgent;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
@@ -42,5 +43,6 @@ public interface ConnectionProvider {
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             ImmutableObservation parentObservation,
-            ChannelPipelineBuilderProvider channelPipelineBuilderProvider);
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider,
+            BoltProtocolVersion preselectedBoltVersion);
 }
