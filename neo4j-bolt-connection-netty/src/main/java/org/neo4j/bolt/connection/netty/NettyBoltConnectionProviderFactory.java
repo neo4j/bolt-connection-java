@@ -37,6 +37,8 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
 import org.neo4j.bolt.connection.netty.impl.Scheme;
+import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
+import org.neo4j.bolt.connection.netty.impl.async.connection.DefaultChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.EventLoopGroupFactory;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
 import org.neo4j.bolt.connection.observation.ObservationProvider;
@@ -154,6 +156,12 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
         Set<BoltCapability> preferredCapabilities =
                 getConfigEntry(logger, additionalConfig, "preferredCapabilities", Set.class, Set::of);
         var preferredCapabilitiesMask = toBoltCapabilitiesMask(preferredCapabilities);
+        var channelPipelineBuilderProvider = getConfigEntry(
+                logger,
+                additionalConfig,
+                "channelPipelineBuilderProvider",
+                ChannelPipelineBuilderProvider.class,
+                DefaultChannelPipelineBuilderProvider::new);
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
@@ -167,7 +175,8 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 loggingProvider,
                 valueFactory,
                 shutdownEventLoopGroupOnClose,
-                observationProvider);
+                observationProvider,
+                channelPipelineBuilderProvider);
     }
 
     private EventLoopGroupFactory createEventLoopGroupFactory(

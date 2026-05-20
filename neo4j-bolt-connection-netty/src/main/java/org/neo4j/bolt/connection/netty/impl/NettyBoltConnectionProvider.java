@@ -36,6 +36,7 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.NotificationConfig;
 import org.neo4j.bolt.connection.SecurityPlan;
 import org.neo4j.bolt.connection.exception.MinVersionAcquisitionException;
+import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.NettyTransport;
 import org.neo4j.bolt.connection.netty.impl.util.FutureUtil;
 import org.neo4j.bolt.connection.observation.ImmutableObservation;
@@ -51,6 +52,7 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
     private final ValueFactory valueFactory;
     private final boolean shutdownEventLoopGroupOnClose;
     private final ObservationProvider observationProvider;
+    private final ChannelPipelineBuilderProvider channelPipelineBuilderProvider;
 
     private CompletableFuture<Void> closeFuture;
 
@@ -66,7 +68,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
             LoggingProvider logging,
             ValueFactory valueFactory,
             boolean shutdownEventLoopGroupOnClose,
-            ObservationProvider observationProvider) {
+            ObservationProvider observationProvider,
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider) {
         Objects.requireNonNull(eventLoopGroup);
         this.clock = Objects.requireNonNull(clock);
         this.logging = Objects.requireNonNull(logging);
@@ -83,11 +86,13 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                 preferredCapabilitiesMask,
                 logging,
                 valueFactory,
-                observationProvider);
+                observationProvider,
+                channelPipelineBuilderProvider);
         this.valueFactory = Objects.requireNonNull(valueFactory);
         InternalLoggerFactory.setDefaultFactory(new NettyLogging(logging));
         this.shutdownEventLoopGroupOnClose = shutdownEventLoopGroupOnClose;
         this.observationProvider = Objects.requireNonNull(observationProvider);
+        this.channelPipelineBuilderProvider = Objects.requireNonNull(channelPipelineBuilderProvider);
     }
 
     @Override
@@ -134,7 +139,8 @@ public final class NettyBoltConnectionProvider implements BoltConnectionProvider
                         initialisationTimeoutMillis,
                         latestAuthMillisFuture,
                         notificationConfig,
-                        parentObservation)
+                        parentObservation,
+                        channelPipelineBuilderProvider)
                 .thenCompose(connection -> {
                     if (minVersion != null
                             && minVersion.compareTo(connection.protocol().version()) > 0) {
