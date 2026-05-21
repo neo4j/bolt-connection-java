@@ -32,6 +32,7 @@ import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.ConnectTimeoutHandler;
@@ -82,17 +83,21 @@ public class ChannelConnectedListener implements ChannelFutureListener {
         if (future.isSuccess()) {
             // we know the version already so we can bypass the handshake
             if (!preselectedVersion.equals(BoltProtocolUtil.NO_PROTOCOL_VERSION)) {
-                var protocol = forVersion(preselectedVersion);
-
-                protocolSelected(
-                        preselectedVersion,
-                        protocol.createMessageFormat(),
-                        future.channel(),
-                        pipelineBuilder,
-                        logging,
-                        valueFactory,
-                        handshakeCompletedFuture);
-                return;
+                try {
+                    var protocol = forVersion(preselectedVersion);
+                    protocolSelected(
+                            preselectedVersion,
+                            protocol.createMessageFormat(),
+                            future.channel(),
+                            pipelineBuilder,
+                            logging,
+                            valueFactory,
+                            handshakeCompletedFuture);
+                    return;
+                } catch (BoltClientException protocolUnsupportedException) {
+                    handshakeCompletedFuture.completeExceptionally(protocolUnsupportedException);
+                    return;
+                }
             }
 
             sslHandshakeFuture.whenComplete((handshakeDuration, throwable) -> {
