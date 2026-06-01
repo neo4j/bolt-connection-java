@@ -50,15 +50,16 @@ final class ResetMessageHandler implements MessageHandler<Void> {
                 handler.onResetSummary(ResetSummaryImpl.INSTANCE);
                 result.complete(null);
             }
-            case ERROR -> result.completeExceptionally(
-                    new BoltClientException("It is not possible to reset connection is ERROR state"));
+            case ERROR ->
+                result.completeExceptionally(
+                        new BoltClientException("It is not possible to reset connection is ERROR state"));
             case FAILURE -> {
                 stateHandler.accept(BoltConnectionState.OPEN);
                 handler.onResetSummary(ResetSummaryImpl.INSTANCE);
                 result.complete(null);
             }
-            case CLOSED -> result.completeExceptionally(
-                    new BoltClientException("It is not possible to reset closed connection"));
+            case CLOSED ->
+                result.completeExceptionally(new BoltClientException("It is not possible to reset closed connection"));
         }
         return result;
     }

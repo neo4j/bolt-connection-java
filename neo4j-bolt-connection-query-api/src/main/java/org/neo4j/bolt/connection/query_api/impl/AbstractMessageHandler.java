@@ -126,8 +126,8 @@ abstract class AbstractMessageHandler<T> implements MessageHandler<T> {
                                 }
                             }
                             case 400, 401, 404, 500 -> handleFailureResponse(response);
-                            default -> throw new BoltException(
-                                    "An unexpected response code: " + response.statusCode(), null);
+                            default ->
+                                throw new BoltException("An unexpected response code: " + response.statusCode(), null);
                         };
                     }
                 });

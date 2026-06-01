@@ -541,7 +541,8 @@ public final class BoltConnectionImpl implements BoltConnection {
                 case OPEN -> connection.close();
                 case ERROR -> connection.forceClose("Closing connection after error");
                 case FAILURE -> connection.forceClose("Closing connection after failure");
-                case CLOSED -> CompletableFuture.completedStage(null);};
+                case CLOSED -> CompletableFuture.completedStage(null);
+            };
         } catch (Throwable throwable) {
             close = CompletableFuture.completedStage(null);
         }

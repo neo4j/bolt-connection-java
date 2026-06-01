@@ -55,8 +55,9 @@ public final class EventLoopGroupFactory {
         return switch (nettyTransport.type()) {
             case NIO -> new DriverEventLoopGroup(threadCount);
             case EPOLL -> new EpollEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
-            case IO_URING -> new MultiThreadIoEventLoopGroup(
-                    threadCount, new DriverThreadFactory(threadNamePrefix), IoUringIoHandler.newFactory());
+            case IO_URING ->
+                new MultiThreadIoEventLoopGroup(
+                        threadCount, new DriverThreadFactory(threadNamePrefix), IoUringIoHandler.newFactory());
             case KQUEUE -> new KQueueEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
             case LOCAL -> new LocalEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
         };
