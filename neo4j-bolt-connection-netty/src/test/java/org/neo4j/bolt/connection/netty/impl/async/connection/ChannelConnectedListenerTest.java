@@ -19,6 +19,7 @@ package org.neo4j.bolt.connection.netty.impl.async.connection;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -38,8 +39,12 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.neo4j.bolt.connection.BoltProtocolVersion;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.netty.impl.NoopLoggingProvider;
+import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatcher;
+import org.neo4j.bolt.connection.netty.impl.messaging.v6.BoltProtocolV6;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 class ChannelConnectedListenerTest {
@@ -110,7 +115,39 @@ class ChannelConnectedListenerTest {
         assertEquals(throwable, exception.getCause());
     }
 
-    private static ChannelConnectedListener newListener(CompletableFuture<Channel> handshakeCompletedFuture) {
+    @Test
+    void shouldHandlePreselectedBoltVersion() {
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture, BoltProtocolV6.VERSION);
+
+        var channelConnectedPromise = channel.newPromise();
+        ChannelAttributes.setMessageDispatcher(channel, mock(InboundMessageDispatcher.class));
+        channelConnectedPromise.setSuccess();
+
+        listener.operationComplete(channelConnectedPromise);
+
+        // Handshake handler not added
+        assertNull(channel.pipeline().get(HandshakeHandler.class));
+        assertEquals(ChannelAttributes.protocolVersion(channel), BoltProtocolV6.VERSION);
+    }
+
+    @Test
+    void shouldHandlePreselectedBoltVersionNotValid() {
+        var handshakeCompletedFuture = new CompletableFuture<Channel>();
+        var listener = newListener(handshakeCompletedFuture, new BoltProtocolVersion(234, 567));
+
+        var channelConnectedPromise = channel.newPromise();
+        channelConnectedPromise.setSuccess();
+
+        listener.operationComplete(channelConnectedPromise);
+
+        assertTrue(handshakeCompletedFuture.isCompletedExceptionally());
+        Throwable exception = assertThrows(CompletionException.class, handshakeCompletedFuture::join);
+        assertInstanceOf(BoltClientException.class, exception.getCause());
+    }
+
+    private static ChannelConnectedListener newListener(
+            CompletableFuture<Channel> handshakeCompletedFuture, BoltProtocolVersion preselectedVersion) {
         return new ChannelConnectedListener(
                 LOCAL_DEFAULT,
                 new ChannelPipelineBuilderImpl(),
@@ -121,7 +158,12 @@ class ChannelConnectedListenerTest {
                 mock(ValueFactory.class),
                 0,
                 CompletableFuture.completedFuture(Duration.ZERO),
-                true);
+                true,
+                preselectedVersion);
+    }
+
+    private static ChannelConnectedListener newListener(CompletableFuture<Channel> handshakeCompletedFuture) {
+        return newListener(handshakeCompletedFuture, BoltProtocolUtil.NO_PROTOCOL_VERSION);
     }
 
     private record FailedPromise(Throwable failure) implements ChannelPromise {

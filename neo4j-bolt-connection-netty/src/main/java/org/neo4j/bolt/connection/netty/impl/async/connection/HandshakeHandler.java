@@ -161,7 +161,14 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
 
                 var protocol = protocolForVersion(serverSuggestedVersion);
                 if (protocol != null) {
-                    protocolSelected(serverSuggestedVersion, protocol.createMessageFormat(), ctx);
+                    protocolSelected(
+                            serverSuggestedVersion,
+                            protocol.createMessageFormat(),
+                            ctx.channel(),
+                            pipelineBuilder,
+                            logging,
+                            valueFactory,
+                            handshakeCompletedFuture);
                 } else {
                     handleUnknownSuggestedProtocolVersion(serverSuggestedVersion, ctx);
                 }
@@ -176,12 +183,32 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
             ctx.pipeline().remove(this);
             try {
                 var protocol = manifestHandler.complete();
-                protocolSelected(protocol.version(), protocol.createMessageFormat(), ctx);
+                protocolSelected(
+                        protocol.version(),
+                        protocol.createMessageFormat(),
+                        ctx.channel(),
+                        pipelineBuilder,
+                        logging,
+                        valueFactory,
+                        handshakeCompletedFuture);
             } catch (Throwable e) {
                 fail(ctx, e);
             }
         }
         super.channelReadComplete(ctx);
+    }
+
+    public static void protocolSelected(
+            BoltProtocolVersion version,
+            MessageFormat messageFormat,
+            Channel channel,
+            ChannelPipelineBuilder pipelineBuilder,
+            LoggingProvider logging,
+            ValueFactory valueFactory,
+            CompletableFuture<Channel> handshakeCompletedFuture) {
+        ChannelAttributes.setProtocolVersion(channel, version);
+        pipelineBuilder.build(messageFormat, channel.pipeline(), logging, valueFactory);
+        handshakeCompletedFuture.complete(channel);
     }
 
     private BoltProtocol protocolForVersion(BoltProtocolVersion version) {
@@ -190,12 +217,6 @@ public class HandshakeHandler extends ReplayingDecoder<Void> {
         } catch (BoltClientException e) {
             return null;
         }
-    }
-
-    private void protocolSelected(BoltProtocolVersion version, MessageFormat messageFormat, ChannelHandlerContext ctx) {
-        ChannelAttributes.setProtocolVersion(ctx.channel(), version);
-        pipelineBuilder.build(messageFormat, ctx.pipeline(), logging, valueFactory);
-        handshakeCompletedFuture.complete(ctx.channel());
     }
 
     private void handleUnknownSuggestedProtocolVersion(BoltProtocolVersion version, ChannelHandlerContext ctx) {

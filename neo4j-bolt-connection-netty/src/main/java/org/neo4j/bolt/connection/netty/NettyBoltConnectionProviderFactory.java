@@ -37,6 +37,7 @@ import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.RoutedBoltConnectionParameters;
 import org.neo4j.bolt.connection.netty.impl.NettyBoltConnectionProvider;
 import org.neo4j.bolt.connection.netty.impl.Scheme;
+import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.DefaultChannelPipelineBuilderProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.EventLoopGroupFactory;
@@ -90,6 +91,11 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  *     <li> <b>preferredCapabilities</b> - A {@link Set} of preferred {@link BoltCapability} that should be
  *     selected when server offers support for them during Bolt handshake. This set or individual entries in the set are
  *     ignored when no support is available or handshake does not support this feature at all.</li>
+ *     <li><b>boltProtocolVersion</b> - Sets the bolt protocol used for communication bypassing the handshake mechanism.
+ *     Defaults to {@link  BoltProtocolUtil#NO_PROTOCOL_VERSION} which enables the handshake.</li>
+ *     <li><b>channelPipelineBuilderProvider</b> - Sets a channel pipeline which can be used for custom bolt message
+ *     serialization overriding the default packstream implementation.
+ *     Defaults to {@link DefaultChannelPipelineBuilderProvider}. </li>
  * </ul>
  *
  * @since 4.0.0
@@ -162,6 +168,12 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 "channelPipelineBuilderProvider",
                 ChannelPipelineBuilderProvider.class,
                 DefaultChannelPipelineBuilderProvider::new);
+        var preselectedVersion = getConfigEntry(
+                logger,
+                additionalConfig,
+                "boltProtocolVersion",
+                BoltProtocolVersion.class,
+                () -> BoltProtocolUtil.NO_PROTOCOL_VERSION);
 
         return new NettyBoltConnectionProvider(
                 eventLoopGroup,
@@ -176,7 +188,8 @@ public final class NettyBoltConnectionProviderFactory implements BoltConnectionP
                 valueFactory,
                 shutdownEventLoopGroupOnClose,
                 observationProvider,
-                channelPipelineBuilderProvider);
+                channelPipelineBuilderProvider,
+                preselectedVersion);
     }
 
     private EventLoopGroupFactory createEventLoopGroupFactory(

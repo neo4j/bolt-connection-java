@@ -18,6 +18,8 @@ package org.neo4j.bolt.connection.netty.impl.async.connection;
 
 import static java.lang.String.format;
 import static org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil.handshakeString;
+import static org.neo4j.bolt.connection.netty.impl.async.connection.HandshakeHandler.protocolSelected;
+import static org.neo4j.bolt.connection.netty.impl.messaging.BoltProtocol.forVersion;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -30,6 +32,7 @@ import javax.net.ssl.SSLHandshakeException;
 import org.neo4j.bolt.connection.BoltProtocolVersion;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
+import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltConnectionInitialisationTimeoutException;
 import org.neo4j.bolt.connection.exception.BoltServiceUnavailableException;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.ConnectTimeoutHandler;
@@ -48,6 +51,7 @@ public class ChannelConnectedListener implements ChannelFutureListener {
     private final long initialisationTimeoutMillis;
     private final CompletableFuture<Duration> sslHandshakeFuture;
     private final boolean appendBoltHanshake;
+    private final BoltProtocolVersion preselectedVersion;
 
     public ChannelConnectedListener(
             BoltServerAddress address,
@@ -59,7 +63,8 @@ public class ChannelConnectedListener implements ChannelFutureListener {
             ValueFactory valueFactory,
             long initialisationTimeoutMillis,
             CompletableFuture<Duration> sslHandshakeFuture,
-            boolean appendBoltHanshake) {
+            boolean appendBoltHanshake,
+            BoltProtocolVersion preselectedVersion) {
         this.address = address;
         this.pipelineBuilder = pipelineBuilder;
         this.handshakeCompletedFuture = handshakeCompletedFuture;
@@ -70,11 +75,31 @@ public class ChannelConnectedListener implements ChannelFutureListener {
         this.initialisationTimeoutMillis = initialisationTimeoutMillis;
         this.sslHandshakeFuture = Objects.requireNonNull(sslHandshakeFuture);
         this.appendBoltHanshake = appendBoltHanshake;
+        this.preselectedVersion = preselectedVersion;
     }
 
     @Override
     public void operationComplete(ChannelFuture future) {
         if (future.isSuccess()) {
+            // we know the version already so we can bypass the handshake
+            if (!preselectedVersion.equals(BoltProtocolUtil.NO_PROTOCOL_VERSION)) {
+                try {
+                    var protocol = forVersion(preselectedVersion);
+                    protocolSelected(
+                            preselectedVersion,
+                            protocol.createMessageFormat(),
+                            future.channel(),
+                            pipelineBuilder,
+                            logging,
+                            valueFactory,
+                            handshakeCompletedFuture);
+                    return;
+                } catch (BoltClientException protocolUnsupportedException) {
+                    handshakeCompletedFuture.completeExceptionally(protocolUnsupportedException);
+                    return;
+                }
+            }
+
             sslHandshakeFuture.whenComplete((handshakeDuration, throwable) -> {
                 if (throwable != null) {
                     throwable = FutureUtil.completionExceptionCause(throwable);

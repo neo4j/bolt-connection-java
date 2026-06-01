@@ -115,7 +115,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             CompletableFuture<Long> latestAuthMillisFuture,
             NotificationConfig notificationConfig,
             ImmutableObservation parentObservation,
-            ChannelPipelineBuilderProvider channelPipelineBuilderProvider) {
+            ChannelPipelineBuilderProvider channelPipelineBuilderProvider,
+            BoltProtocolVersion preselectedBoltVersion) {
         // extract address from the URI
         BoltServerAddress uriAddress;
         var boltUnixScheme = Scheme.BOLT_UNIX_SCHEME.equals(uri.getScheme());
@@ -184,7 +185,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                 initialisationTimeoutMillis,
                 sslHandshakeFuture,
                 handshakeCompleted,
-                appendBoltHanshake);
+                appendBoltHanshake,
+                preselectedBoltVersion);
         return handshakeCompleted
                 .thenCompose(channel -> {
                     var boltProtocol = BoltProtocol.forChannel(channel);
@@ -223,8 +225,8 @@ public final class NettyConnectionProvider implements ConnectionProvider {
             long initialisationTimeoutMillis,
             CompletableFuture<Duration> sslHandshakeFuture,
             CompletableFuture<Channel> handshakeCompleted,
-            boolean appendBoltHanshake) {
-        var pipeline = channelConnected.channel().pipeline();
+            boolean appendBoltHanshake,
+            BoltProtocolVersion preselectedVersion) {
 
         // add listener that sends Bolt handshake bytes when channel is connected
         channelConnected.addListener(new ChannelConnectedListener(
@@ -237,6 +239,7 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                 valueFactory,
                 initialisationTimeoutMillis,
                 sslHandshakeFuture,
-                appendBoltHanshake));
+                appendBoltHanshake,
+                preselectedVersion));
     }
 }
