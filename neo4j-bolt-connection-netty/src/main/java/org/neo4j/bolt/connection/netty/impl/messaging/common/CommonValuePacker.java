@@ -144,8 +144,8 @@ public class CommonValuePacker implements ValuePacker {
             }
             case VECTOR -> packVector(value.asBoltVector());
             case UNSUPPORTED -> throw new BoltClientException("Unsupported type must not be sent to the server");
-            default -> throw new IOException(
-                    "Unknown type: " + value.boltValueType().name());
+            default ->
+                throw new IOException("Unknown type: " + value.boltValueType().name());
         }
     }
 

@@ -338,9 +338,11 @@ public final class QueryApiBoltConnection implements BoltConnection {
                         result = switch (state()) {
                             case OPEN -> CompletableFuture.completedStage(null);
                             case ERROR, CLOSED -> MESSAGE_HANDLING_ABORTING_STAGE;
-                            case FAILURE -> messageHandler instanceof ResetMessageHandler
-                                    ? CompletableFuture.completedStage(null)
-                                    : MESSAGE_HANDLING_WITH_IGNORING_STAGE;};
+                            case FAILURE ->
+                                messageHandler instanceof ResetMessageHandler
+                                        ? CompletableFuture.completedStage(null)
+                                        : MESSAGE_HANDLING_WITH_IGNORING_STAGE;
+                        };
                     }
                     return result;
                 });
@@ -408,7 +410,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                     } else {
                         newState = switch (state) {
                             case OPEN, FAILURE, ERROR -> BoltConnectionState.ERROR;
-                            case CLOSED -> BoltConnectionState.CLOSED;};
+                            case CLOSED -> BoltConnectionState.CLOSED;
+                        };
                     }
                     updateState(newState);
                 }
@@ -438,8 +441,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
     private synchronized void assertValidStateForWrite() {
         switch (state) {
             case OPEN, FAILURE -> {}
-            case ERROR, CLOSED -> throw new BoltClientException(
-                    "Failed to write to connection in %s state".formatted(state));
+            case ERROR, CLOSED ->
+                throw new BoltClientException("Failed to write to connection in %s state".formatted(state));
         }
     }
 
@@ -491,7 +494,8 @@ public final class QueryApiBoltConnection implements BoltConnection {
                 yield "Bearer " + token;
             }
             case "none" -> null;
-            default -> throw new BoltClientException("Unsupported auth token: { scheme='" + scheme + "' }");};
+            default -> throw new BoltClientException("Unsupported auth token: { scheme='" + scheme + "' }");
+        };
         this.authInfoFuture = CompletableFuture.completedFuture(new AuthInfoImpl(authToken, clock.millis()));
     }
 
