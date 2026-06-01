@@ -194,7 +194,7 @@
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
-                    <version>2.44.3</version>
+                    <version>3.6.0</version>
                     <configuration>
                         <java>
                             <palantirJavaFormat />
@@ -212,9 +212,12 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>3.5.0</version>
+                    <version>3.6.3</version>
                     <configuration>
                         <rules>
+                            <requireJavaVersion>
+                                <version>25</version>
+                            </requireJavaVersion>
                             <RestrictImports>
                                 <reason>Star imports are not allowed, please configure your editor to substitute them with fully qualified imports.</reason>
                                 <bannedImport>**.'*'</bannedImport>

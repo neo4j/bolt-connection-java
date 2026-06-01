@@ -610,17 +610,18 @@ public class PackStream {
                 case TINY_LIST -> PackType.LIST;
                 case TINY_MAP -> PackType.MAP;
                 case TINY_STRUCT -> PackType.STRUCT;
-                default -> switch (markerByte) {
-                    case NULL -> PackType.NULL;
-                    case TRUE, FALSE -> PackType.BOOLEAN;
-                    case FLOAT_64 -> PackType.FLOAT;
-                    case BYTES_8, BYTES_16, BYTES_32 -> PackType.BYTES;
-                    case STRING_8, STRING_16, STRING_32 -> PackType.STRING;
-                    case LIST_8, LIST_16, LIST_32 -> PackType.LIST;
-                    case MAP_8, MAP_16, MAP_32 -> PackType.MAP;
-                    case STRUCT_8, STRUCT_16 -> PackType.STRUCT;
-                    default -> PackType.INTEGER;
-                };
+                default ->
+                    switch (markerByte) {
+                        case NULL -> PackType.NULL;
+                        case TRUE, FALSE -> PackType.BOOLEAN;
+                        case FLOAT_64 -> PackType.FLOAT;
+                        case BYTES_8, BYTES_16, BYTES_32 -> PackType.BYTES;
+                        case STRING_8, STRING_16, STRING_32 -> PackType.STRING;
+                        case LIST_8, LIST_16, LIST_32 -> PackType.LIST;
+                        case MAP_8, MAP_16, MAP_32 -> PackType.MAP;
+                        case STRUCT_8, STRUCT_16 -> PackType.STRUCT;
+                        default -> PackType.INTEGER;
+                    };
             };
         }
 

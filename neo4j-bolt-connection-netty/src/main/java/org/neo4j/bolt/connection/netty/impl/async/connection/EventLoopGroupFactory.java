@@ -52,14 +52,20 @@ public final class EventLoopGroupFactory {
 
     @SuppressWarnings("deprecation")
     public EventLoopGroup newEventLoopGroup(int threadCount) {
-        return switch (nettyTransport.type()) {
-            case NIO -> new DriverEventLoopGroup(threadCount);
-            case EPOLL -> new EpollEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
-            case IO_URING -> new MultiThreadIoEventLoopGroup(
+        if (NettyTransport.Type.NIO.equals(nettyTransport.type())) {
+            return new DriverEventLoopGroup(threadCount);
+        } else if (NettyTransport.Type.EPOLL.equals(nettyTransport.type())) {
+            return new EpollEventLoopGroup(threadCount);
+        } else if (NettyTransport.Type.IO_URING.equals(nettyTransport.type())) {
+            return new MultiThreadIoEventLoopGroup(
                     threadCount, new DriverThreadFactory(threadNamePrefix), IoUringIoHandler.newFactory());
-            case KQUEUE -> new KQueueEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
-            case LOCAL -> new LocalEventLoopGroup(threadCount, new DriverThreadFactory(threadNamePrefix));
-        };
+        } else if (NettyTransport.Type.KQUEUE.equals(nettyTransport.type())) {
+            return new KQueueEventLoopGroup(threadCount);
+        } else if (NettyTransport.Type.LOCAL.equals(nettyTransport.type())) {
+            return new LocalEventLoopGroup(threadCount);
+        } else {
+            throw new IllegalStateException("Unrecognized NettyTransport type: " + nettyTransport.type());
+        }
     }
 
     /**

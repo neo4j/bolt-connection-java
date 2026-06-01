@@ -120,9 +120,7 @@ final class QueryApiBoltConnectionTest {
     @Test
     void shouldBeFailedAfterFailure() {
         // given
-        given(response.body())
-                .willReturn(
-                        """
+        given(response.body()).willReturn("""
                 {
                     "errors": [{"code": "code", "message": "message"}]
                 }
@@ -160,9 +158,7 @@ final class QueryApiBoltConnectionTest {
     @Test
     void shouldResetStateWhenFailed() {
         // given
-        given(response.body())
-                .willReturn(
-                        """
+        given(response.body()).willReturn("""
                 {
                     "transaction": {"id": "id", "expires": "2024-10-22T15:48:29Z"}
                 }

@@ -390,7 +390,8 @@ public class RediscoveryImpl implements Rediscovery {
                         }
                     }
                 }
-                default -> false;};
+                default -> false;
+            };
         } else if (throwable instanceof IllegalStateException
                 && "Connection provider is closed.".equals(throwable.getMessage())) {
             abort = true;

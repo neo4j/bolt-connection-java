@@ -113,7 +113,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
         this.address = switch (uri.getScheme()) {
             case "bolt", "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc" -> new BoltServerAddress(uri);
             case "bolt+unix" -> new BoltServerAddress(Path.of(uri.getPath()));
-            default -> new BoltServerAddress(uri.getHost(), 0);};
+            default -> new BoltServerAddress(uri.getHost(), 0);
+        };
         this.poolId = poolId(address);
         this.observationProvider = Objects.requireNonNull(observationProvider);
         this.maxSize = maxSize;
@@ -342,9 +343,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                 connectTimeoutMillis,
                                 switch (timeoutPolicy) {
                                     case DEFAULT -> acquisitionTimeout; // while the acquisition timeout is implemented
-                                        // by this source, it is also used as initialisation timeout to make sure there
-                                        // is
-                                        // a limit
+                                    // by this source, it is also used as initialisation timeout to make sure there
+                                    // is a limit
                                     case LEGACY -> connectTimeoutMillis;
                                 },
                                 auth.securityPlan(),
@@ -368,7 +368,8 @@ public class PooledBoltConnectionSource implements BoltConnectionSource<BoltConn
                                 } else if (error instanceof BoltConnectionInitialisationTimeoutException) {
                                     error = switch (timeoutPolicy) {
                                         case DEFAULT -> timeoutException();
-                                        case LEGACY -> error;};
+                                        case LEGACY -> error;
+                                    };
                                 }
                                 createObservation.error(error);
                                 createObservation.stop();
