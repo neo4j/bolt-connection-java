@@ -18,19 +18,18 @@ package org.neo4j.bolt.connection.query_api.impl;
 
 import java.net.URI;
 import java.util.Optional;
-import org.testcontainers.containers.Neo4jContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.neo4j.Neo4jContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 class QueryApiIT extends AbstractQueryApi {
     @SuppressWarnings("resource")
     @Container
-    private static final Neo4jContainer<?> neo4jContainer = new Neo4jContainer<>(
-                    DockerImageName.parse("neo4j:%s-enterprise"
-                            .formatted(Optional.ofNullable(System.getenv("NEO4J_VERSION"))
-                                    .orElse("2025.04.0"))))
+    private static final Neo4jContainer neo4jContainer = new Neo4jContainer(DockerImageName.parse("neo4j:%s-enterprise"
+                    .formatted(
+                            Optional.ofNullable(System.getenv("NEO4J_VERSION")).orElse("2025.04.0"))))
             .withEnv("NEO4J_ACCEPT_LICENSE_AGREEMENT", "yes")
             .withEnv("NEO4JLABS_PLUGINS", "[\"apoc\"]");
 
