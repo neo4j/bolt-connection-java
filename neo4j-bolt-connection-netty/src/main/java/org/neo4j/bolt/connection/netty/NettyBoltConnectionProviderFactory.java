@@ -91,6 +91,11 @@ import org.neo4j.bolt.connection.values.ValueFactory;
  *     <li> <b>preferredCapabilities</b> - A {@link Set} of preferred {@link BoltCapability} that should be
  *     selected when server offers support for them during Bolt handshake. This set or individual entries in the set are
  *     ignored when no support is available or handshake does not support this feature at all.</li>
+ *     <li><b>boltProtocolVersion</b> - Sets the bolt protocol used for communication bypassing the handshake mechanism.
+ *     Defaults to {@link  BoltProtocolUtil#NO_PROTOCOL_VERSION} which enables the handshake.</li>
+ *     <li><b>channelPipelineBuilderProvider</b> - Sets a channel pipeline which can be used for custom bolt message
+ *     serialization overriding the default packstream implementation.
+ *     Defaults to {@link DefaultChannelPipelineBuilderProvider}. </li>
  * </ul>
  *
  * @since 4.0.0
