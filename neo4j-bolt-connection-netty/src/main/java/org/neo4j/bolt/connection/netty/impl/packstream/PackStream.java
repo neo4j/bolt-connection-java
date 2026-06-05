@@ -26,6 +26,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * PackStream is a messaging serialisation format heavily inspired by MessagePack.
@@ -116,6 +117,8 @@ public class PackStream {
     public static final byte STRING_16 = (byte) 0xD1;
     public static final byte STRING_32 = (byte) 0xD2;
 
+    public static final byte UUID_16 = (byte) 0xE0;
+
     @SuppressWarnings("unused")
     public static final byte RESERVED_D3 = (byte) 0xD3;
 
@@ -141,9 +144,6 @@ public class PackStream {
 
     @SuppressWarnings("unused")
     public static final byte RESERVED_DF = (byte) 0xDF;
-
-    @SuppressWarnings("unused")
-    public static final byte RESERVED_E0 = (byte) 0xE0;
 
     @SuppressWarnings("unused")
     public static final byte RESERVED_E1 = (byte) 0xE1;
@@ -261,6 +261,16 @@ public class PackStream {
             }
         }
 
+        public void pack(UUID value) throws IOException {
+            if (value == null) {
+                packNull();
+            } else {
+                packUUIDHeader();
+                packRaw(value.getMostSignificantBits());
+                packRaw(value.getLeastSignificantBits());
+            }
+        }
+
         private void pack(List<?> values) throws IOException {
             if (values == null) {
                 packNull();
@@ -353,6 +363,11 @@ public class PackStream {
             } else {
                 out.writeByte(STRING_32).writeInt(size);
             }
+        }
+
+        @SuppressWarnings("DuplicatedCode")
+        private void packUUIDHeader() throws IOException {
+            out.writeByte(UUID_16);
         }
 
         @SuppressWarnings("DuplicatedCode")
@@ -529,6 +544,11 @@ public class PackStream {
             return new String(unpackUtf8(markerByte), UTF_8);
         }
 
+        public UUID unpackUUID() throws IOException {
+            var markerByte = in.readByte();
+            return new UUID(in.readLong(), in.readLong());
+        }
+
         /**
          * This may seem confusing. This method exists to move forward the internal pointer when encountering
          * a null value. The idiomatic usage would be someone using {@link #peekNextType()} to detect a null type,
@@ -620,6 +640,7 @@ public class PackStream {
                         case LIST_8, LIST_16, LIST_32 -> PackType.LIST;
                         case MAP_8, MAP_16, MAP_32 -> PackType.MAP;
                         case STRUCT_8, STRUCT_16 -> PackType.STRUCT;
+                        case UUID_16 -> PackType.UUID;
                         default -> PackType.INTEGER;
                     };
             };

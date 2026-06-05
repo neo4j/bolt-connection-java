@@ -156,6 +156,9 @@ public class CommonValueUnpacker implements ValueUnpacker {
             case STRING -> {
                 return valueFactory.value(unpacker.unpackString());
             }
+            case UUID -> {
+                return unpackUUID();
+            }
             case MAP -> {
                 return valueFactory.value(unpackMap());
             }
@@ -447,6 +450,10 @@ public class CommonValueUnpacker implements ValueUnpacker {
 
     protected Value unpackUnsupported(long size) throws IOException {
         throw new UnsupportedOperationException();
+    }
+
+    protected Value unpackUUID() throws IOException {
+        throw new BoltProtocolException("Unknown PackStream type: E0");
     }
 
     private static ZonedDateTime newZonedDateTime(long epochSecondLocal, long nano, ZoneId zoneId) {

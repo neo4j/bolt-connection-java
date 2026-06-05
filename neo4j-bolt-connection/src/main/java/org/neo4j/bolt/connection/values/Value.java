@@ -22,6 +22,7 @@ import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZonedDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 public interface Value extends MapAccessor {
     Type boltValueType();
@@ -53,6 +54,14 @@ public interface Value extends MapAccessor {
     Map<String, Value> asBoltMap();
 
     Vector asBoltVector();
+
+    /**
+     * Returns the value as a {@link UUID}, if possible.
+     *
+     * @return the value as a {@link UUID}, if possible
+     * @since 12.0.0
+     */
+    UUID asUUID();
 
     boolean isNull();
 

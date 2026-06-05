@@ -14,27 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.messaging.v6;
+package org.neo4j.bolt.connection.netty.impl.messaging.v61;
 
-import java.util.Map;
-import org.neo4j.bolt.connection.GqlError;
-import org.neo4j.bolt.connection.netty.impl.messaging.ValueUnpacker;
-import org.neo4j.bolt.connection.netty.impl.messaging.v57.MessageReaderV57;
+import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
-import org.neo4j.bolt.connection.values.Value;
+import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-public class MessageReaderV6 extends MessageReaderV57 {
-    public MessageReaderV6(PackInput input, ValueFactory valueFactory) {
-        super(new ValueUnpackerV6(input, valueFactory), valueFactory);
-    }
-
-    public MessageReaderV6(ValueUnpacker unpacker, ValueFactory valueFactory) {
-        super(unpacker, valueFactory);
+final class MessageFormatV61 implements MessageFormat {
+    @Override
+    public Writer newWriter(PackOutput output, ValueFactory valueFactory) {
+        return new MessageWriterV61(output, valueFactory);
     }
 
     @Override
-    public GqlError unpackGqlError(Map<String, Value> params) {
-        return super.unpackGqlError(params);
+    public Reader newReader(PackInput input, ValueFactory valueFactory) {
+        return new MessageReaderV61(input, valueFactory);
     }
 }

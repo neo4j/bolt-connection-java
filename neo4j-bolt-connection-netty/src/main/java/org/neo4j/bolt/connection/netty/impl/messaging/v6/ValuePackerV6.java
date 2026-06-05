@@ -23,7 +23,7 @@ import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
 import org.neo4j.bolt.connection.netty.impl.packstream.PackStream;
 import org.neo4j.bolt.connection.values.Vector;
 
-final class ValuePackerV6 extends CommonValuePacker {
+public class ValuePackerV6 extends CommonValuePacker {
     public ValuePackerV6(PackOutput output) {
         super(output, true);
     }

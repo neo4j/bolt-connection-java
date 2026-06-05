@@ -23,6 +23,7 @@ public enum PackType {
     FLOAT,
     BYTES,
     STRING,
+    UUID,
     LIST,
     MAP,
     STRUCT

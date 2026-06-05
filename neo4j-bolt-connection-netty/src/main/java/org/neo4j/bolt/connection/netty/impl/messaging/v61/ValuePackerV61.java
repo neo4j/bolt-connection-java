@@ -14,38 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.values;
+package org.neo4j.bolt.connection.netty.impl.messaging.v61;
 
-public enum Type {
-    ANY,
-    BOOLEAN,
-    BYTES,
-    STRING,
-    NUMBER,
-    INTEGER,
-    FLOAT,
-    LIST,
-    MAP,
-    NODE,
-    RELATIONSHIP,
-    PATH,
-    POINT,
-    DATE,
-    TIME,
-    LOCAL_TIME,
-    LOCAL_DATE_TIME,
-    DATE_TIME,
-    DURATION,
-    VECTOR,
-    /**
-     * An unsupported type by a given Bolt Protocol version.
-     * @since 9.0.0
-     */
-    UNSUPPORTED,
-    NULL,
-    /**
-     * A UUID type.
-     * @since 12.0.0
-     */
-    UUID
+import java.io.IOException;
+import java.util.UUID;
+import org.neo4j.bolt.connection.netty.impl.messaging.v6.ValuePackerV6;
+import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+
+final class ValuePackerV61 extends ValuePackerV6 {
+    public ValuePackerV61(PackOutput output) {
+        super(output);
+    }
+
+    @Override
+    protected void packUUID(UUID uuid) throws IOException {
+        packer.pack(uuid);
+    }
 }
