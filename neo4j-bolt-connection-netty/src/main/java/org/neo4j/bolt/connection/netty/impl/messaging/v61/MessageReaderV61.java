@@ -14,17 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.packstream;
+package org.neo4j.bolt.connection.netty.impl.messaging.v61;
 
-public enum PackType {
-    NULL,
-    BOOLEAN,
-    INTEGER,
-    FLOAT,
-    BYTES,
-    STRING,
-    UUID,
-    LIST,
-    MAP,
-    STRUCT
+import org.neo4j.bolt.connection.netty.impl.messaging.v6.MessageReaderV6;
+import org.neo4j.bolt.connection.netty.impl.packstream.PackInput;
+import org.neo4j.bolt.connection.values.ValueFactory;
+
+final class MessageReaderV61 extends MessageReaderV6 {
+    public MessageReaderV61(PackInput input, ValueFactory valueFactory) {
+        super(new ValueUnpackerV61(input, valueFactory), valueFactory);
+    }
 }

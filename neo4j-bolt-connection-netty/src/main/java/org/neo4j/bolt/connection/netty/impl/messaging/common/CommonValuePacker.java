@@ -26,6 +26,7 @@ import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Map;
+import java.util.UUID;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.netty.impl.messaging.ValuePacker;
@@ -144,6 +145,7 @@ public class CommonValuePacker implements ValuePacker {
             }
             case VECTOR -> packVector(value.asBoltVector());
             case UNSUPPORTED -> throw new BoltClientException("Unsupported type must not be sent to the server");
+            case UUID -> packUUID(value.asUUID());
             default ->
                 throw new IOException("Unknown type: " + value.boltValueType().name());
         }
@@ -151,6 +153,10 @@ public class CommonValuePacker implements ValuePacker {
 
     protected void packVector(Vector vector) throws IOException {
         throw new BoltUnsupportedFeatureException("Vector type is not supported by this Bolt protocol version");
+    }
+
+    protected void packUUID(UUID uuid) throws IOException {
+        throw new BoltUnsupportedFeatureException("UUID type is not supported by this Bolt protocol version");
     }
 
     private void packDate(LocalDate localDate) throws IOException {

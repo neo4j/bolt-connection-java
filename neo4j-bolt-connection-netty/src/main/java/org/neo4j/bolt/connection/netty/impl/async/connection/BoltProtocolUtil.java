@@ -42,6 +42,7 @@ import org.neo4j.bolt.connection.netty.impl.messaging.v56.BoltProtocolV56;
 import org.neo4j.bolt.connection.netty.impl.messaging.v57.BoltProtocolV57;
 import org.neo4j.bolt.connection.netty.impl.messaging.v58.BoltProtocolV58;
 import org.neo4j.bolt.connection.netty.impl.messaging.v6.BoltProtocolV6;
+import org.neo4j.bolt.connection.netty.impl.messaging.v61.BoltProtocolV61;
 
 public final class BoltProtocolUtil {
     public static final int BOLT_MAGIC_PREAMBLE = 0x6060B017;
@@ -66,6 +67,7 @@ public final class BoltProtocolUtil {
     static {
         var map = new TreeMap<BoltProtocolVersion, BoltProtocol>(Comparator.reverseOrder());
         map.putAll(Map.ofEntries(
+                Map.entry(BoltProtocolV61.VERSION, BoltProtocolV61.INSTANCE),
                 Map.entry(BoltProtocolV6.VERSION, BoltProtocolV6.INSTANCE),
                 Map.entry(BoltProtocolV58.VERSION, BoltProtocolV58.INSTANCE),
                 Map.entry(BoltProtocolV57.VERSION, BoltProtocolV57.INSTANCE),

@@ -42,5 +42,10 @@ public enum Type {
      * @since 9.0.0
      */
     UNSUPPORTED,
-    NULL
+    NULL,
+    /**
+     * A UUID Cypher Type.
+     * @since 11.2.0
+     */
+    UUID
 }

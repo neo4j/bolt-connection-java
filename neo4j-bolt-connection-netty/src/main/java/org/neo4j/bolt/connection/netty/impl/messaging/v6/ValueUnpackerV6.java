@@ -27,7 +27,7 @@ import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
-final class ValueUnpackerV6 extends ValueUnpackerV5 {
+public class ValueUnpackerV6 extends ValueUnpackerV5 {
     public ValueUnpackerV6(PackInput input, ValueFactory valueFactory) {
         super(input, valueFactory);
     }

@@ -14,17 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.neo4j.bolt.connection.netty.impl.packstream;
+package org.neo4j.bolt.connection.netty.impl.messaging.v61;
 
-public enum PackType {
-    NULL,
-    BOOLEAN,
-    INTEGER,
-    FLOAT,
-    BYTES,
-    STRING,
-    UUID,
-    LIST,
-    MAP,
-    STRUCT
+import java.io.IOException;
+import java.util.UUID;
+import org.neo4j.bolt.connection.netty.impl.messaging.v6.ValuePackerV6;
+import org.neo4j.bolt.connection.netty.impl.packstream.PackOutput;
+
+final class ValuePackerV61 extends ValuePackerV6 {
+    public ValuePackerV61(PackOutput output) {
+        super(output);
+    }
+
+    @Override
+    protected void packUUID(UUID uuid) throws IOException {
+        packer.pack(uuid);
+    }
 }

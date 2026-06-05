@@ -24,6 +24,7 @@ import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZonedDateTime;
 import java.util.Map;
+import java.util.UUID;
 import org.neo4j.bolt.connection.test.values.TestNode;
 import org.neo4j.bolt.connection.test.values.TestPath;
 import org.neo4j.bolt.connection.test.values.TestRelationship;
@@ -157,6 +158,11 @@ public abstract class ValueAdapter extends InternalMapAccessorWithDefaultValue i
     @Override
     public Vector asBoltVector() {
         throw new Uncoercible(boltValueType().name(), "Vector");
+    }
+
+    @Override
+    public UUID asUUID() {
+        throw new Uncoercible(boltValueType().name(), "UUID");
     }
 
     // Force implementation
