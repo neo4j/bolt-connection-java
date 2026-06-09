@@ -56,7 +56,7 @@
         <mockito.version>5.23.0</mockito.version>
         <!-- To be overwritten by child projects -->
         <moduleName />
-        <netty-bom.version>4.2.14.Final</netty-bom.version>
+        <netty-bom.version>4.2.15.Final</netty-bom.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <rootDir>${project.basedir}</rootDir>
