@@ -4,7 +4,7 @@
 
     <groupId>org.neo4j.bolt</groupId>
     <artifactId>neo4j-bolt-connection-parent</artifactId>
-    <version>12.0-SNAPSHOT</version>
+    <version>12.1-SNAPSHOT</version>
 
     <packaging>pom</packaging>
     <name>Neo4j Bolt Connection</name>
@@ -46,7 +46,7 @@
 
     <properties>
         <bouncycastle-jdk18on.version>1.84</bouncycastle-jdk18on.version>
-        <build-resources.version>2026.02.5</build-resources.version>
+        <build-resources.version>2026.06.1</build-resources.version>
         <junit.version>6.1.0</junit.version>
         <maven.build.timestamp.format>'v'yyyyMMdd-HHmm</maven.build.timestamp.format>
         <maven.compiler.release>17</maven.compiler.release>
@@ -216,7 +216,7 @@
                     <configuration>
                         <rules>
                             <requireJavaVersion>
-                                <version>25</version>
+                                <version>26</version>
                             </requireJavaVersion>
                             <RestrictImports>
                                 <reason>Star imports are not allowed, please configure your editor to substitute them with fully qualified imports.</reason>
@@ -381,6 +381,23 @@
                         <verifyFail>stop</verifyFail>
                         <verifyFailOn>strict</verifyFailOn>
                         <spaceBeforeCloseEmptyElement>true</spaceBeforeCloseEmptyElement>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>2.21.0</version>
+                    <configuration>
+                        <generateBackupPoms>false</generateBackupPoms>
+                        <allowMajorUpdates>false</allowMajorUpdates>
+                        <ruleSet>
+                            <ignoreVersions>
+                                <ignoreVersion>
+                                    <type>regex</type>
+                                    <version>^.*-(M\d+|alpha\d+|beta\d+|RC\d+)$</version>
+                                </ignoreVersion>
+                            </ignoreVersions>
+                        </ruleSet>
                     </configuration>
                 </plugin>
             </plugins>
