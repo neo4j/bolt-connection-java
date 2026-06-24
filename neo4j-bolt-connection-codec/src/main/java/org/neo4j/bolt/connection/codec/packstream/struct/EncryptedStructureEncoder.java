@@ -45,6 +45,8 @@ public final class EncryptedStructureEncoder implements PackStreamStructureEncod
     @Override
     public void encode(EncryptedStructure structure, PackStreamEncoder encoder, WriteOutput<?> output)
             throws IOException {
+        encoder.encode(structure.profileType(), output);
+        encoder.encode(structure.profileVersion(), output);
         encoder.encode(structure.profileName(), output);
         encoder.encode(structure.cipherOutput(), output);
         encoder.encode(structure.typeName(), output);

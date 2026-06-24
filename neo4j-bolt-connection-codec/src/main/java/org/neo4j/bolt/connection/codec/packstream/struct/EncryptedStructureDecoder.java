@@ -50,6 +50,8 @@ public final class EncryptedStructureDecoder implements PackStreamStructureDecod
 
     @Override
     public EncryptedStructure decode(PackStreamDecoder decoder, ReadInput input) throws IOException {
+        var profileType = decoder.decodeString(input);
+        var profileVersion = decoder.decodeInteger(input);
         var profileName = decoder.decodeString(input);
         var cipherOutput = decoder.decodeBytes(input);
         var typeName = decoder.decodeString(input);
@@ -61,6 +63,8 @@ public final class EncryptedStructureDecoder implements PackStreamStructureDecod
                         Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> b, TreeMap::new),
                         Collections::unmodifiableSortedMap));
         return new EncryptedStructure(
+                profileType,
+                profileVersion,
                 profileName,
                 cipherOutput,
                 typeName,
