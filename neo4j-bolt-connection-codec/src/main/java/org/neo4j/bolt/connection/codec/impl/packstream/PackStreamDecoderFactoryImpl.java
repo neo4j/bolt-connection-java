@@ -16,6 +16,7 @@
  */
 package org.neo4j.bolt.connection.codec.impl.packstream;
 
+import java.util.ServiceLoader;
 import java.util.Set;
 import org.neo4j.bolt.connection.codec.packstream.PackStreamDecoder;
 import org.neo4j.bolt.connection.codec.packstream.PackStreamDecoderFactory;
@@ -23,6 +24,13 @@ import org.neo4j.bolt.connection.codec.packstream.struct.PackStreamStructureDeco
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class PackStreamDecoderFactoryImpl implements PackStreamDecoderFactory {
+    /**
+     * Creates a new instance of this factory.
+     * <p>
+     * It is used by {@link ServiceLoader}.
+     */
+    public PackStreamDecoderFactoryImpl() {}
+
     @Override
     public PackStreamDecoder create(ValueFactory valueFactory, Set<PackStreamStructureDecoder<?>> structureDecoders) {
         return new PackStreamDecoderImpl(valueFactory, structureDecoders);

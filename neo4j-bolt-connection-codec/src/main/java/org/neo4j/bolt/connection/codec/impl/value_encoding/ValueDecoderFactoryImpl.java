@@ -17,6 +17,7 @@
 package org.neo4j.bolt.connection.codec.impl.value_encoding;
 
 import java.util.Objects;
+import java.util.ServiceLoader;
 import org.neo4j.bolt.connection.codec.value_encoding.ValueDecoder;
 import org.neo4j.bolt.connection.codec.value_encoding.ValueDecoderFactory;
 import org.neo4j.bolt.connection.codec.value_encoding.ValueEncodingSchemeVersion;
@@ -24,6 +25,13 @@ import org.neo4j.bolt.connection.exception.BoltClientException;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public final class ValueDecoderFactoryImpl implements ValueDecoderFactory {
+    /**
+     * Creates a new instance of this factory.
+     * <p>
+     * It is used by {@link ServiceLoader}.
+     */
+    public ValueDecoderFactoryImpl() {}
+
     @Override
     public boolean supports(ValueEncodingSchemeVersion encodingVersion) {
         Objects.requireNonNull(encodingVersion);

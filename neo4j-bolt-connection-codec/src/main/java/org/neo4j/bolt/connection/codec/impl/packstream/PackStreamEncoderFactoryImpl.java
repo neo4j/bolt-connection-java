@@ -16,12 +16,18 @@
  */
 package org.neo4j.bolt.connection.codec.impl.packstream;
 
+import java.util.ServiceLoader;
 import java.util.Set;
 import org.neo4j.bolt.connection.codec.packstream.PackStreamEncoder;
 import org.neo4j.bolt.connection.codec.packstream.PackStreamEncoderFactory;
 import org.neo4j.bolt.connection.codec.packstream.struct.PackStreamStructureEncoder;
 
 public final class PackStreamEncoderFactoryImpl implements PackStreamEncoderFactory {
+    /**
+     * Creates a new instance of this factory.
+     * <p>
+     * It is used by {@link ServiceLoader}.
+     */
     public PackStreamEncoderFactoryImpl() {}
 
     @Override
