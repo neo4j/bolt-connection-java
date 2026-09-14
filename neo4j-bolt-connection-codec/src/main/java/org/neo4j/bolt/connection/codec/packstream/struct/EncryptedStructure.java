@@ -21,7 +21,9 @@ import org.neo4j.bolt.connection.values.Value;
 
 /**
  * An Encrypted Structure used to encapsulate encrypted values.
- * @param profileName the encryption profile name
+ * @param profileType the encryption profile type
+ * @param profileVersion the encryption profile version
+ * @param profileName the encryption profile instance name
  * @param cipherOutput the cipher output
  * @param typeName the type name
  * @param typeEncodingSchemeMajor the major version of the encoding scheme used to encode the value
@@ -30,6 +32,8 @@ import org.neo4j.bolt.connection.values.Value;
  * @since 12.1.0
  */
 public record EncryptedStructure(
+        String profileType,
+        long profileVersion,
         String profileName,
         byte[] cipherOutput,
         String typeName,
@@ -38,7 +42,7 @@ public record EncryptedStructure(
         SortedMap<String, Value> metadata)
         implements PackStreamStructure {
     static final byte ENCRYPTED = 'e';
-    static final int ENCRYPTED_STRUCT_SIZE = 6;
+    static final int ENCRYPTED_STRUCT_SIZE = 8;
 
     @Override
     public byte tagByte() {
