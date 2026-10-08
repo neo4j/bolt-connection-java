@@ -107,6 +107,7 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
             return CompletableFuture.failedStage(ex);
         }
         var requestBuilder = HttpRequest.newBuilder(uri);
+        requestBuilder.header("Accept", "application/json");
         if (userAgent != null) {
             requestBuilder.header("User-Agent", userAgent);
         }

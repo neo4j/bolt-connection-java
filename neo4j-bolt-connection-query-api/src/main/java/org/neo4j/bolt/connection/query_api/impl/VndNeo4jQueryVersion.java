@@ -16,14 +16,27 @@
  */
 package org.neo4j.bolt.connection.query_api.impl;
 
-import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
-public record QueryResult(
-        QueryData data,
-        List<String> bookmarks,
-        QueryCounters counters,
-        List<Map<String, Object>> notifications,
-        String queryType,
-        Long resultAvailableAfter,
-        Long resultConsumedAfter) {}
+enum VndNeo4jQueryVersion {
+    V1_0(1, 0, "application/vnd.neo4j.query"),
+    V1_1(1, 1, "application/vnd.neo4j.query.v1.1");
+
+    private final int major;
+    private final int minor;
+    private final String value;
+
+    VndNeo4jQueryVersion(int major, int minor, String value) {
+        this.major = major;
+        this.minor = minor;
+        this.value = Objects.requireNonNull(value);
+    }
+
+    public boolean isBefore(VndNeo4jQueryVersion other) {
+        return major < other.major || (major == other.major && minor < other.minor);
+    }
+
+    public String value() {
+        return value;
+    }
+}

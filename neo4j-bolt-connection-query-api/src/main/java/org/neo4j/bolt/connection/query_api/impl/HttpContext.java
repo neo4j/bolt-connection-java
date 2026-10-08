@@ -23,9 +23,17 @@ import java.net.http.HttpClient;
 import java.util.Objects;
 import org.neo4j.bolt.connection.exception.BoltClientException;
 
-public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String defaultDatabase, String userAgent) {
+public record HttpContext(
+        HttpClient httpClient,
+        URI baseUri,
+        JSON json,
+        String defaultDatabase,
+        String userAgent,
+        VndNeo4jQueryVersion vndNeo4jQueryVersion) {
     // experimental
     private static final String DEFAULT_DATABASE_KEY_NAME = "defaultDatabase";
+    // experimental
+    private static final String ENABLE_VECTOR = "enableVector";
     private static final String QUERY_URL_FORMAT = "%s/db/%s/query/v2";
     public static final String QUERY_URL_TEMPLATE = QUERY_URL_FORMAT.formatted("", "{databaseName}");
     private static final String TRANSACTION_BASE_URL_FORMAT = "%s/tx".formatted(QUERY_URL_FORMAT);
@@ -54,6 +62,11 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String 
                         if (!value.isEmpty()) {
                             defaultDatabase = value;
                         }
+                    } else if (ENABLE_VECTOR.equals(key)) {
+                        var value = keyAndValue[1].trim();
+                        if (!value.isEmpty() && Boolean.parseBoolean(value)) {
+                            vndNeo4jQueryVersion = VndNeo4jQueryVersion.V1_1;
+                        }
                     }
                 }
             }
@@ -67,14 +80,14 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String 
     }
 
     public HttpContext(HttpClient httpClient, URI baseUri, JSON json, String userAgent) {
-        this(httpClient, baseUri, json, null, userAgent);
+        this(httpClient, baseUri, json, null, userAgent, VndNeo4jQueryVersion.V1_0);
     }
 
     public String[] headers(String authHeader) {
-        return headers(authHeader, userAgent);
+        return headers(authHeader, userAgent, vndNeo4jQueryVersion);
     }
 
-    private static String[] headers(String authHeader, String userAgent) {
+    private static String[] headers(String authHeader, String userAgent, VndNeo4jQueryVersion vndNeo4jQueryVersion) {
         var size = 4;
         if (authHeader != null) {
             size += 2;
@@ -84,9 +97,9 @@ public record HttpContext(HttpClient httpClient, URI baseUri, JSON json, String 
         }
         var headers = new String[size];
         headers[0] = "Content-Type";
-        headers[1] = "application/vnd.neo4j.query";
+        headers[1] = vndNeo4jQueryVersion.value();
         headers[2] = "Accept";
-        headers[3] = "application/vnd.neo4j.query";
+        headers[3] = vndNeo4jQueryVersion.value();
         var index = 4;
         if (authHeader != null) {
             headers[index++] = "Authorization";
