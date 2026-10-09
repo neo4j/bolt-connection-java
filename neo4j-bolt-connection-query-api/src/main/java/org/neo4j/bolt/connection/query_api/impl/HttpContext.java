@@ -33,7 +33,7 @@ public record HttpContext(
     // experimental
     private static final String DEFAULT_DATABASE_KEY_NAME = "defaultDatabase";
     // experimental
-    private static final String ENABLE_VECTOR = "enableVector";
+    private static final String EXPERIMENTAL_VECTOR = "experimentalVector";
     private static final String QUERY_URL_FORMAT = "%s/db/%s/query/v2";
     public static final String QUERY_URL_TEMPLATE = QUERY_URL_FORMAT.formatted("", "{databaseName}");
     private static final String TRANSACTION_BASE_URL_FORMAT = "%s/tx".formatted(QUERY_URL_FORMAT);
@@ -62,7 +62,7 @@ public record HttpContext(
                         if (!value.isEmpty()) {
                             defaultDatabase = value;
                         }
-                    } else if (ENABLE_VECTOR.equals(key)) {
+                    } else if (EXPERIMENTAL_VECTOR.equals(key)) {
                         var value = keyAndValue[1].trim();
                         if (!value.isEmpty() && Boolean.parseBoolean(value)) {
                             vndNeo4jQueryVersion = VndNeo4jQueryVersion.V1_1;
