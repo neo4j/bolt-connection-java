@@ -103,7 +103,7 @@ final class QueryApiBoltConnectionTest {
                 TestValueFactory.INSTANCE,
                 httpClient,
                 URI.create("http://localhost"),
-                AuthTokens.basic("user", "password", "realm", TestValueFactory.INSTANCE),
+                AuthTokens.basic("user", "password", null, TestValueFactory.INSTANCE),
                 "userAgent",
                 "serverAgent",
                 new BoltProtocolVersion(5, 6),
