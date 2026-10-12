@@ -20,4 +20,10 @@ import java.util.List;
 import java.util.Map;
 
 public record QueryResult(
-        QueryData data, List<String> bookmarks, QueryCounters counters, List<Map<String, Object>> notifications) {}
+        QueryData data,
+        List<String> bookmarks,
+        QueryCounters counters,
+        List<Map<String, Object>> notifications,
+        String queryType,
+        Long resultAvailableAfter,
+        Long resultConsumedAfter) {}

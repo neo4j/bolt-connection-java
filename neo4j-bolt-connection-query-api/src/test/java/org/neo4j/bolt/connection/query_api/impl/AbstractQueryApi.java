@@ -106,7 +106,7 @@ abstract class AbstractQueryApi {
                         0,
                         0,
                         SecurityPlans.encryptedForSystemCASignedCertificates(),
-                        AuthTokens.basic(username(), password(), "basic", valueFactory),
+                        AuthTokens.basic(username(), password(), null, valueFactory),
                         null,
                         null,
                         mock(ImmutableObservation.class))
@@ -758,7 +758,7 @@ abstract class AbstractQueryApi {
                 .onComplete();
         var messages = List.of(
                 Messages.logoff(),
-                Messages.logon(AuthTokens.basic(username(), password() + "typo", "basic", TestValueFactory.INSTANCE)),
+                Messages.logon(AuthTokens.basic(username(), password() + "typo", null, TestValueFactory.INSTANCE)),
                 Messages.run(
                         database(),
                         AccessMode.WRITE,

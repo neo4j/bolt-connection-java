@@ -108,11 +108,12 @@ public final class QueryApiBoltConnection implements BoltConnection {
         this.baseUri = Objects.requireNonNull(baseUri);
         this.userAgent = userAgent;
         this.serverAgent = Objects.requireNonNull(serverAgent);
+        var httpContext = new HttpContext(null, baseUri, null, null);
         json = JSON.builder()
                 .register(new JacksonJrExtension() {
                     @Override
                     protected void register(ExtensionContext ctxt) {
-                        ctxt.appendProvider(new DriverValueProvider(valueFactory));
+                        ctxt.appendProvider(new DriverValueProvider(valueFactory, httpContext.vndNeo4jQueryVersion()));
                     }
                 })
                 .build();
@@ -483,7 +484,13 @@ public final class QueryApiBoltConnection implements BoltConnection {
         this.authHeader = switch (scheme) {
             case "basic" -> {
                 var username = authMap.get("principal").asString();
+                if (username.contains(":")) {
+                    throw new BoltClientException("Username must not include ':'");
+                }
                 var password = authMap.get("credentials").asString();
+                if (authMap.containsKey("realm")) {
+                    throw new BoltClientException("Basic token realm is not supported when using HTTP schemes");
+                }
                 yield "Basic "
                         + Base64.getEncoder()
                                 .encodeToString(

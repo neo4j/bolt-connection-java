@@ -30,11 +30,13 @@ import com.fasterxml.jackson.jr.ob.impl.JSONWriter;
 import java.io.IOException;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.values.Node;
 import org.neo4j.bolt.connection.values.Relationship;
 import org.neo4j.bolt.connection.values.Segment;
@@ -45,15 +47,17 @@ import org.neo4j.bolt.connection.values.ValueFactory;
 class DriverValueProvider extends ReaderWriterProvider {
 
     private final ValueFactory valueFactory;
+    private final VndNeo4jQueryVersion vndNeo4jQueryVersion;
 
-    public DriverValueProvider(ValueFactory valueFactory) {
+    public DriverValueProvider(ValueFactory valueFactory, VndNeo4jQueryVersion vndNeo4jQueryVersion) {
         this.valueFactory = valueFactory;
+        this.vndNeo4jQueryVersion = vndNeo4jQueryVersion;
     }
 
     @Override
     public ValueReader findValueReader(JSONReader readContext, Class<?> type) {
         if (Value.class.isAssignableFrom(type)) {
-            return new ValueValueReader(Value.class, valueFactory);
+            return new ValueValueReader(Value.class, valueFactory, vndNeo4jQueryVersion);
         }
         return super.findValueReader(readContext, type);
     }
@@ -61,12 +65,17 @@ class DriverValueProvider extends ReaderWriterProvider {
     @Override
     public ValueWriter findValueWriter(JSONWriter writeContext, Class<?> type) {
         if (Value.class.isAssignableFrom(type)) {
-            return new ValueValueWriter();
+            return new ValueValueWriter(vndNeo4jQueryVersion);
         }
         return super.findValueWriter(writeContext, type);
     }
 
     static class ValueValueWriter implements ValueWriter {
+        private final VndNeo4jQueryVersion vndNeo4jQueryVersion;
+
+        ValueValueWriter(VndNeo4jQueryVersion vndNeo4jQueryVersion) {
+            this.vndNeo4jQueryVersion = vndNeo4jQueryVersion;
+        }
 
         @Override
         public void writeValue(JSONWriter context, JsonGenerator g, Object value) throws IOException {
@@ -88,7 +97,12 @@ class DriverValueProvider extends ReaderWriterProvider {
                     };
             context.writeValue(actualName);
             g.writeFieldName(Fieldnames.CYPHER_VALUE);
-            context.writeValue(fromValue(cypherType, theValue));
+            var valueToWrite = fromValue(cypherType, theValue);
+            if (valueToWrite instanceof Number number) {
+                g.writeString(number.toString());
+            } else {
+                context.writeValue(valueToWrite);
+            }
             g.writeEndObject();
         }
 
@@ -96,6 +110,9 @@ class DriverValueProvider extends ReaderWriterProvider {
             Function<Value, Object> writer = cypherType.getWriter();
             if (writer == null) {
                 throw new IllegalArgumentException("could not obtain writer for " + cypherType);
+            }
+            if (vndNeo4jQueryVersion.isBefore(cypherType.getMinVndNeo4jQueryVersion())) {
+                throw new BoltUnsupportedFeatureException("%s type is not supported".formatted(cypherType.name()));
             }
             return writer.apply(value);
         }
@@ -109,10 +126,13 @@ class DriverValueProvider extends ReaderWriterProvider {
     static class ValueValueReader extends ValueReader {
 
         private final ValueFactory valueFactory;
+        private final VndNeo4jQueryVersion vndNeo4jQueryVersion;
 
-        protected ValueValueReader(Class<?> valueType, ValueFactory valueFactory) {
+        protected ValueValueReader(
+                Class<?> valueType, ValueFactory valueFactory, VndNeo4jQueryVersion vndNeo4jQueryVersion) {
             super(valueType);
             this.valueFactory = valueFactory;
+            this.vndNeo4jQueryVersion = vndNeo4jQueryVersion;
         }
 
         @Override
@@ -204,6 +224,63 @@ class DriverValueProvider extends ReaderWriterProvider {
                         }
                         p.nextToken();
                         return valueFactory.value(valueFactory.path(segments, nodes, relationships));
+                    } else if (typeString.equals(CypherTypes.Vector.name())
+                            && !vndNeo4jQueryVersion.isBefore(vndNeo4jQueryVersion)) {
+                        var vector = reader.readBean(SerializedVector.class);
+                        Class<?> elementType;
+                        Object elements;
+                        switch (vector.getCoordinatesType()) {
+                            case "INT64" -> {
+                                elementType = long.class;
+                                elements = Arrays.stream(vector.getCoordinates())
+                                        .mapToLong(Long::parseLong)
+                                        .toArray();
+                            }
+                            case "INT32" -> {
+                                elementType = int.class;
+                                elements = Arrays.stream(vector.getCoordinates())
+                                        .mapToInt(java.lang.Integer::parseInt)
+                                        .toArray();
+                            }
+                            case "FLOAT64" -> {
+                                elementType = double.class;
+                                elements = Arrays.stream(vector.getCoordinates())
+                                        .mapToDouble(Double::parseDouble)
+                                        .toArray();
+                            }
+                            case "FLOAT32" -> {
+                                elementType = float.class;
+                                var coordinates = vector.getCoordinates();
+                                var result = new float[coordinates.length];
+                                for (var i = 0; i < coordinates.length; i++) {
+                                    result[i] = java.lang.Float.parseFloat(coordinates[i]);
+                                }
+                                elements = result;
+                            }
+                            case "INT16" -> {
+                                elementType = short.class;
+                                var coordinates = vector.getCoordinates();
+                                var result = new short[coordinates.length];
+                                for (var i = 0; i < coordinates.length; i++) {
+                                    result[i] = Short.parseShort(coordinates[i]);
+                                }
+                                elements = result;
+                            }
+                            case "INT8" -> {
+                                elementType = byte.class;
+                                var coordinates = vector.getCoordinates();
+                                var result = new byte[coordinates.length];
+                                for (var i = 0; i < coordinates.length; i++) {
+                                    result[i] = Byte.parseByte(coordinates[i]);
+                                }
+                                elements = result;
+                            }
+                            default ->
+                                throw new IllegalArgumentException(
+                                        "Unsupported coordinates type: " + vector.getCoordinatesType());
+                        }
+                        p.nextToken();
+                        return valueFactory.vector(elementType, elements);
                     } else {
                         BiFunction<ValueFactory, String, Value> parser =
                                 CypherTypes.valueOf(typeString).getReader();
@@ -431,6 +508,27 @@ class DriverValueProvider extends ReaderWriterProvider {
 
         public long getEndId() {
             return Long.parseLong(get_end_node_element_id().split(":")[2]);
+        }
+    }
+
+    private static class SerializedVector {
+        private String coordinatesType;
+        private String[] coordinates;
+
+        public String getCoordinatesType() {
+            return coordinatesType;
+        }
+
+        public void setCoordinatesType(String coordinatesType) {
+            this.coordinatesType = coordinatesType;
+        }
+
+        public String[] getCoordinates() {
+            return coordinates;
+        }
+
+        public void setCoordinates(String[] coordinates) {
+            this.coordinates = coordinates;
         }
     }
 }

@@ -164,11 +164,23 @@ final class RunMessageHandler extends AbstractMessageHandler<Query> {
         if (notifications != null && !notifications.isEmpty()) {
             metadata.put("notifications", valueFactory.value(notifications));
         }
+        var queryType = queryResult.queryType();
+        if (queryType != null) {
+            metadata.put("type", valueFactory.value(queryType));
+        }
+        var resultConsumedAfter = queryResult.resultConsumedAfter();
+        if (resultConsumedAfter != null) {
+            metadata.put("t_last", valueFactory.value(resultConsumedAfter));
+        }
         // Jackson on native image does a bit of different default, it does not create query data with two empty lists,
         // but null. Juchhu.
         var data = Objects.requireNonNullElseGet(queryResult.data(), QueryData::empty);
         var query = new Query(id, data.fields(), data.values(), Collections.unmodifiableMap(metadata));
-        handler.onRunSummary(new RunSummaryImpl(query.id(), query.fields(), -1, databaseName));
+        var resultAvailableAfter = queryResult.resultAvailableAfter();
+        if (resultAvailableAfter == null) {
+            resultAvailableAfter = -1L;
+        }
+        handler.onRunSummary(new RunSummaryImpl(query.id(), query.fields(), resultAvailableAfter, databaseName));
         return query;
     }
 

@@ -16,15 +16,16 @@
  */
 package org.neo4j.bolt.connection.query_api.impl;
 
+import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.time.LocalDate;
 import java.time.OffsetTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Locale;
+import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.neo4j.bolt.connection.exception.BoltUnsupportedFeatureException;
 import org.neo4j.bolt.connection.values.Type;
 import org.neo4j.bolt.connection.values.Value;
 import org.neo4j.bolt.connection.values.ValueFactory;
@@ -153,17 +154,28 @@ enum CypherTypes {
     Vector(
             Type.VECTOR,
             null, // handled in DriverValueProvider
-            CypherTypes::unsupportedVector);
+            CypherTypes::writeVector,
+            VndNeo4jQueryVersion.V1_1);
 
     // spotless:on
     private final BiFunction<ValueFactory, String, Value> reader;
     private final Function<Value, Object> writer;
     private final Type type;
+    private final VndNeo4jQueryVersion minVndNeo4jQueryVersion;
 
     CypherTypes(Type type, BiFunction<ValueFactory, String, Value> reader, Function<Value, Object> writer) {
+        this(type, reader, writer, VndNeo4jQueryVersion.V1_0);
+    }
+
+    CypherTypes(
+            Type type,
+            BiFunction<ValueFactory, String, Value> reader,
+            Function<Value, Object> writer,
+            VndNeo4jQueryVersion minVndNeo4jQueryVersion) {
         this.type = type;
         this.reader = reader;
         this.writer = writer;
+        this.minVndNeo4jQueryVersion = minVndNeo4jQueryVersion;
     }
 
     public static CypherTypes typeFromValue(Value value) {
@@ -191,6 +203,10 @@ enum CypherTypes {
         return writer;
     }
 
+    public VndNeo4jQueryVersion getMinVndNeo4jQueryVersion() {
+        return minVndNeo4jQueryVersion;
+    }
+
     private static final Pattern WKT_PATTERN =
             Pattern.compile("SRID=(\\d+);\\s*POINT\\s?Z?\\s?\\(\\s*(\\S+)\\s+(\\S+)\\s*(\\S*)\\)");
 
@@ -216,24 +232,47 @@ enum CypherTypes {
         if (value.boltValueType() == Type.POINT) {
             var point = value.asBoltPoint();
             var srid = point.srid();
-            String pointArguments;
-            if (Double.isNaN(point.z())) {
-                pointArguments = java.lang.String.format(Locale.US, "%f %f", point.x(), point.y());
-            } else {
-                pointArguments = java.lang.String.format(Locale.US, "%f %f %f", point.x(), point.y(), point.z());
-            }
-
-            return "SRID=%d;POINT (%s)".formatted(srid, pointArguments);
+            return Double.isNaN(point.z())
+                    ? "SRID=%d;POINT (%f %f)".formatted(srid, point.x(), point.y())
+                    : "SRID=%d;POINT Z (%f %f %f)".formatted(srid, point.x(), point.y(), point.z());
         } else {
             throw new IllegalArgumentException("Not a point to convert");
         }
     }
 
-    private static Object unsupported(Value value) {
-        throw new IllegalArgumentException("Node value type is not supported");
+    private static Map<String, Serializable> writeVector(Value value) {
+        if (value.boltValueType() == Type.VECTOR) {
+            var vector = value.asBoltVector();
+            var elements = vector.elements();
+            var length = Array.getLength(elements);
+            String coordinatesType;
+            var coordinates = new String[length];
+            var elementType = vector.elementType();
+            if (elementType.equals(long.class) || elementType.isAssignableFrom(Long.class)) {
+                coordinatesType = "INT64";
+            } else if (elementType.equals(int.class) || elementType.equals(Integer.class)) {
+                coordinatesType = "INT32";
+            } else if (elementType.equals(double.class) || elementType.equals(Double.class)) {
+                coordinatesType = "FLOAT64";
+            } else if (elementType.equals(float.class) || elementType.equals(Float.class)) {
+                coordinatesType = "FLOAT32";
+            } else if (elementType.equals(short.class) || elementType.equals(Short.class)) {
+                coordinatesType = "INT16";
+            } else if (elementType.equals(byte.class) || elementType.equals(Byte.class)) {
+                coordinatesType = "INT8";
+            } else {
+                throw new IllegalArgumentException("Unsupported vector element type: " + elementType);
+            }
+            for (var i = 0; i < length; i++) {
+                coordinates[i] = java.lang.String.valueOf(Array.get(elements, i));
+            }
+            return java.util.Map.of("coordinatesType", coordinatesType, "coordinates", coordinates);
+        } else {
+            throw new IllegalArgumentException("Not a vector to convert");
+        }
     }
 
-    private static Object unsupportedVector(Value value) {
-        throw new BoltUnsupportedFeatureException("Vector type is not supported");
+    private static Object unsupported(Value value) {
+        throw new IllegalArgumentException("Node value type is not supported");
     }
 }
