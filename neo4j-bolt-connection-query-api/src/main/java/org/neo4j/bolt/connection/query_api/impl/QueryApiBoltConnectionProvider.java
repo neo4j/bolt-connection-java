@@ -27,8 +27,10 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLParameters;
 import org.neo4j.bolt.connection.AuthToken;
 import org.neo4j.bolt.connection.BoltAgent;
@@ -45,12 +47,14 @@ import org.neo4j.bolt.connection.observation.ObservationProvider;
 import org.neo4j.bolt.connection.values.ValueFactory;
 
 public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
+    private static final AtomicInteger INSTANCE_COUNTER = new AtomicInteger(0);
     private final LoggingProvider logging;
     private final System.Logger logger;
     private final ValueFactory valueFactory;
     // Higher versions of Bolt require GQL support that it not available in Query API.
     private final BoltProtocolVersion BOLT_PROTOCOL_VERSION = new BoltProtocolVersion(5, 4);
-    private final Executor httpExecutor;
+    private final int instanceId;
+    private final ExecutorService httpExecutor;
     private final Clock clock;
     private final ObservationProvider observationProvider;
 
@@ -59,8 +63,11 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
         this.logging = Objects.requireNonNull(logging);
         this.logger = logging.getLog(getClass());
         this.valueFactory = Objects.requireNonNull(valueFactory);
+        instanceId = INSTANCE_COUNTER.getAndIncrement();
+        var threadCounter = new AtomicInteger(0);
         this.httpExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), runnable -> {
-            var thread = new Thread(runnable);
+            var thread = new Thread(
+                    runnable, "neo4j-bolt-http-executor-%s-%d".formatted(instanceId, threadCounter.getAndIncrement()));
             thread.setDaemon(true);
             return thread;
         });
@@ -164,6 +171,22 @@ public class QueryApiBoltConnectionProvider implements BoltConnectionProvider {
 
     @Override
     public CompletionStage<Void> close() {
-        return CompletableFuture.completedStage(null);
+        httpExecutor.shutdown();
+        return CompletableFuture.runAsync(
+                () -> {
+                    try {
+                        if (!httpExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
+                            httpExecutor.shutdownNow();
+                        }
+                    } catch (InterruptedException e) {
+                        httpExecutor.shutdownNow();
+                        Thread.currentThread().interrupt();
+                        throw new BoltClientException("Interrupted while waiting for HTTP executor to shut down", e);
+                    }
+                },
+                task -> {
+                    var thread = new Thread(task, "neo4j-bolt-http-executor-%s-shutdown".formatted(instanceId));
+                    thread.start();
+                });
     }
 }
