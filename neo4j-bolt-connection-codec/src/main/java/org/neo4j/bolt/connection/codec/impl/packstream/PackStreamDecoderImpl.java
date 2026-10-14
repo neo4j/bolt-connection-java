@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.codec.impl.packstream;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -102,15 +103,7 @@ final class PackStreamDecoderImpl implements PackStreamDecoder {
             case UUID -> valueFactory.value(unpacker.unpackUUID());
             case DICTIONARY -> valueFactory.value(decodeDictionary(input));
             case LIST -> valueFactory.value(decodeList(input));
-            case STRUCTURE -> {
-                var size = unpacker.unpackStructHeader();
-                var tagByte = unpacker.unpackStructSignature();
-                var decoder = tagByteToStructureDecoder.get(tagByte);
-                if (decoder == null) {
-                    throw new BoltClientException("No decoder found for tag byte " + tagByte);
-                }
-                yield decoder.decodeValue(this, input);
-            }
+            case STRUCTURE -> findDecoder(input).decodeValue(this, input);
         };
     }
 
@@ -154,6 +147,14 @@ final class PackStreamDecoderImpl implements PackStreamDecoder {
     @Override
     public <T extends PackStreamStructure> T decodeStructure(ReadInput input, Class<T> structureCls)
             throws IOException {
+        return (T) findDecoder(input).decode(this, input);
+    }
+
+    private PackStream.Unpacker unpacker(ReadInput input) {
+        return new PackStream.Unpacker(new ReadInputAdapter(input));
+    }
+
+    private PackStreamStructureDecoder<?> findDecoder(ReadInput input) throws IOException {
         var unpacker = unpacker(input);
         var size = unpacker.unpackStructHeader();
         var tagByte = unpacker.unpackStructSignature();
@@ -161,10 +162,10 @@ final class PackStreamDecoderImpl implements PackStreamDecoder {
         if (decoder == null) {
             throw new BoltClientException("No decoder found for tag byte " + tagByte);
         }
-        return (T) decoder.decode(this, input);
-    }
-
-    private PackStream.Unpacker unpacker(ReadInput input) {
-        return new PackStream.Unpacker(new ReadInputAdapter(input));
+        if (size != decoder.size()) {
+            throw new BoltClientException("Invalid size %d for tag byte %s"
+                    .formatted(size, HexFormat.of().withUpperCase().toHexDigits(tagByte)));
+        }
+        return decoder;
     }
 }
