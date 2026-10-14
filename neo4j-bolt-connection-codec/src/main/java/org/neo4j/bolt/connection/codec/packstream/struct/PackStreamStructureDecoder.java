@@ -35,6 +35,12 @@ public interface PackStreamStructureDecoder<T extends PackStreamStructure> {
     byte tagByte();
 
     /**
+     * Returns the size of the {@link PackStreamStructure}.
+     * @return the size
+     */
+    int size();
+
+    /**
      * Decodes the {@link PackStreamStructure}.
      * @param decoder the decoder to decode the structure fields with
      * @param input the input to read from

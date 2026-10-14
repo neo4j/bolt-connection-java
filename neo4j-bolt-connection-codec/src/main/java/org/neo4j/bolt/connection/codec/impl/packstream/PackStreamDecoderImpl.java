@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.codec.impl.packstream;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -160,6 +161,10 @@ final class PackStreamDecoderImpl implements PackStreamDecoder {
         var decoder = tagByteToStructureDecoder.get(tagByte);
         if (decoder == null) {
             throw new BoltClientException("No decoder found for tag byte " + tagByte);
+        }
+        if (size != decoder.size()) {
+            throw new BoltClientException("Invalid size %d for tag byte %s"
+                    .formatted(size, HexFormat.of().withUpperCase().toHexDigits(tagByte)));
         }
         return (T) decoder.decode(this, input);
     }

@@ -49,6 +49,11 @@ public final class EncryptedStructureDecoder implements PackStreamStructureDecod
     }
 
     @Override
+    public int size() {
+        return EncryptedStructure.ENCRYPTED_STRUCT_SIZE;
+    }
+
+    @Override
     public EncryptedStructure decode(PackStreamDecoder decoder, ReadInput input) throws IOException {
         var profileType = decoder.decodeString(input);
         var profileVersion = decoder.decodeInteger(input);
