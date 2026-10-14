@@ -26,6 +26,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.resolver.AddressResolverGroup;
+import io.netty.util.internal.PlatformDependent;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
@@ -161,6 +162,10 @@ public final class NettyConnectionProvider implements ConnectionProvider {
                         valueFactory));
         if (fastOpen) {
             bootstrap.option(ChannelOption.TCP_FASTOPEN_CONNECT, true);
+        }
+        // Explicitly enable TCP_NODELAY where supported by Netty rather than relying on default behavior.
+        if (PlatformDependent.canEnableTcpNoDelayByDefault()) {
+            bootstrap.option(ChannelOption.TCP_NODELAY, true);
         }
 
         SocketAddress socketAddress;
