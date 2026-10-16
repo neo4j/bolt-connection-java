@@ -16,82 +16,209 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async.outbound;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.neo4j.bolt.connection.netty.impl.util.TestUtil.assertByteBufContains;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledByteBufAllocator;
+import java.util.List;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 
 class ChunkAwareByteBufOutputTest {
-    private static Stream<ByteBuf> testBuffers() {
-        return IntStream.iterate(1, size -> size * 2).limit(20).mapToObj(Unpooled::buffer);
+    private static final UnpooledByteBufAllocator ALLOCATOR = UnpooledByteBufAllocator.DEFAULT;
+
+    private static IntStream segmentSizes() {
+        return IntStream.iterate(1, size -> size * 2).limit(20);
     }
 
     @Test
     void shouldThrowForIllegalMaxChunkSize() {
-        assertThrows(IllegalArgumentException.class, () -> new ChunkAwareByteBufOutput(-42));
+        assertThrows(IllegalArgumentException.class, () -> new ChunkAwareByteBufOutput(-42, 16));
     }
 
     @Test
-    void shouldThrowWhenStartedWithNullBuf() {
-        var output = new ChunkAwareByteBufOutput(16);
+    void shouldThrowForIllegalSegmentSize() {
+        assertThrows(IllegalArgumentException.class, () -> new ChunkAwareByteBufOutput(16, 0));
+    }
+
+    @Test
+    void shouldThrowWhenStartedWithNullAllocator() {
+        var output = new ChunkAwareByteBufOutput(16, 16);
         assertThrows(NullPointerException.class, () -> output.start(null));
     }
 
     @Test
     void shouldThrowWhenStartedTwice() {
-        var output = new ChunkAwareByteBufOutput(16);
-        output.start(mock(ByteBuf.class));
+        var output = new ChunkAwareByteBufOutput(16, 16);
+        output.start(ALLOCATOR);
 
-        assertThrows(IllegalStateException.class, () -> output.start(mock(ByteBuf.class)));
+        assertThrows(IllegalStateException.class, () -> output.start(ALLOCATOR));
+        output.abort();
+    }
+
+    @Test
+    void shouldStartNewSegmentAtTheFirstChunkBoundaryAfterReachingSegmentSize() {
+        // chunks of 2 + 5 bytes: the second chunk takes the first segment past 10 bytes
+        var output = new ChunkAwareByteBufOutput(7, 10);
+
+        output.start(ALLOCATOR);
+        output.writeBytes(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18});
+        var segments = output.stop();
+
+        assertEquals(2, segments.size());
+        assertByteBufContains(
+                segments.get(0),
+                (short) 5,
+                (byte) 1,
+                (byte) 2,
+                (byte) 3,
+                (byte) 4,
+                (byte) 5,
+                (short) 5,
+                (byte) 6,
+                (byte) 7,
+                (byte) 8,
+                (byte) 9,
+                (byte) 10);
+        assertByteBufContains(
+                segments.get(1),
+                (short) 5,
+                (byte) 11,
+                (byte) 12,
+                (byte) 13,
+                (byte) 14,
+                (byte) 15,
+                (short) 3,
+                (byte) 16,
+                (byte) 17,
+                (byte) 18);
+    }
+
+    @Test
+    void shouldNotGrowSegmentWhenItsLastChunkStartsJustBeforeSegmentSizeAndIsFull() {
+        // full chunks of 7 bytes start at 0, 7 and 14, one byte before the segment size of 15, so each segment holds
+        // 21 bytes and the boundary takes the last one to 23 of its 24 bytes
+        var output = new ChunkAwareByteBufOutput(7, 15);
+
+        output.start(ALLOCATOR);
+        output.writeBytes(new byte[6 * 5]);
+        var segments = output.stop();
+        var last = segments.get(segments.size() - 1);
+        var capacityBeforeBoundary = last.capacity();
+        BoltProtocolUtil.writeMessageBoundary(last);
+
+        try {
+            assertEquals(2, segments.size());
+            assertEquals(15 + 7 + BoltProtocolUtil.CHUNK_HEADER_SIZE_BYTES, capacityBeforeBoundary);
+            assertEquals(23, last.readableBytes());
+            assertEquals(capacityBeforeBoundary, last.capacity());
+        } finally {
+            segments.forEach(ByteBuf::release);
+        }
+    }
+
+    @Test
+    void shouldRequestPowerOfTwoSegmentCapacityByDefault() {
+        var output = new ChunkAwareByteBufOutput();
+
+        output.start(ALLOCATOR);
+        output.writeBytes(new byte[1024 * 1024]);
+        var segments = output.stop();
+
+        try {
+            assertTrue(segments.size() > 1, "Expected more than one segment, got " + segments.size());
+            var capacity = segments.get(1).capacity();
+            assertEquals(1, Integer.bitCount(capacity), "Segment capacity is not a power of two: " + capacity);
+        } finally {
+            segments.forEach(ByteBuf::release);
+        }
+    }
+
+    @Test
+    void shouldReleaseEachBufferOnceAndBeReusableWhenSegmentAllocationFails() {
+        var allocator = new RecordingByteBufAllocator(1);
+        var output = new ChunkAwareByteBufOutput(7, 10);
+
+        output.start(allocator);
+        assertThrows(OutOfMemoryError.class, () -> output.writeBytes(new byte[100]));
+        output.abort();
+
+        assertEquals(1, allocator.allocated().size());
+        assertEquals(0, allocator.allocated().get(0).refCnt());
+
+        output.start(ALLOCATOR);
+        output.writeByte((byte) 42);
+        assertByteBufContains(join(output.stop()), (short) 1, (byte) 42);
+    }
+
+    @Test
+    void shouldReleaseAllSegmentsOnAbortAndBeReusable() {
+        var allocator = new RecordingByteBufAllocator();
+        var output = new ChunkAwareByteBufOutput(7, 10);
+
+        output.start(allocator);
+        output.writeBytes(new byte[100]);
+        output.abort();
+
+        assertTrue(allocator.allocated().size() > 1);
+        allocator.allocated().forEach(buf -> assertEquals(0, buf.refCnt()));
+
+        output.start(ALLOCATOR);
+        output.writeByte((byte) 42);
+        assertByteBufContains(join(output.stop()), (short) 1, (byte) 42);
+    }
+
+    private static ByteBuf join(List<ByteBuf> segments) {
+        return Unpooled.wrappedBuffer(segments.toArray(ByteBuf[]::new));
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteByteAtTheBeginningOfChunk(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(16);
+    @MethodSource("segmentSizes")
+    void shouldWriteByteAtTheBeginningOfChunk(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(16, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeByte((byte) 42);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 1, (byte) 42);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteByteWhenCurrentChunkContainsSpace(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(16);
+    @MethodSource("segmentSizes")
+    void shouldWriteByteWhenCurrentChunkContainsSpace(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(16, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeByte((byte) 1);
         output.writeByte((byte) 2);
         output.writeByte((byte) -24);
 
         output.writeByte((byte) 42);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 4, (byte) 1, (byte) 2, (byte) -24, (byte) 42);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteByteWhenCurrentChunkIsFull(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(5);
+    @MethodSource("segmentSizes")
+    void shouldWriteByteWhenCurrentChunkIsFull(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(5, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeByte((byte) 5);
         output.writeByte((byte) 3);
         output.writeByte((byte) -5);
 
         output.writeByte((byte) 42);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -105,46 +232,46 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteShortAtTheBeginningOfChunk(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(10);
+    @MethodSource("segmentSizes")
+    void shouldWriteShortAtTheBeginningOfChunk(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(10, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeShort(Short.MAX_VALUE);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 2, Short.MAX_VALUE);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteShortWhenCurrentChunkContainsSpace(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(12);
+    @MethodSource("segmentSizes")
+    void shouldWriteShortWhenCurrentChunkContainsSpace(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(12, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeShort((short) 1);
         output.writeShort((short) 42);
         output.writeShort((short) 4242);
         output.writeShort((short) 4242);
 
         output.writeShort((short) -30);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 10, (short) 1, (short) 42, (short) 4242, (short) 4242, (short) -30);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteShortWhenCurrentChunkIsFull(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(8);
+    @MethodSource("segmentSizes")
+    void shouldWriteShortWhenCurrentChunkIsFull(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(8, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeShort((short) 14);
         output.writeShort((short) -99);
         output.writeShort((short) 202);
 
         output.writeShort(Short.MIN_VALUE);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -158,39 +285,39 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteIntAtTheBeginningOfChunk(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(18);
+    @MethodSource("segmentSizes")
+    void shouldWriteIntAtTheBeginningOfChunk(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(18, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeInt(73649);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 4, 73649);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteIntWhenCurrentChunkContainsSpace(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(40);
+    @MethodSource("segmentSizes")
+    void shouldWriteIntWhenCurrentChunkContainsSpace(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(40, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeInt(Integer.MAX_VALUE);
         output.writeInt(20);
         output.writeInt(-173);
 
         output.writeInt(Integer.MIN_VALUE);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 16, Integer.MAX_VALUE, 20, -173, Integer.MIN_VALUE);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteIntWhenCurrentChunkIsFull(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(27);
+    @MethodSource("segmentSizes")
+    void shouldWriteIntWhenCurrentChunkIsFull(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(27, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeInt(42);
         output.writeInt(-73467193);
         output.writeInt(373);
@@ -199,7 +326,7 @@ class ChunkAwareByteBufOutputTest {
         output.writeInt(785);
 
         output.writeInt(42);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -216,46 +343,46 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteLongAtTheBeginningOfChunk(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(12);
+    @MethodSource("segmentSizes")
+    void shouldWriteLongAtTheBeginningOfChunk(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(12, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeLong(15);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 8, 15L);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteLongWhenCurrentChunkContainsSpace(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(34);
+    @MethodSource("segmentSizes")
+    void shouldWriteLongWhenCurrentChunkContainsSpace(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(34, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeLong(Long.MAX_VALUE);
         output.writeLong(-1);
         output.writeLong(-100);
 
         output.writeLong(Long.MIN_VALUE / 2);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 32, Long.MAX_VALUE, -1L, -100L, Long.MIN_VALUE / 2);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteLongWhenCurrentChunkIsFull(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(38);
+    @MethodSource("segmentSizes")
+    void shouldWriteLongWhenCurrentChunkIsFull(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(38, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeLong(12);
         output.writeLong(8741);
         output.writeLong(2314);
         output.writeLong(-85793);
 
         output.writeLong(-57999999);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -270,42 +397,42 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteDoubleAtTheBeginningOfChunk(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(10);
+    @MethodSource("segmentSizes")
+    void shouldWriteDoubleAtTheBeginningOfChunk(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(10, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeDouble(12.99937);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 8, 12.99937D);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteDoubleWhenCurrentChunkContainsSpace(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(18);
+    @MethodSource("segmentSizes")
+    void shouldWriteDoubleWhenCurrentChunkContainsSpace(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(18, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeDouble(-5);
 
         output.writeDouble(991.3333);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(buf, (short) 16, -5D, 991.3333D);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteDoubleWhenCurrentChunkIsFull(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(20);
+    @MethodSource("segmentSizes")
+    void shouldWriteDoubleWhenCurrentChunkIsFull(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(20, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeDouble(1839);
         output.writeDouble(5710923.34873);
 
         output.writeDouble(-47389.333399);
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -318,30 +445,30 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteBytesAtTheBeginningOfChunk(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(10);
+    @MethodSource("segmentSizes")
+    void shouldWriteBytesAtTheBeginningOfChunk(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(10, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeBytes(new byte[] {1, 2, 3, -1, -2, -3, 127});
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf, (short) 7, (byte) 1, (byte) 2, (byte) 3, (byte) -1, (byte) -2, (byte) -3, (byte) 127);
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteBytesWhenCurrentChunkContainsSpace(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(13);
+    @MethodSource("segmentSizes")
+    void shouldWriteBytesWhenCurrentChunkContainsSpace(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(13, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeBytes(new byte[] {9, 8, -10});
         output.writeBytes(new byte[] {127, 126, -128, -126});
         output.writeBytes(new byte[] {0, 99});
 
         output.writeBytes(new byte[] {-42, 42});
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -360,17 +487,17 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteBytesWhenCurrentChunkIsFull(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(9);
+    @MethodSource("segmentSizes")
+    void shouldWriteBytesWhenCurrentChunkIsFull(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(9, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeBytes(new byte[] {1, 2});
         output.writeBytes(new byte[] {3, 4, 5});
         output.writeBytes(new byte[] {10});
 
         output.writeBytes(new byte[] {-1, -42, -43});
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -389,13 +516,13 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteBytesThatSpanMultipleChunks(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(7);
+    @MethodSource("segmentSizes")
+    void shouldWriteBytesThatSpanMultipleChunks(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(7, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeBytes(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18});
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,
@@ -425,11 +552,11 @@ class ChunkAwareByteBufOutputTest {
     }
 
     @ParameterizedTest
-    @MethodSource("testBuffers")
-    void shouldWriteDataToMultipleChunks(ByteBuf buf) {
-        var output = new ChunkAwareByteBufOutput(13);
+    @MethodSource("segmentSizes")
+    void shouldWriteDataToMultipleChunks(int segmentSize) {
+        var output = new ChunkAwareByteBufOutput(13, segmentSize);
 
-        output.start(buf);
+        output.start(ALLOCATOR);
         output.writeDouble(12.3);
         output.writeByte((byte) 42);
         output.writeInt(-10);
@@ -441,7 +568,7 @@ class ChunkAwareByteBufOutputTest {
         output.writeShort((short) 1);
         output.writeInt(12345);
         output.writeBytes(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
-        output.stop();
+        var buf = join(output.stop());
 
         assertByteBufContains(
                 buf,

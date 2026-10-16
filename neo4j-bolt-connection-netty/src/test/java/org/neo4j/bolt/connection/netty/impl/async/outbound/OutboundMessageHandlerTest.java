@@ -16,7 +16,9 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async.outbound;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -27,7 +29,10 @@ import static org.neo4j.bolt.connection.netty.impl.util.TestUtil.assertByteBufCo
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.EncoderException;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +44,7 @@ import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes;
 import org.neo4j.bolt.connection.netty.impl.async.inbound.InboundMessageDispatcher;
 import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.MessageFormat;
+import org.neo4j.bolt.connection.netty.impl.messaging.request.RunWithMetadataMessage;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.BoltProtocolV3;
 import org.neo4j.bolt.connection.netty.impl.messaging.v3.MessageFormatV3;
 import org.neo4j.bolt.connection.test.values.TestValueFactory;
@@ -96,6 +102,83 @@ class OutboundMessageHandlerTest {
 
         assertTrue(channel.writeOutbound(new BoltProtocolV3.Query("RETURN 1", params)));
         assertTrue(channel.finish());
+    }
+
+    @Test
+    void shouldWriteLargeMessageAsMultipleBuffersThatFormOneChunkedMessage() {
+        var handler = newHandler(new MessageFormatV3());
+        channel.pipeline().addLast(handler);
+        var payload = new byte[1024 * 1024];
+        for (var i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i % 251);
+        }
+
+        assertTrue(channel.writeOutbound(RunWithMetadataMessage.unmanagedTxRunMessage(
+                "RETURN $array", Map.of("array", valueFactory.value(payload)))));
+        assertTrue(channel.finish());
+
+        var outbound = channel.outboundMessages().size();
+        assertTrue(outbound > 1, "Expected the message to span several buffers, got " + outbound);
+        var body = dechunkSingleMessage();
+        var payloadStart = indexOf(body, payload);
+        assertTrue(payloadStart >= 0, "Payload not found in the dechunked message");
+        assertArrayEquals(payload, Arrays.copyOfRange(body, payloadStart, payloadStart + payload.length));
+    }
+
+    @Test
+    void shouldReleaseEveryBufferAndWriteNothingWhenWriterFails() throws IOException {
+        var allocator = new RecordingByteBufAllocator();
+        channel.config().setAllocator(allocator);
+        var writer = mock(MessageFormat.Writer.class);
+        doAnswer(invocation -> {
+                    WriteOutput<?> output = invocation.getArgument(1);
+                    output.writeBytes(new byte[1024 * 1024]);
+                    throw new IOException("Writer failed after spanning several buffers");
+                })
+                .when(writer)
+                .write(any(Message.class), any());
+        var messageFormat = mock(MessageFormat.class);
+        when(messageFormat.newWriter(any())).thenReturn(writer);
+        channel.pipeline().addLast(newHandler(messageFormat));
+
+        assertThrows(EncoderException.class, () -> channel.writeOutbound(PULL_ALL));
+
+        assertTrue(channel.outboundMessages().isEmpty());
+        assertTrue(allocator.allocated().size() > 1);
+        allocator.allocated().forEach(buf -> assertEquals(0, buf.refCnt()));
+    }
+
+    private byte[] dechunkSingleMessage() {
+        var body = new ByteArrayOutputStream();
+        var stream = channel.alloc().buffer();
+        try {
+            ByteBuf buf;
+            while ((buf = channel.readOutbound()) != null) {
+                stream.writeBytes(buf);
+                buf.release();
+            }
+            while (true) {
+                var chunkSize = stream.readUnsignedShort();
+                if (chunkSize == 0) {
+                    assertEquals(0, stream.readableBytes(), "Bytes after the message boundary");
+                    return body.toByteArray();
+                }
+                var chunk = new byte[chunkSize];
+                stream.readBytes(chunk);
+                body.writeBytes(chunk);
+            }
+        } finally {
+            stream.release();
+        }
+    }
+
+    private static int indexOf(byte[] haystack, byte[] needle) {
+        for (var i = 0; i + needle.length <= haystack.length; i++) {
+            if (Arrays.equals(haystack, i, i + needle.length, needle, 0, needle.length)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static MessageFormat mockMessageFormatWithWriter(
