@@ -18,6 +18,7 @@ package org.neo4j.bolt.connection.netty.impl.async.outbound;
 
 import static io.netty.buffer.ByteBufUtil.hexDump;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.EncoderException;
 import io.netty.handler.codec.MessageToMessageEncoder;
@@ -64,24 +65,25 @@ public class OutboundMessageHandler extends MessageToMessageEncoder<Message> imp
     protected void encode(ChannelHandlerContext ctx, Message msg, List<Object> out) {
         log.log(System.Logger.Level.DEBUG, "C: %s", msg);
 
-        var messageBuf = ctx.alloc().ioBuffer();
-        output.start(messageBuf);
+        output.start(ctx.alloc());
+        List<ByteBuf> messageBufs;
         try {
             writer.write(msg, output);
-            output.stop();
+            messageBufs = output.stop();
         } catch (Throwable error) {
-            output.stop();
-            // release buffer because it will not get added to the out list and no other handler is going to handle it
-            messageBuf.release();
+            // the buffers never reach the out list, so nothing else would release them
+            output.abort();
             throw new EncoderException("Failed to write outbound message: " + msg, error);
         }
 
         if (log.isLoggable(System.Logger.Level.TRACE)) {
-            log.log(System.Logger.Level.TRACE, "C: %s", hexDump(messageBuf));
+            for (var messageBuf : messageBufs) {
+                log.log(System.Logger.Level.TRACE, "C: %s", hexDump(messageBuf));
+            }
         }
 
-        BoltProtocolUtil.writeMessageBoundary(messageBuf);
-        out.add(messageBuf);
+        BoltProtocolUtil.writeMessageBoundary(messageBufs.get(messageBufs.size() - 1));
+        out.addAll(messageBufs);
     }
 
     @Override

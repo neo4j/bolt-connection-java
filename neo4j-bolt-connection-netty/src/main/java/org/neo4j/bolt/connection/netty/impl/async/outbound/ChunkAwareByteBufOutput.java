@@ -19,35 +19,69 @@ package org.neo4j.bolt.connection.netty.impl.async.outbound;
 import static java.util.Objects.requireNonNull;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import java.util.ArrayList;
+import java.util.List;
 import org.neo4j.bolt.connection.codec.WriteOutput;
 import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 
+/**
+ * Writes a message as Bolt chunks into a sequence of buffers. A new buffer is started at the first chunk boundary
+ * after the current one reaches the segment size, so a large message never makes Netty reallocate and copy the
+ * bytes already written.
+ */
 public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
-    private final int maxChunkSize;
+    // a power of two, because the adaptive allocator rounds larger buffers up to one
+    static final int DEFAULT_SEGMENT_CAPACITY_BYTES = 128 * 1024;
 
+    private final int maxChunkSize;
+    private final int segmentSize;
+    private final List<ByteBuf> segments = new ArrayList<>();
+
+    private ByteBufAllocator allocator;
     private ByteBuf buf;
     private int currentChunkStartIndex;
     private int currentChunkSize;
 
     public ChunkAwareByteBufOutput() {
-        this(BoltProtocolUtil.DEFAULT_MAX_OUTBOUND_CHUNK_SIZE_BYTES);
+        this(
+                BoltProtocolUtil.DEFAULT_MAX_OUTBOUND_CHUNK_SIZE_BYTES,
+                DEFAULT_SEGMENT_CAPACITY_BYTES
+                        - BoltProtocolUtil.DEFAULT_MAX_OUTBOUND_CHUNK_SIZE_BYTES
+                        - BoltProtocolUtil.CHUNK_HEADER_SIZE_BYTES);
     }
 
-    ChunkAwareByteBufOutput(int maxChunkSize) {
-        this.maxChunkSize = verifyMaxChunkSize(maxChunkSize);
+    ChunkAwareByteBufOutput(int maxChunkSize, int segmentSize) {
+        this.maxChunkSize = verifyPositive("Max chunk size", maxChunkSize);
+        this.segmentSize = verifyPositive("Segment size", segmentSize);
     }
 
-    public void start(ByteBuf newBuf) {
+    public void start(ByteBufAllocator allocator) {
         assertNotStarted();
-        buf = requireNonNull(newBuf);
+        this.allocator = requireNonNull(allocator);
+        buf = allocator.ioBuffer();
         startNewChunk(0);
     }
 
-    public void stop() {
+    /**
+     * Completes the message and transfers ownership of its buffers, in write order, to the caller.
+     */
+    public List<ByteBuf> stop() {
         writeChunkSizeHeader();
-        buf = null;
-        currentChunkStartIndex = 0;
-        currentChunkSize = 0;
+        var result = new ArrayList<ByteBuf>(segments.size() + 1);
+        result.addAll(segments);
+        result.add(buf);
+        reset();
+        return result;
+    }
+
+    public void abort() {
+        try {
+            segments.forEach(ByteBuf::release);
+            buf.release();
+        } finally {
+            reset();
+        }
     }
 
     @Override
@@ -118,8 +152,26 @@ public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
         var targetChunkSize = currentChunkSize + numberOfBytes;
         if (targetChunkSize > maxChunkSize) {
             writeChunkSizeHeader();
+            if (buf.writerIndex() >= segmentSize) {
+                startNewSegment();
+            }
             startNewChunk(buf.writerIndex());
         }
+    }
+
+    private void startNewSegment() {
+        // room for the segment, the chunk that crosses its end, and the message boundary, so it never grows
+        var next = allocator.ioBuffer(segmentSize + maxChunkSize + BoltProtocolUtil.CHUNK_HEADER_SIZE_BYTES);
+        segments.add(buf);
+        buf = next;
+    }
+
+    private void reset() {
+        segments.clear();
+        allocator = null;
+        buf = null;
+        currentChunkStartIndex = 0;
+        currentChunkSize = 0;
     }
 
     private void startNewChunk(int index) {
@@ -144,10 +196,10 @@ public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
         }
     }
 
-    private static int verifyMaxChunkSize(int maxChunkSize) {
-        if (maxChunkSize <= 0) {
-            throw new IllegalArgumentException("Max chunk size should be > 0, given: " + maxChunkSize);
+    private static int verifyPositive(String name, int value) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " should be > 0, given: " + value);
         }
-        return maxChunkSize;
+        return value;
     }
 }
