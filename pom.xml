@@ -46,22 +46,27 @@
     </scm>
 
     <properties>
-        <bouncycastle-jdk18on.version>1.85</bouncycastle-jdk18on.version>
+        <bouncycastle-jdk18on.version>1.86</bouncycastle-jdk18on.version>
         <build-resources.version>2026.07.1</build-resources.version>
         <junit.version>6.1.3</junit.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
         <maven.build.timestamp.format>'v'yyyyMMdd-HHmm</maven.build.timestamp.format>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.xlint.extras />
         <!-- Skip deployment by default for everything in this project. -->
         <maven.deploy.skip>true</maven.deploy.skip>
-        <mockito.version>5.23.0</mockito.version>
+        <mockito.version>5.24.0</mockito.version>
         <!-- To be overwritten by child projects -->
         <moduleName />
-        <netty-bom.version>4.2.17.Final</netty-bom.version>
+        <netty-bom.version>4.2.19.Final</netty-bom.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <rootDir>${project.basedir}</rootDir>
         <sortpom-maven-plugin.version>4.0.0</sortpom-maven-plugin.version>
+        <spotless-maven-plugin.version>3.10.4</spotless-maven-plugin.version>
+        <!-- temporary until palantir-java-format is updated to work on Java 27 -->
+        <spotless.check.skip>true</spotless.check.skip>
         <surefire.and.failsafe.version>3.5.6</surefire.and.failsafe.version>
         <surefire.jpms.args />
         <testcontainers.version>2.0.5</testcontainers.version>
@@ -196,7 +201,7 @@
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
-                    <version>3.6.0</version>
+                    <version>${spotless-maven-plugin.version}</version>
                     <configuration>
                         <java>
                             <palantirJavaFormat />
@@ -218,7 +223,7 @@
                     <configuration>
                         <rules>
                             <requireJavaVersion>
-                                <version>26</version>
+                                <version>27</version>
                             </requireJavaVersion>
                             <RestrictImports>
                                 <reason>Star imports are not allowed, please configure your editor to substitute them with fully qualified imports.</reason>
