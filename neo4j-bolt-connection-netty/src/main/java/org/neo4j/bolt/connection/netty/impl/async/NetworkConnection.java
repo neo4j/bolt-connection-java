@@ -16,14 +16,6 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async;
 
-import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setClosing;
-import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setTerminationReason;
-import static org.neo4j.bolt.connection.netty.impl.util.LockUtil.executeWithLock;
-
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.EventLoop;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Optional;
@@ -32,6 +24,11 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.EventLoop;
 import org.neo4j.bolt.connection.BoltServerAddress;
 import org.neo4j.bolt.connection.LoggingProvider;
 import org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes;
@@ -43,6 +40,10 @@ import org.neo4j.bolt.connection.netty.impl.messaging.Message;
 import org.neo4j.bolt.connection.netty.impl.messaging.request.GoodbyeMessage;
 import org.neo4j.bolt.connection.netty.impl.spi.Connection;
 import org.neo4j.bolt.connection.netty.impl.spi.ResponseHandler;
+
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setClosing;
+import static org.neo4j.bolt.connection.netty.impl.async.connection.ChannelAttributes.setTerminationReason;
+import static org.neo4j.bolt.connection.netty.impl.util.LockUtil.executeWithLock;
 
 /**
  * This connection represents a simple network connection to a remote server. It wraps a channel obtained from a connection pool. The life cycle of this
@@ -107,10 +108,15 @@ public class NetworkConnection implements Connection {
     @Override
     public CompletionStage<Void> flush() {
         var future = new CompletableFuture<Void>();
-        channel.eventLoop().execute(() -> {
+        Runnable runnable = () -> {
             channel.flush();
             future.complete(null);
-        });
+        };
+        if (channel.eventLoop().inEventLoop()) {
+            runnable.run();
+        } else {
+            channel.eventLoop().execute(runnable);
+        }
         return future;
     }
 
