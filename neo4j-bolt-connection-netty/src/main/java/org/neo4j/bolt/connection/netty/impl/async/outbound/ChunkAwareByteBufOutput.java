@@ -16,15 +16,25 @@
  */
 package org.neo4j.bolt.connection.netty.impl.async.outbound;
 
-import static java.util.Objects.requireNonNull;
+import java.util.ArrayList;
+import java.util.List;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import org.neo4j.bolt.connection.codec.WriteOutput;
 import org.neo4j.bolt.connection.netty.impl.async.connection.BoltProtocolUtil;
 
+import static java.util.Objects.requireNonNull;
+
+/**
+ * Writes a message as Bolt chunks into a sequence of buffers. A new buffer is started at the first chunk boundary
+ * after the current chunk reaches the maximum size.
+ */
 public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
     private final int maxChunkSize;
+    private final List<ByteBuf> buffers = new ArrayList<>();
 
+    private ByteBufAllocator allocator;
     private ByteBuf buf;
     private int currentChunkStartIndex;
     private int currentChunkSize;
@@ -34,20 +44,35 @@ public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
     }
 
     ChunkAwareByteBufOutput(int maxChunkSize) {
-        this.maxChunkSize = verifyMaxChunkSize(maxChunkSize);
+        this.maxChunkSize = verifyPositive("Max chunk size", maxChunkSize);
     }
 
-    public void start(ByteBuf newBuf) {
+    public void start(ByteBufAllocator allocator) {
         assertNotStarted();
-        buf = requireNonNull(newBuf);
+        this.allocator = requireNonNull(allocator);
+        buf = allocator.ioBuffer();
         startNewChunk(0);
     }
 
-    public void stop() {
+    /**
+     * Completes the message and transfers ownership of its buffers, in write order, to the caller.
+     */
+    public List<ByteBuf> stop() {
         writeChunkSizeHeader();
-        buf = null;
-        currentChunkStartIndex = 0;
-        currentChunkSize = 0;
+        var result = new ArrayList<ByteBuf>(buffers.size() + 1);
+        result.addAll(buffers);
+        result.add(buf);
+        reset();
+        return result;
+    }
+
+    public void abort() {
+        try {
+            buffers.forEach(ByteBuf::release);
+            buf.release();
+        } finally {
+            reset();
+        }
     }
 
     @Override
@@ -118,8 +143,23 @@ public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
         var targetChunkSize = currentChunkSize + numberOfBytes;
         if (targetChunkSize > maxChunkSize) {
             writeChunkSizeHeader();
+            startNewBuffer();
             startNewChunk(buf.writerIndex());
         }
+    }
+
+    private void startNewBuffer() {
+        var next = allocator.ioBuffer(BoltProtocolUtil.DEFAULT_MAX_OUTBOUND_CHUNK_SIZE_BYTES);
+        buffers.add(buf);
+        buf = next;
+    }
+
+    private void reset() {
+        buffers.clear();
+        allocator = null;
+        buf = null;
+        currentChunkStartIndex = 0;
+        currentChunkSize = 0;
     }
 
     private void startNewChunk(int index) {
@@ -144,10 +184,10 @@ public class ChunkAwareByteBufOutput implements WriteOutput<Void> {
         }
     }
 
-    private static int verifyMaxChunkSize(int maxChunkSize) {
-        if (maxChunkSize <= 0) {
-            throw new IllegalArgumentException("Max chunk size should be > 0, given: " + maxChunkSize);
+    private static int verifyPositive(String name, int value) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " should be > 0, given: " + value);
         }
-        return maxChunkSize;
+        return value;
     }
 }
